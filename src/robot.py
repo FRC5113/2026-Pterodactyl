@@ -7,6 +7,7 @@ from wpilib import (
     RobotController,
     DriverStation,
     PowerDistribution,
+    Preferences
 )
 from wpilib import RobotController, SmartDashboard
 from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
@@ -27,7 +28,7 @@ from lemonlib.util import (
     AlertType,
 )
 from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib import LemonRobot, LemonCamera
+from lemonlib import LemonRobot#, LemonCamera
 from lemonlib.util import AsymmetricSlewLimiter
 
 from autonomous.auto_base import AutoBase
@@ -35,13 +36,13 @@ from components.swerve_drive import SwerveDrive
 from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
 from components.sysid_drive import SysIdDriveLinear
-from components.odometry import Odometry
+# from components.odometry import Odometry
 
 
 class MyRobot(LemonRobot):
     sysid_drive: SysIdDriveLinear
     drive_control: DriveControl
-    odometry: Odometry
+    # odometry: Odometry
 
     swerve_drive: SwerveDrive
     front_left: SwerveWheel
@@ -56,7 +57,7 @@ class MyRobot(LemonRobot):
     rasing_slew_rate = SmartPreference(5.0)
     falling_slew_rate = SmartPreference(5.0)
 
-    tuning_enabled = True
+    
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -65,6 +66,7 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
+        self.tuning_enabled = True
 
         self.canicore_canbus = CANBus("can0")
 
@@ -90,8 +92,8 @@ class MyRobot(LemonRobot):
         self.rear_right_cancoder = CANcoder(33, self.canicore_canbus)
 
         # physical constants
-        self.offset_x: units.meters = 0.3175
-        self.offset_y: units.meters = 0.3175
+        self.offset_x: units.meters = 0.28575
+        self.offset_y: units.meters = 0.28575
         self.drive_gear_ratio = 6.75
         self.direction_gear_ratio = 150 / 7
         self.wheel_radius: units.meters = 0.0508
@@ -106,23 +108,27 @@ class MyRobot(LemonRobot):
                 "kP": 0.0,
                 "kI": 0.0,
                 "kD": 0.0,
-                "kS": 0.0,
-                "kV": 0.0,
-                "kA": 0.0,
+                "kS": 0.17,
+                "kV": 0.104,
+                "kA": 0.01,
             },
-            (not self.low_bandwidth) and self.tuning_enabled,
+            not self.low_bandwidth,
         )
         self.direction_profile = SmartProfile(
             "direction",
             {
-                "kP": 0.0,
+                "kP": 3.0,
                 "kI": 0.0,
                 "kD": 0.0,
-                "kS": 0.0,
-                "kV": 0.0,
+                "kS": 0.14,
+                "kV": 0.375,
                 "kA": 0.0,
+                "kMaxV": 400.0,
+                "kMaxA": 4000.0,
+                "kMinInput": -math.pi,
+                "kMaxInput": math.pi,
             },
-            (not self.low_bandwidth) and self.tuning_enabled,
+            not self.low_bandwidth,
         )
         self.translation_profile = SmartProfile(
             "translation",
@@ -179,9 +185,9 @@ class MyRobot(LemonRobot):
 
         self.robot_to_camera_front = Transform3d(0.0, 0.0, 0.0, Rotation3d())
 
-        self.camera_front = LemonCamera(
-            "Global_Shutter_Camera", self.robot_to_camera_front, self.field_layout
-        )
+        # self.camera_front = LemonCamera(
+        #     "Global_Shutter_Camera", self.robot_to_camera_front, self.field_layout
+        # )
 
         if DriverStation.getAlliance() == DriverStation.Alliance.kRed:
             self.alliance = True
@@ -196,7 +202,7 @@ class MyRobot(LemonRobot):
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
-        self.primary = LemonInput(0, "PS5")
+        self.primary = LemonInput(0)
 
         self.x_filter = SlewRateLimiter(
             self.rasing_slew_rate  # , self.falling_slew_rate
@@ -223,10 +229,10 @@ class MyRobot(LemonRobot):
 
             self.drive_control.drive_manual(
                 self.x_filter.calculate(
-                    self.sammi_curve(self.primary.getPovX()) * mult * self.top_speed
+                    self.sammi_curve(self.primary.getLeftY()) * mult * self.top_speed
                 ),
                 self.y_filter.calculate(
-                    self.sammi_curve(self.primary.getPovY()) * mult * self.top_speed
+                    self.sammi_curve(self.primary.getLeftX()) * mult * self.top_speed
                 ),
                 self.theta_filter.calculate(
                     -self.sammi_curve(self.primary.getRightX())

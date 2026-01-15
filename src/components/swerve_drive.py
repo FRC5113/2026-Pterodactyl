@@ -391,6 +391,8 @@ class SwerveDrive(Sendable):
             self.max_speed,
         )
 
+        print(f"Error: {self.front_left.direction_motor.get_closed_loop_error().value} Refrence: {self.front_left.direction_motor.get_closed_loop_reference().value} Output: {self.front_left.direction_motor.get_closed_loop_output().value}")
+
         self.front_left.setDesiredState(self.swerve_module_states[0])
         self.front_right.setDesiredState(self.swerve_module_states[1])
         self.rear_left.setDesiredState(self.swerve_module_states[2])
