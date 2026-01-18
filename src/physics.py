@@ -49,47 +49,48 @@ class PhysicsEngine:
         self.robot.pigeon.sim_state.set_supply_voltage(5.0)
 
     def update_sim(self, now, tm_diff):
-        if DriverStation.isEnabled():
-            unmanaged.feed_enable(100)
+        # if DriverStation.isEnabled():
+        unmanaged.feed_enable(100)
 
-            if self.robot.swerve_drive.starting_pose is not None:
-                self.physics_controller.move_robot(
-                    Transform2d(self.pose.translation(), self.pose.rotation()).inverse()
-                )
-                start = self.robot.swerve_drive.starting_pose
-                self.physics_controller.move_robot(
-                    Transform2d(start.translation(), start.rotation())
-                )
-                self.robot.swerve_drive.set_starting_pose(None)
-
-            for i in range(4):
-                self.speed_sims[i].update(tm_diff)
-                self.direction_sims[i].update(tm_diff)
-                self.encoders[i].sim_state.add_position(
-                    -self.direction_sims[i].motor_sim.getAngularVelocity()
-                    / (2 * math.pi)
-                    * tm_diff
-                )
-
-            sim_speeds = four_motor_swerve_drivetrain(
-                self.speed_sims[2].sim_state.motor_voltage / 12.0,
-                self.speed_sims[3].sim_state.motor_voltage / 12.0,
-                self.speed_sims[0].sim_state.motor_voltage / 12.0,
-                self.speed_sims[1].sim_state.motor_voltage / 12.0,
-                (self.encoders[2].get_absolute_position().value * -360) % 360,
-                (self.encoders[3].get_absolute_position().value * -360) % 360,
-                (self.encoders[0].get_absolute_position().value * -360) % 360,
-                (self.encoders[1].get_absolute_position().value * -360) % 360,
-                2.5,
-                2.5,
-                15.52,
+        if self.robot.swerve_drive.starting_pose is not None:
+            self.physics_controller.move_robot(
+                Transform2d(self.pose.translation(), self.pose.rotation()).inverse()
             )
-            # Artificially soften simulated omega
-            sim_speeds.omega_dps *= 0.4
-            # Correct chassis speeds to match initial robot orientation
-            sim_speeds.vx, sim_speeds.vy = sim_speeds.vy, -sim_speeds.vx
-            self.pose = self.physics_controller.drive(sim_speeds, tm_diff)
-            # self.robot.camera.set_robot_pose(pose)
-            self.robot.pigeon.sim_state.set_raw_yaw(
-                self.pose.rotation().degrees() + 180
+            start = self.robot.swerve_drive.starting_pose
+            self.physics_controller.move_robot(
+                Transform2d(start.translation(), start.rotation())
             )
+            self.robot.swerve_drive.set_starting_pose(None)
+
+        for i in range(4):
+            self.speed_sims[i].update(tm_diff)
+            self.direction_sims[i].update(tm_diff)
+            self.encoders[i].sim_state.add_position(
+                -self.direction_sims[i].motor_sim.getAngularVelocity()
+                / (2 * math.pi)
+                * tm_diff
+            )
+            # print(self.encoders[i].get_absolute_position().value)
+
+        sim_speeds = four_motor_swerve_drivetrain(
+            self.speed_sims[2].sim_state.motor_voltage / 12.0,
+            self.speed_sims[3].sim_state.motor_voltage / 12.0,
+            self.speed_sims[0].sim_state.motor_voltage / 12.0,
+            self.speed_sims[1].sim_state.motor_voltage / 12.0,
+            (self.encoders[2].get_absolute_position().value * -360) % 360,
+            (self.encoders[3].get_absolute_position().value * -360) % 360,
+            (self.encoders[0].get_absolute_position().value * -360) % 360,
+            (self.encoders[1].get_absolute_position().value * -360) % 360,
+            2.25,
+            2.25,
+            15.52,
+        )
+        # Artificially soften simulated omega
+        sim_speeds.omega_dps *= 0.4
+        # Correct chassis speeds to match initial robot orientation
+        sim_speeds.vx, sim_speeds.vy = sim_speeds.vy, sim_speeds.vx
+        self.pose = self.physics_controller.drive(sim_speeds, tm_diff)
+        # self.robot.camera.set_robot_pose(pose)
+        self.robot.pigeon.sim_state.set_raw_yaw(
+            self.pose.rotation().degrees()
+        )

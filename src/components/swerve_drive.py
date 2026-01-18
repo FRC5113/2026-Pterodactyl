@@ -116,7 +116,7 @@ class SwerveDrive(Sendable):
         )
         builder.addDoubleProperty(
             "Front Left Velocity",
-            lambda: self.swerve_module_states[0].speed / self.max_speed,
+            lambda: self.swerve_module_states[0].speed * 2,
             lambda _: None,
         )
         builder.addDoubleProperty(
@@ -126,7 +126,7 @@ class SwerveDrive(Sendable):
         )
         builder.addDoubleProperty(
             "Front Right Velocity",
-            lambda: self.swerve_module_states[1].speed / self.max_speed,
+            lambda: self.swerve_module_states[1].speed * 2,
             lambda _: None,
         )
         builder.addDoubleProperty(
@@ -136,7 +136,7 @@ class SwerveDrive(Sendable):
         )
         builder.addDoubleProperty(
             "Back Left Velocity",
-            lambda: self.swerve_module_states[2].speed / self.max_speed,
+            lambda: self.swerve_module_states[2].speed * 2,
             lambda _: None,
         )
         builder.addDoubleProperty(
@@ -146,7 +146,7 @@ class SwerveDrive(Sendable):
         )
         builder.addDoubleProperty(
             "Back Right Velocity",
-            lambda: self.swerve_module_states[3].speed / self.max_speed,
+            lambda: self.swerve_module_states[3].speed * 2,
             lambda _: None,
         )
         builder.addDoubleProperty(

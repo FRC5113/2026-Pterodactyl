@@ -13,6 +13,16 @@ from phoenix6.signals import (
     SensorDirectionValue,
     FeedbackSensorSourceValue,
 )
+from phoenix6.configs import (
+    ClosedLoopGeneralConfigs,
+    FeedbackConfigs,
+    MotorOutputConfigs,
+    Slot0Configs,
+    TalonFXConfiguration,
+)
+from phoenix6.controls import PositionVoltage, VelocityVoltage, VoltageOut
+from phoenix6.hardware import CANcoder, Pigeon2, TalonFX
+from phoenix6.signals import InvertedValue, NeutralModeValue
 from wpimath import units
 from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
@@ -49,6 +59,7 @@ class SwerveWheel(Sendable):
     """
     INITIALIZATION METHODS
     """
+
     def __init__(self) -> None:
         Sendable.__init__(self)
 
@@ -56,63 +67,76 @@ class SwerveWheel(Sendable):
         """
         This function is automatically called after the motors and encoders have been injected.
         """
+        self.direction_motor.get_fault_field().set_update_frequency(
+            frequency_hz=4, timeout_seconds=0.01
+        )
+        self.speed_motor.get_fault_field().set_update_frequency(
+            frequency_hz=4, timeout_seconds=0.01
+        )
 
         # apply configs
-        self.motor_configs = TalonFXConfiguration()
+        self.speed_motor_configs = TalonFXConfiguration()
+        self.direction_motor_configs = TalonFXConfiguration()
         self.cancoder_config = CANcoderConfiguration()
         self.speed_current_limit_configs = CurrentLimitsConfigs()
         self.direction_current_limit_configs = CurrentLimitsConfigs()
 
+        self.cancoder_config.magnet_sensor.sensor_direction = SensorDirectionValue.COUNTER_CLOCKWISE_POSITIVE
+        self.cancoder_config.magnet_sensor.absolute_sensor_discontinuity_point = math.pi
+
         self.direction_current_limit_configs.stator_current_limit = self.direction_amps
         self.speed_current_limit_configs.stator_current_limit = self.speed_amps
 
-        # self.cancoder_config.magnet_sensor.sensor_direction = (
-        #     SensorDirectionValue.COUNTER_CLOCKWISE_POSITIVE
-        # )
+        self.speed_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        self.direction_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
 
-        # self.motor_configs.feedback.feedback_remote_sensor_id = self.cancoder.device_id
-        # self.motor_configs.feedback.feedback_sensor_source = (
-        #     FeedbackSensorSourceValue.FUSED_CANCODER
-        # )
-        # self.motor_configs.feedback.sensor_to_mechanism_ratio = 1.0
-        # self.motor_configs.feedback.rotor_to_sensor_ratio = self.direction_gear_ratio
+        self.direction_motor_configs.feedback = (
+            FeedbackConfigs()
+            .with_feedback_remote_sensor_id(self.cancoder.device_id)
+            .with_feedback_sensor_source(FeedbackSensorSourceValue.FUSED_CANCODER)
+            .with_rotor_to_sensor_ratio(self.direction_gear_ratio)
+        )
 
-        self.motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        self.speed_motor_configs.feedback = (
+            FeedbackConfigs()
+            .with_sensor_to_mechanism_ratio(self.drive_gear_ratio)
+        )
 
-        self.direction_motor.configurator.apply(self.motor_configs)
+        steer_closed_loop_config = ClosedLoopGeneralConfigs()
+        steer_closed_loop_config.continuous_wrap = True
+
+        self.direction_motor.configurator.apply(self.direction_motor_configs)
         self.direction_motor.configurator.apply(self.direction_current_limit_configs)
-        self.speed_motor.configurator.apply(self.motor_configs)
+        self.speed_motor.configurator.apply(self.speed_motor_configs)
         self.speed_motor.configurator.apply(self.speed_current_limit_configs)
-        # self.cancoder.configurator.apply(self.cancoder_config)
 
         self.desired_state = None
-        
 
     def on_enable(self):
-        # if self.tuning_enabled:
-        #     self.speed_controller = self.speed_profile.create_ctre_flywheel_controller()
-        #     self.direction_controller = (
-        #         self.direction_profile.create_ctre_turret_controller()
-        #     )
-        #     direction_motor_config = TalonFXConfiguration().with_slot0(
-        #         self.direction_controller
-        #     )
-        #     self.direction_motor.configurator.apply(direction_motor_config)
+        if self.tuning_enabled:
+            self.speed_controller = self.speed_profile.create_ctre_flywheel_controller()
+            self.direction_controller = (
+                self.direction_profile.create_ctre_turret_controller()
+            )
+            direction_motor_config = TalonFXConfiguration().with_slot0(
+                self.direction_controller
+            )
+            self.direction_motor.configurator.apply(direction_motor_config)
 
-        #     speed_motor_config = TalonFXConfiguration().with_slot0(
-        #         self.speed_controller
-        #     )
-        #     self.speed_motor.configurator.apply(speed_motor_config)
+            speed_motor_config = TalonFXConfiguration().with_slot0(
+                self.speed_controller
+            )
+            self.speed_motor.configurator.apply(speed_motor_config)
 
-        # self.direction_control = controls.PositionVoltage(0).with_slot(0)
-        # self.speed_control = controls.VelocityVoltage(0).with_slot(0)
+        self.direction_control = controls.PositionVoltage(0).with_slot(0).with_enable_foc(True)
+        self.speed_control = controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
 
-        self.speed_controller = self.speed_profile.create_flywheel_controller(
-            f"{self.speed_motor.device_id}_speed"
-        )
-        self.direction_controller = self.direction_profile.create_turret_controller(
-            f"{self.direction_motor.device_id}_direction"
-        )
+        # self.speed_controller = self.speed_profile.create_flywheel_controller(
+        #     f"{self.speed_motor.device_id}_speed"
+        # )
+        # self.direction_controller = self.direction_profile.create_turret_controller(
+        #     f"{self.direction_motor.device_id}_direction"
+        # )
 
     """
     INFORMATIONAL METHODS
@@ -151,8 +175,6 @@ class SwerveWheel(Sendable):
             / self.drive_gear_ratio
             * (self.wheel_radius * 2 * math.pi)
         )
-    
-    
 
     """
     CONTROL METHODS
@@ -172,47 +194,55 @@ class SwerveWheel(Sendable):
     """
 
     def execute(self) -> None:
-        # SmartDashboard.putData(self)
-        encoder_rotation = Rotation2d(
-            self.cancoder.get_absolute_position().value * 2 * math.pi
-        )
-
+        """ctre"""
         if self.stopped:
             self.speed_motor.set_control(controls.static_brake.StaticBrake())
             self.direction_motor.set_control(controls.coast_out.CoastOut())
             return
-
         state = self.desired_state
-        state.optimize(encoder_rotation)
 
-        # scale speed while turning
-        state.speed *= (state.angle - encoder_rotation).cos()
-        # convert speed from m/s to r/s
-        state.speed *= self.drive_gear_ratio / (self.wheel_radius * 2 * math.pi)
-        """ctre"""
-        # self.speed_motor.set_control(
-        #     self.speed_control.with_velocity(state.speed)
-        # )
+        current_angle = Rotation2d(self.cancoder.get_absolute_position().value)
+        target_displacement = state.angle - current_angle
+        target_angle = state.angle.radians()
 
-        # self.direction_motor.set_control(
-        #     self.direction_control.with_position((state.angle.degrees()/180) * self.direction_gear_ratio)
-        # )
 
+        self.direction_motor.set_control(self.direction_control.with_position(target_angle))
+
+        # rescale the speed target based on how close we are to being correctly aligned
+        target_speed = state.speed * target_displacement.cos()
+        # speed_volt = self.drive_ff.calculate(target_speed)
+        self.speed_motor.set_control(
+            self.speed_control.with_velocity(target_speed)
+        )
 
         """wpi"""
-        speed_output = self.speed_controller.calculate(
-            self.speed_motor.get_velocity().value, state.speed
-            )
-        self.speed_motor.set_control(controls.VoltageOut(-speed_output))
-        # else:
-        #     print(f"doing sysid at volts: {self.sysid_volts}")
-        #     self.speed_motor.set_control(controls.VoltageOut(self.sysid_volts))
+        # SmartDashboard.putData(self)
+        # encoder_rotation = Rotation2d(
+        #     self.cancoder.get_absolute_position().value * 2 * math.pi
+        # )
 
-        direction_output = self.direction_controller.calculate(
-            encoder_rotation.radians(),
-            state.angle.radians(),
-        )
-        if abs(self.direction_controller.error) < 0.03:
-            self.direction_motor.set_control(controls.static_brake.StaticBrake())
-            return
-        self.direction_motor.set_control(controls.VoltageOut(direction_output))
+        # if self.stopped:
+        #     self.speed_motor.set_control(controls.static_brake.StaticBrake())
+        #     self.direction_motor.set_control(controls.coast_out.CoastOut())
+        #     return
+
+        # state = self.desired_state
+        # state.optimize(encoder_rotation)
+
+        # # scale speed while turning
+        # state.speed *= (state.angle - encoder_rotation).cos()
+        # # convert speed from m/s to r/s
+        # state.speed *= self.drive_gear_ratio / (self.wheel_radius * 2 * math.pi)
+        # speed_output = self.speed_controller.calculate(
+        #     self.speed_motor.get_velocity().value, state.speed
+        # )
+        # self.speed_motor.set_control(controls.VoltageOut(-speed_output))
+
+        # direction_output = self.direction_controller.calculate(
+        #     encoder_rotation.radians(),
+        #     state.angle.radians(),
+        # )
+        # if abs(self.direction_controller.error) < 0.03:
+        #     self.direction_motor.set_control(controls.static_brake.StaticBrake())
+        #     return
+        # self.direction_motor.set_control(controls.VoltageOut(direction_output))
