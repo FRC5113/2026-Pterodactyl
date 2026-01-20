@@ -93,8 +93,10 @@ class MyRobot(LemonRobot):
         # physical constants
         self.offset_x: units.meters = 0.28575
         self.offset_y: units.meters = 0.28575
-        self.drive_gear_ratio = 6.75
-        self.direction_gear_ratio = 150 / 7
+        # self.drive_gear_ratio = 6.75
+        self.drive_gear_ratio = (14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0)
+        # self.direction_gear_ratio = 150 / 7
+        self.direction_gear_ratio = (14/50)*(10/60)
         self.wheel_radius: units.meters = 0.0508
         self.max_speed: units.meters_per_second = 4.7
         self.direction_amps: units.amperes = 40.0
