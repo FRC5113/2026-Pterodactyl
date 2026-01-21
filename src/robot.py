@@ -1,15 +1,14 @@
 import math
 from pathlib import Path
-
+from wpimath.units import units_per_second
 import wpilib
 from wpilib import (
     Field2d,
     RobotController,
     DriverStation,
     PowerDistribution,
-    Preferences,
 )
-from wpilib import RobotController, SmartDashboard
+from wpilib import RobotController
 from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 
 from wpimath import units
@@ -29,7 +28,6 @@ from lemonlib.util import (
 )
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib import LemonRobot, LemonCamera
-from lemonlib.util import AsymmetricSlewLimiter
 
 from autonomous.auto_base import AutoBase
 from components.swerve_drive import SwerveDrive
@@ -56,8 +54,8 @@ class MyRobot(LemonRobot):
     top_speed = SmartPreference(3.0)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate = SmartPreference(5.0)
-    falling_slew_rate = SmartPreference(5.0)
+    rasing_slew_rate: SmartPreference = SmartPreference(5.0)
+    falling_slew_rate: SmartPreference = SmartPreference(5.0)
     intake: Intake
 
     def createObjects(self):
@@ -74,10 +72,6 @@ class MyRobot(LemonRobot):
         """
         SWERVE
         """
-        #temp can ID
-        self.intake.motor_1 = TalonFX(1)
-        self.intake.motor_2 = TalonFX(2)
-
         # hardware
         self.front_left_speed_motor = TalonFX(11, self.canicore_canbus)
         self.front_left_direction_motor = TalonFX(12, self.canicore_canbus)
@@ -152,6 +146,11 @@ class MyRobot(LemonRobot):
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
+        """
+        INTAKE
+        """
+        self.intake_motor_1 = TalonFX(51)
+        self.intake_motor_2 = TalonFX(52)
 
         """
         MISCELLANEOUS
@@ -207,6 +206,7 @@ class MyRobot(LemonRobot):
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
         self.primary = LemonInput(0)
+        self.secondary = LemonInput(1)
 
         self.x_filter = SlewRateLimiter(
             self.rasing_slew_rate  # , self.falling_slew_rate
@@ -258,10 +258,10 @@ class MyRobot(LemonRobot):
             Intake
             """
             #average of both bumpers times 12
-            if self.primary.getLeftBumper() > 0.2:
-                self.intake.applyVolts(self.primary.getLeftBumper() * 12)
-            elif self.primary.getRightBumper > 0.2:
-                self.intake.applyVolts(self.primary.getLeftBumper() * 12)
+            if self.primary.getLeftTriggerAxis() > 0.2:
+                self.intake.applyReverseVolts(self.secondary.getLeftTriggerAxis() * 12)
+            elif self.primary.getRightTriggerAxis() > 0.2:
+                self.intake.applyVolts(self.secondary.getRightTriggerAxis() * 12)
                 
 
     @feedback
