@@ -17,7 +17,7 @@ from subsystems.sysid_subsystem import SysidSubsystem
 
 
 class SwerveDrive(SysidSubsystem):
-    DRIVE_GEAR_RATIO = 1/((14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0))
+    DRIVE_GEAR_RATIO = 1 / ((14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0))
     STEER_GEAR_RATIO = 150 / 7
 
     WHEEL_CIRCUMFERENCE = 4 * 2.54 / 100 * math.pi

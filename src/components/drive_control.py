@@ -10,20 +10,27 @@ from components.swerve_drive import SwerveDrive
 
 
 class DriveControl(StateMachine):
+    """
+    State machine that manages different driving modes for the robot.
+    Handles transitions between manual teleop, autonomous, pose targeting, and sysid modes.
+    """
+
     swerve_drive: SwerveDrive
 
     pigeon: Pigeon2
 
+    # will_reset_to ensures these values reset to their default each robot cycle
+    # unless explicitly set, preventing stale commands from persisting
     go_to_pose = will_reset_to(False)
     desired_pose = Pose2d()
-    period: units.seconds = 0.02
+    period: units.seconds = 0.02  # Control loop period (50Hz)
     drive_auto_man = will_reset_to(False)
     translationX = will_reset_to(0)
     translationY = will_reset_to(0)
     rotationX = will_reset_to(0)
     drive_sysid = will_reset_to(False)
     sysid_volts = will_reset_to(0.0)
-    sample: SwerveSample = None
+    sample: SwerveSample = None  # Trajectory sample for autonomous path following
 
     def drive_manual(
         self,
@@ -32,6 +39,10 @@ class DriveControl(StateMachine):
         rotationX: units.radians_per_second,
         field_relative: bool,
     ):
+        """
+        Request manual drive control. Only accepted when in 'free' state
+        to prevent overriding other control modes.
+        """
         if self.current_state == "free":
             self.translationX = translationX
             self.translationY = translationY
@@ -42,14 +53,17 @@ class DriveControl(StateMachine):
         self,
         volts: float,
     ):
+        """Request system identification mode with specified voltage."""
         self.drive_sysid = True
         self.sysid_volts = volts
 
     def request_pose(self, pose: Pose2d):
+        """Request the robot to autonomously navigate to a specific pose."""
         self.go_to_pose = True
         self.desired_pose = pose
 
     def drive_auto(self, sample: SwerveSample = None):
+        """Provide a trajectory sample for autonomous path following."""
         self.sample = sample
 
     def drive_auto_manual(
@@ -59,7 +73,10 @@ class DriveControl(StateMachine):
         rotationX: units.radians_per_second,
         field_relative: bool,
     ):
-
+        """
+        Manual drive override during autonomous mode.
+        Used when autonomous needs direct velocity control instead of trajectory following.
+        """
         self.translationX = translationX
         self.translationY = translationY
         self.rotationX = rotationX
@@ -68,6 +85,10 @@ class DriveControl(StateMachine):
 
     @state(first=True)
     def initialise(self):
+        """
+        Initial state - resets drive commands and determines which state to enter.
+        Priority: go_to_pose > autonomous > free (teleop)
+        """
         self.translationX = 0
         self.translationY = 0
         self.rotationX = 0
@@ -80,6 +101,10 @@ class DriveControl(StateMachine):
 
     @state
     def free(self):
+        """
+        Default teleop state - accepts manual joystick input.
+        Continuously checks for state transition triggers.
+        """
         self.swerve_drive.drive(
             self.translationX,
             self.translationY,
@@ -87,6 +112,7 @@ class DriveControl(StateMachine):
             self.field_relative,
             self.period,
         )
+        # Check for state transitions in priority order
         if DriverStation.isAutonomousEnabled():
             self.next_state("run_auton_routine")
         if self.go_to_pose:
@@ -96,20 +122,31 @@ class DriveControl(StateMachine):
 
     @state
     def drive_sysid_state(self):
+        """
+        System identification state - applies constant voltage for characterization.
+        Exits when drive_sysid is no longer requested (resets each cycle via will_reset_to).
+        """
         if not self.drive_sysid:
             self.next_state("free")
         self.swerve_drive.sysid_drive(self.sysid_volts)
 
     @state
     def going_to_pose(self):
+        """
+        Autonomous pose targeting state - drives robot to desired_pose.
+        Exits when go_to_pose is no longer requested.
+        """
         if not self.go_to_pose:
             self.next_state("free")
         self.swerve_drive.set_desired_pose(self.desired_pose)
 
     @state
     def run_auton_routine(self):
-        # used to drive the bot and used here to keep driving in one place
-        # main controls are in the auto_base.py like intake eject etc
+        """
+        Autonomous routine state - follows trajectory samples from Choreo.
+        Drive commands come from auto_base.py which calls drive_auto() with samples.
+        Returns to free state when teleop begins.
+        """
         if self.sample is not None:
             self.swerve_drive.follow_trajectory(self.sample)
         if DriverStation.isTeleop():

@@ -1,10 +1,8 @@
 import math
 
 from phoenix6 import controls
-from phoenix6.units import ampere
 from phoenix6.configs import (
     TalonFXConfiguration,
-    CurrentLimitsConfigs,
     CANcoderConfiguration,
 )
 from phoenix6.hardware import CANcoder, TalonFX
@@ -16,19 +14,15 @@ from phoenix6.signals import (
 from phoenix6.configs import (
     ClosedLoopGeneralConfigs,
     FeedbackConfigs,
-    MotorOutputConfigs,
-    Slot0Configs,
     TalonFXConfiguration,
 )
-from phoenix6.controls import PositionVoltage, VelocityVoltage, VoltageOut
-from phoenix6.hardware import CANcoder, Pigeon2, TalonFX
-from phoenix6.signals import InvertedValue, NeutralModeValue
+from phoenix6.hardware import CANcoder, TalonFX
+from phoenix6.signals import NeutralModeValue
 from wpimath import units
 from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
-from wpilib import SmartDashboard
 
-from wpiutil import Sendable, SendableBuilder
+from wpiutil import Sendable
 from magicbot import will_reset_to
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.smart import SmartNT
@@ -52,8 +46,8 @@ class SwerveWheel(Sendable):
     """Module must be explicitly told to move (via setDesiredState) each
     loop, otherwise it defaults to stopped for safety.
     """
-    stopped = will_reset_to(True)
-    angle_deadband = SmartPreference(0.0349)
+    stopped = will_reset_to(True)  # Resets to True each loop if not explicitly set
+    angle_deadband = SmartPreference(0.0349)  # ~2 degrees in radians
 
     doing_sysid = will_reset_to(False)
 
@@ -68,6 +62,7 @@ class SwerveWheel(Sendable):
         """
         This function is automatically called after the motors and encoders have been injected.
         """
+        # set fault update frequencies
         self.direction_motor.get_fault_field().set_update_frequency(
             frequency_hz=4, timeout_seconds=0.01
         )
@@ -79,40 +74,46 @@ class SwerveWheel(Sendable):
         self.speed_motor_configs = TalonFXConfiguration()
         self.direction_motor_configs = TalonFXConfiguration()
         self.cancoder_config = CANcoderConfiguration()
-        self.speed_current_limit_configs = CurrentLimitsConfigs()
-        self.direction_current_limit_configs = CurrentLimitsConfigs()
 
         self.cancoder_config.magnet_sensor.sensor_direction = (
             SensorDirectionValue.CLOCKWISE_POSITIVE
         )
 
-        self.direction_current_limit_configs.stator_current_limit = self.direction_amps
-        self.speed_current_limit_configs.stator_current_limit = self.speed_amps
+        # current limits
+        self.direction_motor_configs.current_limits.stator_current_limit = (
+            self.direction_amps
+        )
+        self.speed_motor_configs.current_limits.stator_current_limit = self.speed_amps
 
+        # neutral modes
         self.speed_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.direction_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
 
+        # feedback configs - uses fused CANcoder for direction motor
         self.direction_motor_configs.feedback = (
             FeedbackConfigs()
             .with_feedback_remote_sensor_id(self.cancoder.device_id)
-            .with_feedback_sensor_source(FeedbackSensorSourceValue.FUSED_CANCODER)
-            .with_rotor_to_sensor_ratio(self.direction_gear_ratio)
+            .with_feedback_sensor_source(
+                FeedbackSensorSourceValue.FUSED_CANCODER
+            )  # Fuse CANcoder with internal encoder for better accuracy
+            .with_rotor_to_sensor_ratio(
+                self.direction_gear_ratio
+            )  # Converts motor rotations to sensor rotations
         )
-
-        self.direction_motor_configs.closed_loop_general = (
-            ClosedLoopGeneralConfigs().with_continuous_wrap(True)
-        )
-
+        # Speed motor feedback converts motor rotations to linear distance (meters)
         self.speed_motor_configs.feedback = (
             FeedbackConfigs().with_sensor_to_mechanism_ratio(
                 self.drive_gear_ratio * self.wheel_radius
             )
         )
 
+        # Enable continuous wrap so direction motor can take shortest path to target angle
+        self.direction_motor_configs.closed_loop_general = (
+            ClosedLoopGeneralConfigs().with_continuous_wrap(True)
+        )
+
         self.direction_motor.configurator.apply(self.direction_motor_configs)
-        self.direction_motor.configurator.apply(self.direction_current_limit_configs)
         self.speed_motor.configurator.apply(self.speed_motor_configs)
-        self.speed_motor.configurator.apply(self.speed_current_limit_configs)
 
         self.desired_state = None
 
@@ -132,7 +133,9 @@ class SwerveWheel(Sendable):
             self.speed_motor.configurator.apply(self.speed_motor_configs)
 
         self.direction_control = (
-            controls.PositionVoltage(0).with_slot(0).with_enable_foc(True)
+            controls.PositionVoltage(0)
+            .with_slot(0)
+            .with_enable_foc(True)  # FOC = Field Oriented Control for smoother motion
         )
         self.speed_control = (
             controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
@@ -148,9 +151,12 @@ class SwerveWheel(Sendable):
         """
 
         return [
-            self.cancoder.get_absolute_position().value * 360,
+            self.cancoder.get_absolute_position().value
+            * 360,  # Convert rotations to degrees
             self.speed_motor.get_velocity().value
-            * (self.wheel_radius * 2 * math.pi)
+            * (
+                self.wheel_radius * 2 * math.pi
+            )  # Convert rotations/s to m/s using wheel circumference
             / self.drive_gear_ratio,
         ]
 
@@ -158,8 +164,12 @@ class SwerveWheel(Sendable):
         return SwerveModulePosition(
             self.speed_motor.get_position().value
             / self.drive_gear_ratio
-            * (self.wheel_radius * 2 * math.pi),
-            Rotation2d(self.cancoder.get_absolute_position().value * math.tau),
+            * (
+                self.wheel_radius * 2 * math.pi
+            ),  # Convert motor rotations to linear distance (meters)
+            Rotation2d(
+                self.cancoder.get_absolute_position().value * math.tau
+            ),  # Convert rotations to radians (tau = 2*pi)
         )
 
     def getVoltage(self) -> units.volts:
@@ -173,14 +183,18 @@ class SwerveWheel(Sendable):
         return (
             self.speed_motor.get_velocity().value
             / self.drive_gear_ratio
-            * (self.wheel_radius * 2 * math.pi)
+            * (self.wheel_radius * 2 * math.pi)  # Convert rotations/s to m/s
         )
 
     def get_integrated_angle(self):
-        return self.direction_motor.get_position().value * math.tau
+        return (
+            self.direction_motor.get_position().value * math.tau
+        )  # Convert rotations to radians
 
     def get_angle_absoulte(self):
-        return self.cancoder.get_absolute_position().value * math.tau
+        return (
+            self.cancoder.get_absolute_position().value * math.tau
+        )  # Convert rotations to radians
 
     """
     CONTROL METHODS
@@ -200,7 +214,6 @@ class SwerveWheel(Sendable):
     """
 
     def execute(self) -> None:
-        """ctre"""
         if self.stopped:
             self.speed_motor.set_control(controls.static_brake.StaticBrake())
             self.direction_motor.set_control(controls.coast_out.CoastOut())
@@ -209,25 +222,28 @@ class SwerveWheel(Sendable):
 
         current_angle = Rotation2d(self.get_angle_absoulte())
 
+        # Optimize flips the wheel direction if it's faster than rotating 180 degrees
         state.optimize(current_angle)
 
         target_displacement = state.angle - current_angle
         target_angle = state.angle.radians()
 
-        # m/s to r/s
+        # Convert m/s to rotations/s for motor control
         state.speed *= self.drive_gear_ratio / (self.wheel_radius * 2 * math.pi)
 
-        # rescale the speed target based on how close we are to being correctly aligned
+        # Cosine compensation: reduce speed when wheel isn't pointing the right direction
+        # This prevents the robot from drifting while the wheel is still rotating
         target_speed = state.speed * target_displacement.cos()
 
         # speed_volt = self.drive_ff.calculate(target_speed)
         self.speed_motor.set_control(self.speed_control.with_velocity(target_speed))
 
-
+        # If direction is close enough to target, brake instead of hunting
         if abs(self.direction_motor.get_closed_loop_error()) < 0.03:
             self.direction_motor.set_control(controls.static_brake.StaticBrake())
             return
-        
+
+        # Divide by tau to convert radians back to rotations for motor control
         self.direction_motor.set_control(
             self.direction_control.with_position(target_angle / math.tau)
         )

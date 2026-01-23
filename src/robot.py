@@ -1,6 +1,6 @@
 import math
 from pathlib import Path
-from wpimath.units import units_per_second
+
 import wpilib
 from wpilib import (
     Field2d,
@@ -8,14 +8,14 @@ from wpilib import (
     DriverStation,
     PowerDistribution,
 )
-from wpilib import RobotController
-from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Transform3d, Rotation3d
 
-from phoenix6.hardware import CANcoder, TalonFX, Pigeon2
+from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
+
+from phoenix6.hardware import CANcoder, TalonFX, Pigeon2, TalonFXS
 from phoenix6 import CANBus
 
 from magicbot import feedback
@@ -68,6 +68,8 @@ class MyRobot(LemonRobot):
         self.tuning_enabled = True
 
         self.canicore_canbus = CANBus("can0")
+        self.rio_canbus = CANBus.roborio()
+        TalonFXS().get_connected_motor
 
         """
         SWERVE
@@ -93,7 +95,9 @@ class MyRobot(LemonRobot):
         self.offset_x: units.meters = 0.28575
         self.offset_y: units.meters = 0.28575
 
-        self.drive_gear_ratio = 1/((14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0)) # gets more accurate gear ratio or something, idk dropbears did it
+        self.drive_gear_ratio = 1 / (
+            (14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0)
+        )  # gets more accurate gear ratio or something, idk dropbears did it
 
         self.direction_gear_ratio = 150 / 7
         self.wheel_radius: units.meters = 0.0508
@@ -146,11 +150,15 @@ class MyRobot(LemonRobot):
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
+
         """
         INTAKE
         """
-        self.intake_motor_1 = TalonFX(51)
-        self.intake_motor_2 = TalonFX(52)
+        self.intake_motor = TalonFX(51)
+
+        """
+        SHOOTER
+        """
 
         """
         MISCELLANEOUS
@@ -176,17 +184,28 @@ class MyRobot(LemonRobot):
 
         self.estimated_field = Field2d()
 
+        # Custom apriltag field layout 
         self.field_layout = AprilTagFieldLayout(
             str(Path(__file__).parent.resolve() / "2026_test_field.json")
         )
 
-        self.field_layout = AprilTagFieldLayout.loadField(AprilTagField.k2026RebuiltWelded)
+        # self.field_layout = AprilTagFieldLayout.loadField(
+        #     AprilTagField.k2026RebuiltWelded
+        # )
 
         # Robot to Camera Transforms
-        self.rtc_front_left = Transform3d(-self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, 45))
-        self.rtc_front_right = Transform3d(self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, -45))
-        self.rtc_back_left = Transform3d(-self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, 135))
-        self.rtc_back_right = Transform3d(self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, -135))
+        self.rtc_front_left = Transform3d(
+            -self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, 45)
+        )
+        self.rtc_front_right = Transform3d(
+            self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, -45)
+        )
+        self.rtc_back_left = Transform3d(
+            -self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, 135)
+        )
+        self.rtc_back_right = Transform3d(
+            self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, -135)
+        )
 
         self.camera_front_left = LemonCamera(
             "Front_Left", self.rtc_front_left, self.field_layout
@@ -255,14 +274,12 @@ class MyRobot(LemonRobot):
                 self.swerve_drive.reset_gyro()
 
             """
-            Intake
+            INTAKE
             """
-            #average of both bumpers times 12
             if self.primary.getLeftTriggerAxis() > 0.2:
-                self.intake.applyReverseVolts(self.secondary.getLeftTriggerAxis() * 12)
-            elif self.primary.getRightTriggerAxis() > 0.2:
-                self.intake.applyVolts(self.secondary.getRightTriggerAxis() * 12)
-                
+                self.intake.set_voltage(self.secondary.getLeftTriggerAxis() * 12)
+            if self.primary.getRightTriggerAxis() > 0.2:
+                self.intake.set_voltage(-self.secondary.getRightTriggerAxis() * 12)
 
     @feedback
     def get_voltage(self) -> units.volts:

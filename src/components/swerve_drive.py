@@ -18,17 +18,16 @@ from phoenix6.hardware import Pigeon2
 from components.swerve_wheel import SwerveWheel
 from magicbot import will_reset_to, feedback
 from lemonlib.util import Alert, AlertType
-from lemonlib.ctre import LemonPigeon
 from lemonlib.smart import SmartProfile, SmartController
 from choreo.trajectory import SwerveSample
 from wpilib.sysid import SysIdRoutineLog
-from lemonlib import LemonComponent
 
 
 from commands2 import Command
 
 
 class SwerveDrive(Sendable):
+    # Distance from robot center to wheel in X and Y directions
     offset_x: units.meters
     offset_y: units.meters
     drive_gear_ratio: float
@@ -38,10 +37,11 @@ class SwerveDrive(Sendable):
     front_right: SwerveWheel
     rear_left: SwerveWheel
     rear_right: SwerveWheel
-    pigeon: Pigeon2
+    pigeon: Pigeon2  # IMU/gyroscope for heading measurement
     translation_profile: SmartProfile
     rotation_profile: SmartProfile
 
+    # will_reset_to ensures these values reset to defaults each robot loop iteration
     translationX = will_reset_to(0)
     translationY = will_reset_to(0)
     rotationX = will_reset_to(0)
@@ -69,11 +69,13 @@ class SwerveDrive(Sendable):
         This function is automatically called after the components have
         been injected.
         """
-        # Kinematics
+        # Define wheel positions relative to robot center (using standard WPILib coordinate system)
+        # Positive X is forward, positive Y is left
         self.front_left_pose = Translation2d(-self.offset_x, self.offset_y)
         self.front_right_pose = Translation2d(self.offset_x, self.offset_y)
         self.rear_left_pose = Translation2d(-self.offset_x, -self.offset_y)
         self.rear_right_pose = Translation2d(self.offset_x, -self.offset_y)
+        # Kinematics converts between chassis speeds and individual module states
         self.kinematics = SwerveDrive4Kinematics(
             self.front_left_pose,
             self.front_right_pose,
@@ -81,10 +83,12 @@ class SwerveDrive(Sendable):
             self.rear_right_pose,
         )
         self.chassis_speeds = ChassisSpeeds()
+        # Pre-compute stopped states to avoid recalculating when robot is still
         self.still_states = self.kinematics.toSwerveModuleStates(self.chassis_speeds)
         self.swerve_module_states = self.still_states
         SmartDashboard.putData("Swerve Drive", self)
 
+        # Pose estimator fuses odometry with vision for more accurate position tracking
         self.pose_estimator = SwerveDrive4PoseEstimator(
             self.kinematics,
             Rotation2d(),
@@ -96,17 +100,18 @@ class SwerveDrive(Sendable):
             ),
             Pose2d(),
         )
-        self.period = 0.02
+        self.period = 0.02  # Default loop period in seconds (50Hz)
 
         self.desired_pose = Pose2d()
         self.starting_pose = None  # only used in sim
 
-        self.pigeon_offset = Rotation2d()
+        self.pigeon_offset = Rotation2d()  # Allows software adjustment of gyro heading
         self.pigeon_alert = Alert(
             "Pigeon heading has been reset.", AlertType.INFO, timeout=3.0
         )
 
     def initSendable(self, builder: SendableBuilder) -> None:
+        # Configure data sent to SmartDashboard's swerve widget
         builder.setSmartDashboardType("SwerveDrive")
         builder.addDoubleProperty(
             "Robot Angle",
@@ -114,6 +119,7 @@ class SwerveDrive(Sendable):
             lambda: self.pigeon.getRotation2d().degrees(),
             lambda _: None,
         )
+        # Speed multiplied by 2 to scale for dashboard display
         builder.addDoubleProperty(
             "Front Left Velocity",
             lambda: self.swerve_module_states[0].speed * 2,
@@ -156,14 +162,17 @@ class SwerveDrive(Sendable):
         )
 
     def on_enable(self):
+        # Create PID controllers for X/Y translation and rotation
         self.x_controller = self.translation_profile.create_wpi_pid_controller()
         self.y_controller = self.translation_profile.create_wpi_pid_controller()
         self.theta_controller = (
             self.rotation_profile.create_wpi_profiled_pid_controller_radians()
         )
+        # HolonomicDriveController combines X, Y, and theta control for autonomous driving
         self.holonomic_controller = HolonomicDriveController(
             self.x_controller, self.y_controller, self.theta_controller
         )
+        # Allow theta controller to wrap around from -pi to pi (continuous rotation)
         self.theta_controller.enableContinuousInput(-math.pi, math.pi)
         self.smart_theta_controller = SmartController(
             "Theta Controller", self.theta_controller.calculate, True
@@ -214,6 +223,7 @@ class SwerveDrive(Sendable):
         field_relative: bool,
         period: units.seconds,
     ):
+        # Store drive commands to be processed in execute()
         self.translationX = translationX
         self.translationY = translationY
         self.rotationX = rotationX
@@ -221,9 +231,11 @@ class SwerveDrive(Sendable):
         self.field_relative = field_relative
 
     def sysid_drive(self, volts: float, rot: float = 0.0) -> None:
+        # System identification mode for characterizing drive motors
         self.doing_sysid = True
         self.sysid_volts = volts
         if rot == 0.0:
+            # Small forward motion to keep wheels aligned during linear characterization
             self.translationX = 0.01
             self.translationY = 0.0
         self.rotationX = rot
@@ -244,8 +256,10 @@ class SwerveDrive(Sendable):
         self.pigeon_offset = Rotation2d.fromDegrees(offset)
 
     def follow_trajectory(self, sample: SwerveSample):
+        # Follow a Choreo trajectory sample using feedforward + feedback control
         pose = self.get_estimated_pose()
 
+        # Combine trajectory feedforward velocities with PID feedback corrections
         speeds = ChassisSpeeds(
             sample.vx + self.x_controller.calculate(pose.X(), sample.x),
             sample.vy + self.y_controller.calculate(pose.Y(), sample.y),
@@ -257,9 +271,11 @@ class SwerveDrive(Sendable):
         self.drive(speeds.vx, speeds.vy, speeds.omega, False, self.period)
 
     def point_towards(self, rightX: float, rightY: float):
-        moved = abs(rightX) > 0.1 or abs(rightY) > 0.1
+        # Convert joystick input to rotation command for pointing robot
+        moved = abs(rightX) > 0.1 or abs(rightY) > 0.1  # Deadband check
         if not moved:
             return 0.0
+        # Convert joystick position to angle, offset by 90 degrees to align with robot forward
         angle = math.atan2(rightY, rightX) - math.radians(90)
         current_angle = math.radians(self.pigeon.get_yaw().value)
         print(current_angle, angle)
@@ -273,7 +289,7 @@ class SwerveDrive(Sendable):
             speeds.vx,
             speeds.vy,
             speeds.omega,
-            False,
+            False,  # Robot relative, not field relative
             self.period,
         )
 
@@ -293,6 +309,7 @@ class SwerveDrive(Sendable):
     def sendAdvantageScopeData(self):
         """Put swerve module setpoints and measurements to NT.
         This is used mainly for AdvantageScope's swerve tab"""
+        # Format: [angle1, speed1, angle2, speed2, ...] for each module
         swerve_setpoints = []
         for state in self.swerve_module_states:
             swerve_setpoints += [state.angle.degrees(), state.speed]
@@ -311,6 +328,7 @@ class SwerveDrive(Sendable):
     # Tell SysId how to record a frame of data for each motor on the mechanism being
     # characterized.
     def log(self, sys_id_routine: SysIdRoutineLog) -> None:
+        # Log voltage, position, and velocity for each drive motor (used for system identification)
         sys_id_routine.motor("drive-front-left").voltage(
             self.front_left.getVoltage()
         ).position(self.front_left.getPosition().distance).velocity(
@@ -341,6 +359,7 @@ class SwerveDrive(Sendable):
 
     def execute(self) -> None:
         self.sendAdvantageScopeData()
+        # Update pose estimate with latest gyro heading and wheel positions
         self.pose_estimator.update(
             self.pigeon.getRotation2d() + self.pigeon_offset,
             (
@@ -351,21 +370,26 @@ class SwerveDrive(Sendable):
             ),
         )
 
+        # If we have a target pose and aren't close enough (>2cm), use holonomic controller
         if self.has_desired_pose and self.get_distance_from_desired_pose() > 0.02:
             self.chassis_speeds = self.holonomic_controller.calculate(
                 self.get_estimated_pose(),
                 self.desired_pose,
-                0.0,
+                0.0,  # Desired linear velocity at target (0 = stop)
                 self.desired_pose.rotation(),
             )
         else:
+            # Normal teleop driving
             if self.translationX == self.translationY == self.rotationX == 0:
-                # below line is only to keep NT updated
-                self.swerve_module_states = self.still_states
+                # Robot is commanded to stop - skip motor commands to reduce CAN usage
+                self.swerve_module_states = self.still_states  # Keep NT updated
                 self.chassis_speeds = ChassisSpeeds()
                 return
+            # discretize() compensates for robot rotation during the control period
+            # to improve accuracy during fast rotations
             self.chassis_speeds = ChassisSpeeds.discretize(
                 (
+                    # Convert field-relative commands to robot-relative using gyro heading
                     ChassisSpeeds.fromFieldRelativeSpeeds(
                         self.translationX,
                         self.translationY,
@@ -377,19 +401,22 @@ class SwerveDrive(Sendable):
                         self.translationX,
                         self.translationY,
                         self.rotationX,
-                        Rotation2d(),
+                        Rotation2d(),  # Zero rotation = robot-relative
                     )
                 ),
                 self.period,
             )
+        # Convert chassis speeds to individual wheel states
         self.swerve_module_states = self.kinematics.toSwerveModuleStates(
             self.chassis_speeds
         )
+        # Scale down all wheel speeds proportionally if any exceed max speed
         self.swerve_module_states = SwerveDrive4Kinematics.desaturateWheelSpeeds(
             self.swerve_module_states,
             self.max_speed,
         )
 
+        # Command each wheel to its target state
         self.front_left.setDesiredState(self.swerve_module_states[0])
         self.front_right.setDesiredState(self.swerve_module_states[1])
         self.rear_left.setDesiredState(self.swerve_module_states[2])
