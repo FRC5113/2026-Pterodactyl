@@ -35,8 +35,8 @@ from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
 from components.sysid_drive import SysIdDriveLinear
 from components.intake import Intake
-
 from components.odometry import Odometry
+from components.shooter import Shooter
 
 
 class MyRobot(LemonRobot):
@@ -49,6 +49,8 @@ class MyRobot(LemonRobot):
     front_right: SwerveWheel
     rear_left: SwerveWheel
     rear_right: SwerveWheel
+
+    shooter: Shooter
 
     # greatest speed that chassis should move (not greatest possible speed)
     top_speed = SmartPreference(3.0)
@@ -158,6 +160,41 @@ class MyRobot(LemonRobot):
         """
         SHOOTER
         """
+        self.shooter_left_motor = TalonFX(2, self.rio_canbus)
+        self.shooter_right_motor = TalonFX(3, self.rio_canbus)
+        self.shooter_hood_motor = TalonFXS(4, self.rio_canbus)
+
+        self.shooter_gear_ratio = 1.0
+        self.shooter_hood_gear_ratio = 1.0
+        self.shooter_amps: units.amperes = 40.0
+
+        self.hood_profile = SmartProfile(
+            "hood",
+            {
+                "kP": 0.0,
+                "kI": 0.0,
+                "kD": 0.0,
+                "kS": 0.0,
+                "kV": 0.0,
+                "kA": 0.0,
+                "kMaxV": 10.0,
+                "kMaxA": 100.0,
+            },
+            not self.low_bandwidth,
+        )
+
+        self.shooter_profile = SmartProfile(
+            "shooter",
+            {
+                "kP": 0.0,
+                "kI": 0.0,
+                "kD": 0.0,
+                "kS": 0.0,
+                "kV": 0.0,
+                "kA": 0.0,
+            },
+            not self.low_bandwidth,
+        )
 
         """
         MISCELLANEOUS
@@ -183,7 +220,7 @@ class MyRobot(LemonRobot):
 
         self.estimated_field = Field2d()
 
-        # Custom apriltag field layout 
+        # Custom apriltag field layout
         self.field_layout = AprilTagFieldLayout(
             str(Path(__file__).parent.resolve() / "2026_test_field.json")
         )
@@ -275,10 +312,17 @@ class MyRobot(LemonRobot):
             """
             INTAKE
             """
-            if self.primary.getLeftTriggerAxis() > 0.2:
-                self.intake.set_voltage(self.secondary.getLeftTriggerAxis() * 12)
-            if self.primary.getRightTriggerAxis() > 0.2:
-                self.intake.set_voltage(-self.secondary.getRightTriggerAxis() * 12)
+            if self.secondary.getAButton():
+                self.intake.set_voltage(12)
+            if self.secondary.getBButton():
+                self.intake.set_voltage(-12)
+
+            """
+            SHOOTER
+            """
+            if self.secondary.getLeftTriggerAxis() >= 0.8:
+                self.shooter.set_velocity(100)
+            
 
     @feedback
     def get_voltage(self) -> units.volts:
