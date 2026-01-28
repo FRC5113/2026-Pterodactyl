@@ -308,6 +308,7 @@ class MyRobot(LemonRobot):
             )
             if self.primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
+            self.swerve_drive.doTelemetry()
 
             """
             INTAKE
@@ -322,7 +323,6 @@ class MyRobot(LemonRobot):
             """
             if self.secondary.getLeftTriggerAxis() >= 0.8:
                 self.shooter.set_velocity(100)
-            
 
     @feedback
     def get_voltage(self) -> units.volts:

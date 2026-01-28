@@ -1,6 +1,5 @@
 import math
 
-
 from wpilib import SmartDashboard, DriverStation
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
@@ -14,6 +13,7 @@ from wpimath.kinematics import (
 )
 from wpiutil import Sendable, SendableBuilder
 from phoenix6.hardware import Pigeon2
+from phoenix6 import BaseStatusSignal
 
 from components.swerve_wheel import SwerveWheel
 from magicbot import will_reset_to, feedback
@@ -21,9 +21,6 @@ from lemonlib.util import Alert, AlertType
 from lemonlib.smart import SmartProfile, SmartController
 from choreo.trajectory import SwerveSample
 from wpilib.sysid import SysIdRoutineLog
-
-
-from commands2 import Command
 
 
 class SwerveDrive(Sendable):
@@ -109,6 +106,25 @@ class SwerveDrive(Sendable):
         self.pigeon_alert = Alert(
             "Pigeon heading has been reset.", AlertType.INFO, timeout=3.0
         )
+
+        self.modules = (
+            self.front_left,
+            self.front_right,
+            self.rear_left,
+            self.rear_right,
+        )
+
+        self.module_positions = [None] * 4
+
+        # 4 signals per module + yaw + yaw rate
+        self.all_signals = []
+
+        for module in self.modules:
+            self.all_signals.extend(module.getSignals())
+
+        self.all_signals.append(self.pigeon.get_yaw())
+
+        # BaseStatusSignal.set_update_frequency_for_all(250, self.all_signals)
 
     def initSendable(self, builder: SendableBuilder) -> None:
         # Configure data sent to SmartDashboard's swerve widget
@@ -282,7 +298,7 @@ class SwerveDrive(Sendable):
         output = self.smart_theta_controller.calculate(current_angle, angle)
         return output
 
-    def driveRobotRelative(self, speeds: ChassisSpeeds) -> Command:
+    def driveRobotRelative(self, speeds: ChassisSpeeds):
         """Drives the robot using ROBOT RELATIVE speeds.
         This is used for path following."""
         return self.drive(
@@ -353,21 +369,34 @@ class SwerveDrive(Sendable):
             self.rear_right.getVelocity()
         )
 
+    def doTelemetry(self):
+        self.front_left.putTelem()
+        self.front_right.putTelem()
+        self.rear_left.putTelem()
+        self.rear_right.putTelem()
+
     """
     EXECUTE
     """
 
     def execute(self) -> None:
         self.sendAdvantageScopeData()
-        # Update pose estimate with latest gyro heading and wheel positions
+
+        for i, module in enumerate(self.modules):
+            self.module_positions[i] = module.getPosition(True)
+
+        chassis_rot = (
+            Rotation2d(
+                BaseStatusSignal.get_latency_compensated_value(
+                    self.pigeon.get_yaw(), self.pigeon.get_angular_velocity_z_world()
+                )
+            )
+            + self.pigeon_offset
+        )
+
         self.pose_estimator.update(
-            self.pigeon.getRotation2d() + self.pigeon_offset,
-            (
-                self.front_left.getPosition(),
-                self.front_right.getPosition(),
-                self.rear_left.getPosition(),
-                self.rear_right.getPosition(),
-            ),
+            chassis_rot,
+            tuple(self.module_positions),
         )
 
         # If we have a target pose and aren't close enough (>2cm), use holonomic controller
@@ -394,7 +423,7 @@ class SwerveDrive(Sendable):
                         self.translationX,
                         self.translationY,
                         self.rotationX,
-                        self.pigeon.getRotation2d() + self.pigeon_offset,
+                        chassis_rot,
                     )
                     if self.field_relative
                     else ChassisSpeeds.fromFieldRelativeSpeeds(

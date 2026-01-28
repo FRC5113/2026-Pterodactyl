@@ -1,6 +1,7 @@
 import math
+from typing import List
 
-from phoenix6 import controls
+from phoenix6 import controls, StatusSignal, BaseStatusSignal
 from phoenix6.configs import (
     TalonFXConfiguration,
     CANcoderConfiguration,
@@ -18,6 +19,8 @@ from phoenix6.configs import (
 )
 from phoenix6.hardware import CANcoder, TalonFX
 from phoenix6.signals import NeutralModeValue
+
+
 from wpimath import units
 from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
@@ -50,6 +53,8 @@ class SwerveWheel(Sendable):
     angle_deadband = SmartPreference(0.0349)  # ~2 degrees in radians
 
     doing_sysid = will_reset_to(False)
+
+    signals: List[StatusSignal] = []
 
     """
     INITIALIZATION METHODS
@@ -115,6 +120,25 @@ class SwerveWheel(Sendable):
         self.direction_motor.configurator.apply(self.direction_motor_configs)
         self.speed_motor.configurator.apply(self.speed_motor_configs)
 
+        self.drive_position = self.speed_motor.get_position()
+        self.drive_velocity = self.speed_motor.get_velocity()
+        self.direction_position = self.direction_motor.get_position()
+        self.direction_velocity = self.direction_motor.get_velocity()
+
+        self.signals = [
+            self.drive_position,
+            self.drive_velocity,
+            self.direction_position,
+            self.direction_velocity,
+        ]
+
+        self.meters_per_wheel_rotation = self.wheel_radius * math.tau
+        self.drive_rot_per_meter = (
+            self.drive_gear_ratio / self.meters_per_wheel_rotation
+        )
+
+        self.swerve_module_position = SwerveModulePosition()
+
         self.desired_state = None
 
         self.nt = SmartNT("Swerve Modules")
@@ -132,14 +156,10 @@ class SwerveWheel(Sendable):
             self.speed_motor_configs.slot0 = self.speed_controller
             self.speed_motor.configurator.apply(self.speed_motor_configs)
 
-        self.direction_control = (
-            controls.PositionVoltage(0)
-            .with_slot(0)
-            .with_enable_foc(True)  # FOC = Field Oriented Control for smoother motion
-        )
-        self.speed_control = (
-            controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
-        )
+        self.direction_control = controls.PositionVoltage(0).with_enable_foc(
+            True
+        )  # FOC = Field Oriented Control for better motion
+        self.speed_control = controls.VelocityTorqueCurrentFOC(0)
 
     """
     INFORMATIONAL METHODS
@@ -160,17 +180,26 @@ class SwerveWheel(Sendable):
             / self.drive_gear_ratio,
         ]
 
-    def getPosition(self) -> SwerveModulePosition:
-        return SwerveModulePosition(
-            self.speed_motor.get_position().value
-            / self.drive_gear_ratio
-            * (
-                self.wheel_radius * 2 * math.pi
-            ),  # Convert motor rotations to linear distance (meters)
-            Rotation2d(
-                self.cancoder.get_absolute_position().value * math.tau
-            ),  # Convert rotations to radians (tau = 2*pi)
+    def getPosition(self, refresh: bool = False) -> SwerveModulePosition:
+        if refresh:
+            self.drive_position.refresh()
+            self.direction_position.refresh()
+            self.drive_velocity.refresh()
+            self.direction_velocity.refresh()
+
+        drive_rot = BaseStatusSignal.get_latency_compensated_value(
+            self.drive_position, self.drive_velocity
         )
+        angle_rot = BaseStatusSignal.get_latency_compensated_value(
+            self.direction_position, self.direction_velocity
+        )
+
+        self.swerve_module_position.distance = (
+            drive_rot / self.drive_rot_per_meter
+        )  # Convert motor rotations to linear distance (meters)
+        self.swerve_module_position.angle = Rotation2d.fromRotations(angle_rot)
+
+        return self.swerve_module_position
 
     def getVoltage(self) -> units.volts:
         return (
@@ -186,15 +215,48 @@ class SwerveWheel(Sendable):
             * (self.wheel_radius * 2 * math.pi)  # Convert rotations/s to m/s
         )
 
-    def get_integrated_angle(self):
-        return (
-            self.direction_motor.get_position().value * math.tau
-        )  # Convert rotations to radians
-
-    def get_angle_absoulte(self):
-        return (
+    def get_angle_absoulte(self) -> Rotation2d:
+        return Rotation2d(
             self.cancoder.get_absolute_position().value * math.tau
         )  # Convert rotations to radians
+
+    def getSignals(self):
+        return self.signals
+
+    def putTelem(self):
+        self.nt.put(
+            f"Direction {self.direction_motor.device_id}/Error",
+            self.direction_motor.get_closed_loop_error().value,
+        )
+        self.nt.put(
+            f"Direction {self.direction_motor.device_id}/Reference",
+            self.direction_motor.get_closed_loop_reference().value,
+        )
+        self.nt.put(
+            f"Direction {self.direction_motor.device_id}/Output",
+            self.direction_motor.get_closed_loop_output().value,
+        )
+        self.nt.put(
+            f"Direction {self.direction_motor.device_id}/Mesurement",
+            self.swerve_module_position.angle.radians(),
+        )
+
+        self.nt.put(
+            f"Speed {self.speed_motor.device_id}/Error",
+            self.speed_motor.get_closed_loop_error().value,
+        )
+        self.nt.put(
+            f"Speed {self.speed_motor.device_id}/Reference",
+            self.speed_motor.get_closed_loop_reference().value,
+        )
+        self.nt.put(
+            f"Speed {self.speed_motor.device_id}/Output",
+            self.speed_motor.get_closed_loop_output().value,
+        )
+        self.nt.put(
+            f"Speed {self.speed_motor.device_id}/Mesurement",
+            self.speed_motor.get_position().value,
+        )
 
     """
     CONTROL METHODS
@@ -220,7 +282,7 @@ class SwerveWheel(Sendable):
             return
         state = self.desired_state
 
-        current_angle = Rotation2d(self.get_angle_absoulte())
+        current_angle = self.swerve_module_position.angle
 
         # Optimize flips the wheel direction if it's faster than rotating 180 degrees
         state.optimize(current_angle)
@@ -229,56 +291,19 @@ class SwerveWheel(Sendable):
         target_angle = state.angle.radians()
 
         # Convert m/s to rotations/s for motor control
-        state.speed *= self.drive_gear_ratio / (self.wheel_radius * 2 * math.pi)
+        state.speed *= self.drive_rot_per_meter
 
         # Cosine compensation: reduce speed when wheel isn't pointing the right direction
         # This prevents the robot from drifting while the wheel is still rotating
         target_speed = state.speed * target_displacement.cos()
 
-        # speed_volt = self.drive_ff.calculate(target_speed)
         self.speed_motor.set_control(self.speed_control.with_velocity(target_speed))
 
-        # If direction is close enough to target, brake instead of hunting
-        if abs(self.direction_motor.get_closed_loop_error()) < 0.03:
-            self.direction_motor.set_control(controls.static_brake.StaticBrake())
-            return
+        # if abs(self.direction_motor.get_closed_loop_error().value) < 0.03:
+        #     self.direction_motor.set_control(controls.static_brake.StaticBrake())
+        #     return
 
         # Divide by tau to convert radians back to rotations for motor control
         self.direction_motor.set_control(
             self.direction_control.with_position(target_angle / math.tau)
-        )
-
-        # log data to nt
-        self.nt.put(
-            f"Direction {self.direction_motor.device_id}/Error",
-            self.direction_motor.get_closed_loop_error().value,
-        )
-        self.nt.put(
-            f"Direction {self.direction_motor.device_id}/Reference",
-            self.direction_motor.get_closed_loop_reference().value,
-        )
-        self.nt.put(
-            f"Direction {self.direction_motor.device_id}/Output",
-            self.direction_motor.get_closed_loop_output().value,
-        )
-        self.nt.put(
-            f"Direction {self.direction_motor.device_id}/Mesurement",
-            current_angle.radians(),
-        )
-
-        self.nt.put(
-            f"Speed {self.speed_motor.device_id}/Error",
-            self.speed_motor.get_closed_loop_error().value,
-        )
-        self.nt.put(
-            f"Speed {self.speed_motor.device_id}/Reference",
-            self.speed_motor.get_closed_loop_reference().value,
-        )
-        self.nt.put(
-            f"Speed {self.speed_motor.device_id}/Output",
-            self.speed_motor.get_closed_loop_output().value,
-        )
-        self.nt.put(
-            f"Speed {self.speed_motor.device_id}/Mesurement",
-            self.speed_motor.get_position().value,
         )

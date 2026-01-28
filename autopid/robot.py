@@ -9,7 +9,11 @@ from phoenix6.configs import (
     FeedbackConfigs,
     ClosedLoopGeneralConfigs,
 )
-from phoenix6.signals import FeedbackSensorSourceValue, NeutralModeValue,StaticFeedforwardSignValue
+from phoenix6.signals import (
+    FeedbackSensorSourceValue,
+    NeutralModeValue,
+    StaticFeedforwardSignValue,
+)
 from phoenix6 import controls, CANBus
 
 
@@ -55,7 +59,9 @@ class MyRobot(MagicRobot):
         motor_cfg.slot0.k_i = 0
         motor_cfg.slot0.k_d = 0
         motor_cfg.slot0.k_s = 0
-        motor_cfg.slot0.static_feedforward_sign = StaticFeedforwardSignValue.USE_CLOSED_LOOP_SIGN
+        motor_cfg.slot0.static_feedforward_sign = (
+            StaticFeedforwardSignValue.USE_CLOSED_LOOP_SIGN
+        )
 
         self.steer_motor.configurator.apply(motor_cfg)
 
