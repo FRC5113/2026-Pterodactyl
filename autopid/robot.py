@@ -10,6 +10,16 @@ from components.swerve_tuner import SwerveTuner
 from components.analytical_tuner import AnalyticalTuner
 from components.trial_error_tuner import TrialErrorTuner
 from lemonlib.smart import SmartProfile
+from lemonlib.autopid.generic_motor_tuner import (
+    GenericMotorTuner,
+    tune_swerve_module,
+    tune_flywheel,
+    tune_hood,
+    tune_elevator,
+    tune_arm,
+)
+from lemonlib.autopid.tuning_data import ControlType, GravityType, MotorGains
+from lemonlib.autopid.motor_interface import TalonFXInterface, SparkMaxInterface
 
 
 class MyRobot(MagicRobot):
@@ -18,7 +28,7 @@ class MyRobot(MagicRobot):
 
     analytical_tuner: AnalyticalTuner
     trial_tuner: TrialErrorTuner
-    
+
     front_left: SwerveWheel
 
     def createObjects(self):
@@ -75,7 +85,7 @@ class MyRobot(MagicRobot):
     def teleopPeriodic(self):
         # self.tuner.engage()
         """Called periodically during teleop mode"""
-        self.tuner.engage()
+        # self.tuner.engage()
 
         if self.joystick.getBackButtonPressed():
             print("Starting Swerve Tuning...")
