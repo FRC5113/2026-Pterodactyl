@@ -4,12 +4,13 @@ Supports position and velocity control with optional gravity compensation.
 """
 from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Any
 import wpilib
 from phoenix6 import controls
 from phoenix6.hardware import TalonFX
 
 from lemonlib.smart import SmartNT
+from components.swerve_wheel import SwerveWheel
 
 
 class ControlType(Enum):
@@ -35,7 +36,7 @@ class MotorGains:
     kD: float = 0.0  # Derivative gain
     kG: float = 0.0  # Gravity feedforward (volts)
     
-    def __str__(self):
+    def __str__(self) -> str:
         return f"kS={self.kS:.4f}, kV={self.kV:.4f}, kP={self.kP:.4f}, kI={self.kI:.4f}, kD={self.kD:.4f}, kG={self.kG:.4f}"
 
 
@@ -49,6 +50,7 @@ class GenericMotorTuner:
     - Gravity compensation (constant or cosine)
     
     Example usage:
+    ```
         # Swerve steering
         tuner = GenericMotorTuner(
             motor=swerve_module.direction_motor,
@@ -78,6 +80,7 @@ class GenericMotorTuner:
             gravity_type=GravityType.COSINE,
             name="Arm"
         )
+        ```
     """
     
     def __init__(
@@ -88,7 +91,7 @@ class GenericMotorTuner:
         name: str = "Motor",
         position_getter: Optional[Callable[[], float]] = None,
         velocity_getter: Optional[Callable[[], float]] = None,
-    ):
+    ) -> None:
         """
         Initialize the generic motor tuner.
         
@@ -126,9 +129,9 @@ class GenericMotorTuner:
         self.oscillation_voltage = 1.5
         
         # Data collection
-        self.position_samples = []
-        self.velocity_samples = []
-        self.time_samples = []
+        self.position_samples: List[float] = []
+        self.velocity_samples: List[float] = []
+        self.time_samples: List[float] = []
         self.timer = wpilib.Timer()
         
     def tune(self, use_analytical: bool = True, use_trial: bool = True) -> MotorGains:
@@ -142,7 +145,7 @@ class GenericMotorTuner:
         Returns:
             Tuned motor gains
         """
-        print(f"\n=Tuning {self.name}")
+        print(f"\nTuning {self.name}")
         print(f"Control type: {self.control_type.value}")
         print(f"Gravity type: {self.gravity_type.value}")
         
@@ -340,49 +343,345 @@ class GenericMotorTuner:
         print(f"Max velocity: {max_vel:.3f} units/s")
         return max_vel
     
+    def _detect_oscillation(self, target: float) -> bool:
+        """Detect position oscillation around target"""
+        if len(self.position_samples) < 30:
+            return False
+        
+        recent_samples = self.position_samples[-30:]
+        crossings = 0
+        
+        for i in range(1, len(recent_samples)):
+            if (recent_samples[i-1] < target and recent_samples[i] > target) or \
+               (recent_samples[i-1] > target and recent_samples[i] < target):
+                crossings += 1
+        
+        return crossings >= 4
+    
+    def _detect_velocity_oscillation(self) -> bool:
+        """Detect velocity oscillation"""
+        if len(self.velocity_samples) < 30:
+            return False
+        
+        recent_samples = self.velocity_samples[-30:]
+        mean_vel = sum(recent_samples) / len(recent_samples)
+        crossings = 0
+        
+        for i in range(1, len(recent_samples)):
+            if (recent_samples[i-1] < mean_vel and recent_samples[i] > mean_vel) or \
+               (recent_samples[i-1] > mean_vel and recent_samples[i] < mean_vel):
+                crossings += 1
+        
+        return crossings >= 4
+    
+    def _detect_jitter(self) -> bool:
+        """Detect velocity jitter (high variance)"""
+        if len(self.velocity_samples) < 30:
+            return False
+        
+        recent_velocities = self.velocity_samples[-30:]
+        mean_vel = sum(recent_velocities) / len(recent_velocities)
+        variance = sum((v - mean_vel) ** 2 for v in recent_velocities) / len(recent_velocities)
+        
+        return variance > 0.5
+    
     def _trial_tune_kS(self, initial: float) -> float:
         """Trial tune kS by increasing until movement"""
         print(f"Trial tuning kS...")
-        # Implementation similar to TrialErrorTuner._tune_kS()
-        # Simplified for example
-        return initial
+        
+        kS = initial
+        self.timer.restart()
+        self.position_samples.clear()
+        
+        while self.timer.get() < 15.0:
+            elapsed = self.timer.get()
+            
+            # Apply voltage
+            self.motor.set_control(controls.VoltageOut(kS))
+            
+            # Collect position data
+            position = self.position_getter()
+            self.position_samples.append(position)
+            
+            # Check for movement
+            if len(self.position_samples) > 10:
+                recent_movement = abs(
+                    self.position_samples[-1] - self.position_samples[-10]
+                )
+                
+                if recent_movement > 0.01:  # Movement detected
+                    kS = max(0.0, kS - 0.05)  # Back off slightly
+                    break
+            
+            # Increment every 0.5 seconds
+            if elapsed > 0.5 and int(elapsed / 0.5) != int((elapsed - 0.02) / 0.5):
+                kS += 0.05
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        print(f"  Final kS: {kS:.4f}V")
+        return kS
     
     def _trial_tune_kV_position(self, gains: MotorGains) -> float:
-        """Trial tune kV for position control"""
-        print(f"  Trial tuning kV...")
-        # Implementation similar to TrialErrorTuner._tune_kV()
-        return gains.kV
+        """Trial tune kV for position control by testing velocity tracking"""
+        print(f"  Trial tuning kV for position...")
+        
+        kV = gains.kV
+        best_kV = kV
+        best_error = float('inf')
+        velocity_setpoint = 2.0  # rad/s or m/s
+        
+        # Apply gains to motor
+        config = controls.MotionMagicVelocityVoltage(velocity_setpoint)
+        config.slot = 0
+        
+        self.timer.restart()
+        
+        while self.timer.get() < 20.0:
+            elapsed = self.timer.get()
+            
+            # Apply velocity control
+            self.motor.set_control(controls.VelocityVoltage(velocity_setpoint))
+            
+            # Collect velocity data
+            velocity = self.velocity_getter()
+            self.velocity_samples.append(abs(velocity))
+            
+            # Calculate error after settling
+            if elapsed > 1.0 and len(self.velocity_samples) > 20:
+                avg_velocity = sum(self.velocity_samples[-20:]) / 20.0
+                error = abs(velocity_setpoint - avg_velocity)
+                
+                if error < best_error:
+                    best_error = error
+                    best_kV = kV
+                
+                # If error increasing significantly, we passed optimum
+                if error > best_error * 1.5 and kV > best_kV + 0.01:
+                    kV = best_kV
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+                kV += 0.01
+                self.velocity_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        kV = best_kV if best_kV > 0 else kV
+        print(f"  Final kV: {kV:.4f} (error: {best_error:.4f})")
+        return kV
     
     def _trial_tune_kP_position(self, gains: MotorGains) -> float:
-        """Trial tune kP for position control"""
-        print(f"  Trial tuning kP...")
-        # Implementation similar to TrialErrorTuner._tune_kP()
-        return gains.kP
+        """Trial tune kP for position control by increasing until oscillation"""
+        print(f"  Trial tuning kP for position...")
+        
+        kP = gains.kP
+        target_position = self.position_getter()
+        
+        self.timer.restart()
+        self.position_samples.clear()
+        
+        while self.timer.get() < 20.0:
+            elapsed = self.timer.get()
+            
+            # Use position control
+            self.motor.set_control(controls.PositionVoltage(target_position))
+            
+            # Collect position data
+            position = self.position_getter()
+            self.position_samples.append(position)
+            
+            # Check for oscillation after settling
+            if elapsed > 1.0 and len(self.position_samples) > 30:
+                if self._detect_oscillation(target_position):
+                    kP = max(0.0, kP - 0.5)  # Back off
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+                kP += 0.5
+                self.position_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        print(f"  Final kP: {kP:.4f}")
+        return kP
     
     def _trial_tune_kD_position(self, gains: MotorGains) -> float:
-        """Trial tune kD for position control"""
-        print(f"  Trial tuning kD...")
-        # Implementation similar to TrialErrorTuner._tune_kD()
-        return gains.kD
+        """Trial tune kD for position control by increasing until jitter"""
+        print(f"  Trial tuning kD for position...")
+        
+        kD = 0.0
+        target_position = self.position_getter()
+        
+        self.timer.restart()
+        self.velocity_samples.clear()
+        
+        while self.timer.get() < 20.0:
+            elapsed = self.timer.get()
+            
+            # Use position control with full PD
+            self.motor.set_control(controls.PositionVoltage(target_position))
+            
+            # Collect velocity data
+            velocity = self.velocity_getter()
+            self.velocity_samples.append(velocity)
+            
+            # Check for jitter after settling
+            if elapsed > 1.0 and len(self.velocity_samples) > 30:
+                if self._detect_jitter():
+                    kD = max(0.0, kD - 0.01)  # Back off
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+                kD += 0.01
+                self.velocity_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        print(f"  Final kD: {kD:.4f}")
+        return kD
     
     def _trial_tune_kV_velocity(self, gains: MotorGains) -> float:
-        """Trial tune kV for velocity control"""
+        """Trial tune kV for velocity control by minimizing steady-state error"""
         print(f"  Trial tuning kV for velocity...")
-        return gains.kV
+        
+        kV = gains.kV
+        best_kV = kV
+        best_error = float('inf')
+        velocity_setpoint = 5.0  # rad/s or m/s
+        
+        self.timer.restart()
+        
+        while self.timer.get() < 20.0:
+            elapsed = self.timer.get()
+            
+            # Apply velocity control
+            self.motor.set_control(controls.VelocityVoltage(velocity_setpoint))
+            
+            # Collect velocity data
+            velocity = self.velocity_getter()
+            self.velocity_samples.append(abs(velocity))
+            
+            # Calculate error after settling
+            if elapsed > 1.5 and len(self.velocity_samples) > 20:
+                avg_velocity = sum(self.velocity_samples[-20:]) / 20.0
+                error = abs(velocity_setpoint - avg_velocity)
+                
+                if error < best_error:
+                    best_error = error
+                    best_kV = kV
+                
+                # If error increasing significantly, we passed optimum
+                if error > best_error * 1.5 and kV > best_kV + 0.01:
+                    kV = best_kV
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 1.5 and int(elapsed) != int(elapsed - 0.02):
+                kV += 0.01
+                self.velocity_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        kV = best_kV if best_kV > 0 else kV
+        print(f"  Final kV: {kV:.4f} (error: {best_error:.4f})")
+        return kV
     
     def _trial_tune_kP_velocity(self, gains: MotorGains) -> float:
-        """Trial tune kP for velocity control"""
+        """Trial tune kP for velocity control by increasing until oscillation"""
         print(f"  Trial tuning kP for velocity...")
-        return gains.kP
+        
+        kP = gains.kP
+        velocity_setpoint = 5.0  # rad/s or m/s
+        
+        self.timer.restart()
+        self.velocity_samples.clear()
+        
+        while self.timer.get() < 20.0:
+            elapsed = self.timer.get()
+            
+            # Apply velocity control
+            self.motor.set_control(controls.VelocityVoltage(velocity_setpoint))
+            
+            # Collect velocity data
+            velocity = self.velocity_getter()
+            self.velocity_samples.append(velocity)
+            
+            # Check for oscillation after settling
+            if elapsed > 1.0 and len(self.velocity_samples) > 30:
+                if self._detect_velocity_oscillation():
+                    kP = max(0.0, kP - 0.1)  # Back off
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+                kP += 0.1
+                self.velocity_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        print(f"  Final kP: {kP:.4f}")
+        return kP
     
     def _trial_tune_kI_velocity(self, gains: MotorGains) -> float:
-        """Trial tune kI for velocity control"""
+        """Trial tune kI for velocity control by improving steady-state error"""
         print(f"  Trial tuning kI for velocity...")
-        return gains.kI
+        
+        kI = 0.0
+        best_kI = 0.0
+        best_error = float('inf')
+        velocity_setpoint = 5.0  # rad/s or m/s
+        
+        self.timer.restart()
+        
+        while self.timer.get() < 15.0:
+            elapsed = self.timer.get()
+            
+            # Apply velocity control
+            self.motor.set_control(controls.VelocityVoltage(velocity_setpoint))
+            
+            # Collect velocity data
+            velocity = self.velocity_getter()
+            self.velocity_samples.append(abs(velocity))
+            
+            # Calculate steady-state error after settling
+            if elapsed > 2.0 and len(self.velocity_samples) > 30:
+                avg_velocity = sum(self.velocity_samples[-30:]) / 30.0
+                error = abs(velocity_setpoint - avg_velocity)
+                
+                if error < best_error:
+                    best_error = error
+                    best_kI = kI
+                
+                # If error increasing or system unstable, stop
+                if error > best_error * 1.5 or error > 0.5:
+                    kI = best_kI
+                    break
+            
+            # Increment every 1.0 seconds
+            if elapsed > 2.0 and int(elapsed) != int(elapsed - 0.02):
+                kI += 0.05
+                self.velocity_samples.clear()
+            
+            wpilib.wait(0.02)
+        
+        self.motor.set_control(controls.StaticBrake())
+        kI = best_kI if best_kI > 0 else 0.0
+        print(f"  Final kI: {kI:.4f} (error: {best_error:.4f})")
+        return kI
 
 
 # Example usage for different mechanisms
-def tune_swerve_module(swerve_module):
+def tune_swerve_module(swerve_module: SwerveWheel) -> MotorGains:
     """Tune a swerve steering module"""
     tuner = GenericMotorTuner(
         motor=swerve_module.direction_motor,
@@ -393,7 +692,7 @@ def tune_swerve_module(swerve_module):
     return tuner.tune(use_analytical=True, use_trial=True)
 
 
-def tune_flywheel(shooter):
+def tune_flywheel(shooter: Any) -> MotorGains:
     """Tune a shooter flywheel"""
     tuner = GenericMotorTuner(
         motor=shooter.flywheel_motor,
@@ -403,7 +702,7 @@ def tune_flywheel(shooter):
     return tuner.tune(use_analytical=True, use_trial=True)
 
 
-def tune_hood(shooter):
+def tune_hood(shooter: Any) -> MotorGains:
     """Tune a shooter hood"""
     tuner = GenericMotorTuner(
         motor=shooter.hood_motor,
@@ -413,7 +712,7 @@ def tune_hood(shooter):
     return tuner.tune(use_analytical=True, use_trial=False)  # Analytical only
 
 
-def tune_elevator(elevator):
+def tune_elevator(elevator: Any) -> MotorGains:
     """Tune an elevator"""
     tuner = GenericMotorTuner(
         motor=elevator.motor,
@@ -425,7 +724,7 @@ def tune_elevator(elevator):
     return tuner.tune(use_analytical=True, use_trial=True)
 
 
-def tune_arm(arm):
+def tune_arm(arm: Any) -> MotorGains:
     """Tune an arm pivot"""
     tuner = GenericMotorTuner(
         motor=arm.pivot_motor,
