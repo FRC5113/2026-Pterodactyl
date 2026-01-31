@@ -303,11 +303,6 @@ def example_tune_complete_robot(robot):
     return results
 
 
-# =============================================================================
-# EXAMPLE 8: Using Tuned Gains
-# =============================================================================
-
-
 def example_apply_saved_gains(motor, gains: MotorGains):
     """
     Apply previously tuned gains to a motor.
@@ -348,11 +343,6 @@ def example_load_and_apply_gains(motor, filename: str):
     return example_apply_saved_gains(motor, gains)
 
 
-# =============================================================================
-# EXAMPLE 9: Incremental Tuning
-# =============================================================================
-
-
 def example_incremental_tuning(mechanism):
     """
     Start with analytical tuning, then refine with trial-and-error.
@@ -381,11 +371,6 @@ def example_incremental_tuning(mechanism):
     return final_gains
 
 
-# =============================================================================
-# EXAMPLE 10: Mixed Motor Controllers
-# =============================================================================
-
-
 def example_mixed_controllers(robot):
     """
     Tune mechanisms with different motor controllers.
@@ -408,11 +393,6 @@ def example_mixed_controllers(robot):
     arm_gains = tune_arm(motor=robot.arm.talon_motor, name="Arm Pivot")  # TalonFX
 
     return {"swerve": swerve_gains, "elevator": elevator_gains, "arm": arm_gains}
-
-
-# =============================================================================
-# Helper function for integration into robot code
-# =============================================================================
 
 
 def integrate_tuner_into_robot():

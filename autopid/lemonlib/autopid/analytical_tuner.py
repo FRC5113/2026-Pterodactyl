@@ -91,13 +91,34 @@ class AnalyticalTuner:
         self.timer.restart()
         self._reset_data()
 
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kS", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kV", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kA", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kP", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kI", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kD", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Analytical kG", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kS", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kV", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kA", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kP", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kI", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kD", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Analytical kG", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Static Voltage", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Step Voltage", 0.0)
+        # self.nt.put(
+        #     f"{self.results.mechanism_name}/Time Constant pos",
+        #     0.0,
+        # )
+        # self.nt.put(f"{self.results.mechanism_name}/Max Velocity pos", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Max Accel pos", 0.0)
+        # self.nt.put(
+        #     f"{self.results.mechanism_name}/Time Constant neg",
+        #     0.0,
+        # )
+        # self.nt.put(f"{self.results.mechanism_name}/Max Velocity neg", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Max Accel neg", 0.0)
+        # self.nt.put("Oscillation Voltage", 0.0)
+        # self.nt.put("Static Voltage", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Gravity V", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Static Friction V", 0.0)
+        # self.nt.put("Step Voltage", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Oscillation Period", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Oscillation Amplitude", 0.0)
 
         print(f"Analytical tuning started for {name}")
 

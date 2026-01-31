@@ -61,26 +61,26 @@ class PhysicsEngine:
 
         # Create speed motor simulations
         self.speed_sims = (
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 6.75),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 6.75),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 6.75),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 6.75),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 6.75),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 6.75),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 6.75),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 6.75),
         )
 
         # Create direction motor simulations
         self.direction_sims = (
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 150 / 7),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 150 / 7),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 150 / 7),
-            KrakenSimFOC(robot.front_left_speed_motor, 0.01, 150 / 7),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 150 / 7),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 150 / 7),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 150 / 7),
+            KrakenSimFOC(robot.rear_left_speed_motor, 0.01, 150 / 7),
         )
 
         # CANcoder references
         self.encoders = (
-            robot.front_left_cancoder,
-            robot.front_left_cancoder,
-            robot.front_left_cancoder,
-            robot.front_left_cancoder,
+            robot.rear_left_cancoder,
+            robot.rear_left_cancoder,
+            robot.rear_left_cancoder,
+            robot.rear_left_cancoder,
         )
 
         # Initialize encoder positions

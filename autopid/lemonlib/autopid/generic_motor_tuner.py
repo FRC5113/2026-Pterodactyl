@@ -5,58 +5,85 @@ and various gravity compensation types.
 """
 
 from typing import Optional, Callable
+from enum import Enum, auto
 import wpilib
+from wpimath import units
 
 from .motor_interface import (
     MotorInterface,
     TalonFXInterface,
-    SparkMaxInterface,
+    WPIMotorControllerInterface,
     ControlMode,
+    SparkMaxInterface,
+    TalonFXSInterface,
 )
 from .tuning_data import ControlType, GravityType, MotorGains, MechanismTuningResults
 from .analytical_tuner import AnalyticalTuner
 from .trial_error_tuner import TrialErrorTuner
 
 
+class TuningState(Enum):
+    """States for the tuning state machine"""
+
+    IDLE = auto()
+    ANALYTICAL_TUNING = auto()
+    TRIAL_TUNING = auto()
+    COMPLETE = auto()
+    FAILED = auto()
+
+
 class GenericMotorTuner:
     """
     High-level tuner for any FRC mechanism.
 
-    Example usage:
+    This tuner uses a non-blocking state machine that integrates with the RobotPy periodic loop.
+
+    Basic Usage:
         ```python
-        # Swerve module
-        tuner = GenericMotorTuner(
-            motor=swerve_module.direction_motor,
-            control_type=ControlType.POSITION,
-            name="Swerve Module FL"
-        )
-        gains = tuner.tune()
+        # In robot init:
+        self.tuner = None
 
-        # Flywheel
-        tuner = GenericMotorTuner(
-            motor=shooter.flywheel_motor,
-            control_type=ControlType.VELOCITY,
-            name="Shooter Flywheel"
-        )
-        gains = tuner.tune(use_trial=False)
+        # In teleopPeriodic():
+        if some_condition and self.tuner is None:
+            # Create and start tuning
+            self.tuner = GenericMotorTuner(
+                motor=my_motor,
+                control_type=ControlType.POSITION,
+                name="My Mechanism"
+            )
+            self.tuner.start_tuning(use_analytical=True, use_trial=True)
 
-        # Elevator
-        tuner = GenericMotorTuner(
-            motor=elevator.motor,
-            control_type=ControlType.POSITION,
-            gravity_type=GravityType.CONSTANT,
-            name="Elevator"
-        )
-        gains = tuner.tune()
+        # Run tuning state machine each loop
+        if self.tuner is not None:
+            if not self.tuner.is_complete():
+                self.tuner.periodic()
+            else:
+                gains = self.tuner.get_final_gains()
+                print(f"Tuning complete! Gains: {gains}")
+                self.tuner = None
+        ```
 
-        # Arm
-        tuner = GenericMotorTuner(
-            motor=arm.pivot_motor,
-            control_type=ControlType.POSITION,
-            gravity_type=GravityType.COSINE,
-            name="Arm Pivot"
-        )
-        gains = tuner.tune()
+    Using Convenience Functions:
+        ```python
+        # Swerve module - position control
+        self.tuner = tune_swerve_module(motor, "FL Module")
+        self.tuner.start_tuning()
+
+        # Flywheel - velocity control
+        self.tuner = tune_flywheel(motor, "Shooter Flywheel")
+        self.tuner.start_tuning()
+
+        # Elevator - position control with constant gravity
+        self.tuner = tune_elevator(motor, "Elevator", height_getter)
+        self.tuner.start_tuning()
+
+        # Arm - position control with cosine gravity
+        self.tuner = tune_arm(motor, "Arm Pivot", angle_getter)
+        self.tuner.start_tuning()
+
+        # Hood - analytical tuning only
+        self.tuner = tune_hood(motor, "Hood")
+        self.tuner.start_tuning(use_trial=False)
         ```
     """
 
@@ -65,8 +92,10 @@ class GenericMotorTuner:
         motor,
         control_type: ControlType,
         name: str,
+        motor_interface: Optional[MotorInterface] = None,
         gravity_type: GravityType = GravityType.NONE,
         position_getter: Optional[Callable[[], float]] = None,
+        velocity_getter: Optional[Callable[[], units.meters_per_second]] = None,
         conversion_factor: float = 1.0,
     ):
         """
@@ -81,13 +110,17 @@ class GenericMotorTuner:
             conversion_factor: For SparkMax, conversion from encoder units to mechanism units
         """
         # Create motor interface
-        self.motor_interface = self._create_motor_interface(
-            motor, position_getter, conversion_factor
-        )
+        if motor_interface is None:
+            self.motor_interface = self._create_motor_interface(
+                motor, position_getter, conversion_factor
+            )
+        else:
+            self.motor_interface = motor_interface
 
         self.control_type = control_type
         self.gravity_type = gravity_type
         self.name = name
+        self.velocity_getter = velocity_getter
 
         # Create tuning components
         self.analytical_tuner = AnalyticalTuner()
@@ -100,6 +133,13 @@ class GenericMotorTuner:
         # Results
         self.results: Optional[MechanismTuningResults] = None
 
+        # State machine
+        self.state = TuningState.IDLE
+        self.start_time = 0.0
+        self.timeout_seconds = 180.0
+        self.use_analytical = True
+        self.use_trial = True
+
     def _create_motor_interface(
         self, motor, position_getter, conversion_factor
     ) -> MotorInterface:
@@ -109,32 +149,38 @@ class GenericMotorTuner:
 
         if "TalonFX" in motor_type_name:
             return TalonFXInterface(motor, position_getter)
+        if "TalonFXS" in motor_type_name:
+            return TalonFXSInterface(motor, position_getter)
         elif "SparkMax" in motor_type_name or "CANSparkMax" in motor_type_name:
             return SparkMaxInterface(motor, conversion_factor, position_getter)
         else:
             # Default to TalonFX interface
             print(
-                f"Warning: Unknown motor type {motor_type_name}, defaulting to TalonFX interface"
+                f"Warning: Unknown motor type {motor_type_name}, defaulting to Wpi MotorController interface"
             )
-            return TalonFXInterface(motor, position_getter)
+            return WPIMotorControllerInterface(
+                motor, position_getter, velocity_getter=self.velocity_getter
+            )
 
-    def tune(
+    def start_tuning(
         self,
         use_analytical: bool = True,
         use_trial: bool = True,
         timeout_seconds: float = 180.0,
-    ) -> MotorGains:
+    ):
         """
-        Run the complete tuning process.
+        Start the tuning process. Call periodic() repeatedly until is_complete() returns True.
 
         Args:
             use_analytical: Run analytical tuning phase
             use_trial: Run trial-and-error tuning phase
             timeout_seconds: Maximum time for entire tuning process
-
-        Returns:
-            MotorGains object with final tuned gains
         """
+        self.use_analytical = use_analytical
+        self.use_trial = use_trial
+        self.timeout_seconds = timeout_seconds
+        self.start_time = wpilib.Timer.getFPGATimestamp()
+
         print(f"\n{'='*70}")
         print(f"Starting Auto-Tune for: {self.name}")
         print(f"Control Type: {self.control_type.value}")
@@ -144,79 +190,97 @@ class GenericMotorTuner:
         )
         print(f"{'='*70}\n")
 
-        start_time = wpilib.Timer.getFPGATimestamp()
-
-        # Phase 1: Analytical tuning
+        # Start with analytical tuning if enabled
         if use_analytical:
+            self.state = TuningState.ANALYTICAL_TUNING
             print(f"[{self.name}] Starting analytical tuning...")
             self.analytical_tuner.start(
                 self.motor_interface, self.control_type, self.gravity_type, self.name
             )
+        elif use_trial:
+            self._start_trial_tuning()
+        else:
+            print(f"[{self.name}] Warning: No tuning phases enabled")
+            self.state = TuningState.FAILED
 
-            # Run analytical tuner
-            while not self.analytical_tuner.is_complete():
-                if wpilib.Timer.getFPGATimestamp() - start_time > timeout_seconds:
-                    print(f"[{self.name}] Analytical tuning timed out")
-                    break
+    def periodic(self):
+        """
+        Execute one iteration of the tuning state machine.
+        Call this repeatedly from your robot's periodic method until is_complete() returns True.
+        """
+        # Check timeout
+        if wpilib.Timer.getFPGATimestamp() - self.start_time > self.timeout_seconds:
+            print(f"[{self.name}] Tuning timed out")
+            self._finalize_tuning()
+            return
 
-                self.analytical_tuner.execute()
-                wpilib.wait(0.02)  # 20ms loop
+        # Execute current state
+        if self.state == TuningState.ANALYTICAL_TUNING:
+            self.analytical_tuner.execute()
 
-            analytical_results = self.analytical_tuner.get_results()
-            if analytical_results:
-                self.results = analytical_results
-                print(f"[{self.name}] Analytical tuning complete")
-            else:
-                print(f"[{self.name}] Analytical tuning failed")
-                # Create empty results
-                self.results = MechanismTuningResults(
-                    mechanism_id=self.motor_interface.get_motor_id(),
-                    mechanism_name=self.name,
-                    control_type=self.control_type,
-                    gravity_type=self.gravity_type,
-                )
+            if self.analytical_tuner.is_complete():
+                analytical_results = self.analytical_tuner.get_results()
+                if analytical_results:
+                    self.results = analytical_results
+                    print(f"[{self.name}] Analytical tuning complete")
+                else:
+                    print(f"[{self.name}] Analytical tuning failed")
+                    # Create empty results
+                    self.results = MechanismTuningResults(
+                        mechanism_id=self.motor_interface.get_motor_id(),
+                        mechanism_name=self.name,
+                        control_type=self.control_type,
+                        gravity_type=self.gravity_type,
+                    )
 
-        # Phase 2: Trial-and-error tuning
-        if use_trial:
-            print(f"\n[{self.name}] Starting trial-and-error tuning...")
+                # Move to trial tuning if enabled
+                if self.use_trial:
+                    self._start_trial_tuning()
+                else:
+                    self._finalize_tuning()
 
-            # Get analytical gains as starting point
-            analytical_gains = (
-                self.analytical_tuner.get_analytical_gains() if use_analytical else None
-            )
+        elif self.state == TuningState.TRIAL_TUNING:
+            self.trial_tuner.execute()
 
-            # Pass results to trial tuner if we have them
-            if self.results:
-                self.trial_tuner.results = self.results
+            if self.trial_tuner.is_complete():
+                trial_results = self.trial_tuner.get_results()
+                if trial_results:
+                    self.results = trial_results
+                    print(f"[{self.name}] Trial-and-error tuning complete")
+                else:
+                    print(f"[{self.name}] Trial-and-error tuning failed")
 
-            self.trial_tuner.start(
-                self.motor_interface,
-                self.control_type,
-                self.gravity_type,
-                self.name,
-                analytical_gains,
-            )
+                self._finalize_tuning()
 
-            # Run trial tuner
-            while not self.trial_tuner.is_complete():
-                if wpilib.Timer.getFPGATimestamp() - start_time > timeout_seconds:
-                    print(f"[{self.name}] Trial tuning timed out")
-                    break
+    def _start_trial_tuning(self):
+        """Transition to trial-and-error tuning phase"""
+        self.state = TuningState.TRIAL_TUNING
+        print(f"\n[{self.name}] Starting trial-and-error tuning...")
 
-                self.trial_tuner.execute()
-                wpilib.wait(0.02)  # 20ms loop
+        # Get analytical gains as starting point
+        analytical_gains = (
+            self.analytical_tuner.get_analytical_gains()
+            if self.use_analytical
+            else None
+        )
 
-            trial_results = self.trial_tuner.get_results()
-            if trial_results:
-                self.results = trial_results
-                print(f"[{self.name}] Trial-and-error tuning complete")
-            else:
-                print(f"[{self.name}] Trial-and-error tuning failed")
+        # Pass results to trial tuner if we have them
+        if self.results:
+            self.trial_tuner.results = self.results
 
-        # Finalize results
+        self.trial_tuner.start(
+            self.motor_interface,
+            self.control_type,
+            self.gravity_type,
+            self.name,
+            analytical_gains,
+        )
+
+    def _finalize_tuning(self):
+        """Complete the tuning process and apply gains"""
         if self.results:
             # Select final gains (prefer trial if available, otherwise analytical)
-            self.results.select_final_gains(use_trial=use_trial)
+            self.results.select_final_gains(use_trial=self.use_trial)
 
             # Print comparison
             self.results.print_comparison()
@@ -227,10 +291,20 @@ class GenericMotorTuner:
             # Stop motor
             self.motor_interface.set_control(ControlMode.BRAKE)
 
-            return self.results.final_gains
+            self.state = TuningState.COMPLETE
         else:
             print(f"[{self.name}] Tuning failed - no results available")
-            return MotorGains()
+            self.state = TuningState.FAILED
+
+    def is_complete(self) -> bool:
+        """Check if tuning is complete"""
+        return self.state in (TuningState.COMPLETE, TuningState.FAILED)
+
+    def get_final_gains(self) -> Optional[MotorGains]:
+        """Get the final tuned gains after tuning is complete"""
+        if self.state == TuningState.COMPLETE and self.results:
+            return self.results.final_gains
+        return None
 
     def _apply_final_gains(self):
         """Apply final tuned gains to the motor"""
@@ -284,9 +358,10 @@ def tune_swerve_module(
     motor,
     name: str = "Swerve Module",
     position_getter: Optional[Callable[[], float]] = None,
-) -> MotorGains:
+) -> GenericMotorTuner:
     """
-    Tune a swerve steering module.
+    Create a tuner for a swerve steering module.
+    Call start_tuning() and periodic() on the returned tuner.
 
     Args:
         motor: TalonFX or SparkMax motor
@@ -294,37 +369,37 @@ def tune_swerve_module(
         position_getter: Optional custom position getter
 
     Returns:
-        Tuned MotorGains
+        GenericMotorTuner configured for swerve module
     """
-    tuner = GenericMotorTuner(
+    return GenericMotorTuner(
         motor=motor,
         control_type=ControlType.POSITION,
         name=name,
         position_getter=position_getter,
     )
-    return tuner.tune(use_analytical=True, use_trial=True)
 
 
-def tune_flywheel(motor, name: str = "Flywheel") -> MotorGains:
+def tune_flywheel(motor, name: str = "Flywheel") -> GenericMotorTuner:
     """
-    Tune a shooter flywheel.
+    Create a tuner for a shooter flywheel.
+    Call start_tuning() and periodic() on the returned tuner.
 
     Args:
         motor: TalonFX or SparkMax motor
         name: Name for the flywheel
 
     Returns:
-        Tuned MotorGains
+        GenericMotorTuner configured for flywheel
     """
-    tuner = GenericMotorTuner(motor=motor, control_type=ControlType.VELOCITY, name=name)
-    return tuner.tune(use_analytical=True, use_trial=True)
+    return GenericMotorTuner(motor=motor, control_type=ControlType.VELOCITY, name=name)
 
 
 def tune_hood(
     motor, name: str = "Hood", position_getter: Optional[Callable[[], float]] = None
-) -> MotorGains:
+) -> GenericMotorTuner:
     """
-    Tune a shooter hood or similar mechanism.
+    Create a tuner for a shooter hood or similar mechanism.
+    Call start_tuning(use_trial=False) and periodic() on the returned tuner for analytical tuning only.
 
     Args:
         motor: TalonFX or SparkMax motor
@@ -332,22 +407,22 @@ def tune_hood(
         position_getter: Optional custom position getter
 
     Returns:
-        Tuned MotorGains
+        GenericMotorTuner configured for hood
     """
-    tuner = GenericMotorTuner(
+    return GenericMotorTuner(
         motor=motor,
         control_type=ControlType.POSITION,
         name=name,
         position_getter=position_getter,
     )
-    return tuner.tune(use_analytical=True, use_trial=False)  # Analytical only
 
 
 def tune_elevator(
     motor, name: str = "Elevator", position_getter: Optional[Callable[[], float]] = None
-) -> MotorGains:
+) -> GenericMotorTuner:
     """
-    Tune an elevator with constant gravity compensation.
+    Create a tuner for an elevator with constant gravity compensation.
+    Call start_tuning() and periodic() on the returned tuner.
 
     Args:
         motor: TalonFX or SparkMax motor
@@ -355,25 +430,25 @@ def tune_elevator(
         position_getter: Optional custom position getter (e.g., for height in meters)
 
     Returns:
-        Tuned MotorGains
+        GenericMotorTuner configured for elevator
     """
-    tuner = GenericMotorTuner(
+    return GenericMotorTuner(
         motor=motor,
         control_type=ControlType.POSITION,
         gravity_type=GravityType.CONSTANT,
         name=name,
         position_getter=position_getter,
     )
-    return tuner.tune(use_analytical=True, use_trial=True)
 
 
 def tune_arm(
     motor,
     name: str = "Arm Pivot",
     position_getter: Optional[Callable[[], float]] = None,
-) -> MotorGains:
+) -> GenericMotorTuner:
     """
-    Tune an arm pivot with cosine gravity compensation.
+    Create a tuner for an arm pivot with cosine gravity compensation.
+    Call start_tuning() and periodic() on the returned tuner.
 
     Args:
         motor: TalonFX or SparkMax motor
@@ -381,13 +456,12 @@ def tune_arm(
         position_getter: Optional custom position getter (e.g., for angle in radians)
 
     Returns:
-        Tuned MotorGains
+        GenericMotorTuner configured for arm
     """
-    tuner = GenericMotorTuner(
+    return GenericMotorTuner(
         motor=motor,
         control_type=ControlType.POSITION,
         gravity_type=GravityType.COSINE,
         name=name,
         position_getter=position_getter,
     )
-    return tuner.tune(use_analytical=True, use_trial=True)

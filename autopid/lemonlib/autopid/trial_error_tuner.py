@@ -144,13 +144,14 @@ class TrialErrorTuner:
             kS=0.0, kV=0.0, kA=0.0, kP=0.0, kI=0.0, kD=0.0, kG=0.0
         )
 
-        self.nt.put(f"{self.results.mechanism_name}/Trial kS", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kV", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kA", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kP", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kI", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kD", 0.0)
-        self.nt.put(f"{self.results.mechanism_name}/Trial kG", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kS", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kV", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kA", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kP", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kI", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kD", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/Trial kG", 0.0)
+        # self.nt.put(f"{self.results.mechanism_name}/kV Error", 0.0)
 
         print(f"Trial-and-error tuning started for {name}")
 
@@ -242,7 +243,7 @@ class TrialErrorTuner:
 
         # Apply kG voltage (with sign depending on gravity type)
         self.current_motor.set_control(ControlMode.VOLTAGE, self.kG_trial)
-        self.nt.put("Trial kG", self.kG_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kG", self.kG_trial)
 
         # Check if position is stable (mechanism not falling/rising)
         if len(self.position_samples) > 20:
@@ -261,12 +262,12 @@ class TrialErrorTuner:
                 self._reset_data()
                 return
 
-        # Increment every 0.5 seconds
-        if elapsed > 0.5 and int(elapsed / 0.5) != int((elapsed - 0.02) / 0.5):
+        # Increment every 2 seconds
+        if elapsed > 2 and int(elapsed / 2) != int((elapsed - 0.02) / 2):
             self.kG_trial += self.kG_increment
 
         # Timeout or simulation
-        if elapsed > 20.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -285,7 +286,7 @@ class TrialErrorTuner:
         # Apply kS voltage plus gravity compensation
         voltage = self.kG_trial + self.kS_trial
         self.current_motor.set_control(ControlMode.VOLTAGE, voltage)
-        self.nt.put("Trial kS", self.kS_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kS", self.kS_trial)
 
         # Check for movement
         if len(self.position_samples) > 10:
@@ -304,11 +305,11 @@ class TrialErrorTuner:
                 return
 
         # Increment every 0.5 seconds
-        if elapsed > 0.5 and int(elapsed / 0.5) != int((elapsed - 0.02) / 0.5):
+        if elapsed > 2 and int(elapsed / 2) != int((elapsed - 0.02) / 2):
             self.kS_trial += self.kS_increment
 
         # Timeout or simulation
-        if elapsed > 15.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -335,12 +336,12 @@ class TrialErrorTuner:
             kG=self.kG_trial,
         )
         self.current_motor.set_control(ControlMode.VELOCITY, self.velocity_setpoint)
-        self.nt.put("Trial kV", self.kV_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kV", self.kV_trial)
 
         # Check error after settling
-        if elapsed > 1.0 and len(self.velocity_samples) > 20:
+        if elapsed > 2.0 and len(self.velocity_samples) > 20:
             error = self._calculate_velocity_error(self.velocity_setpoint)
-            self.nt.put("kV Error", error)
+            self.nt.put(f"{self.results.mechanism_name}/kV Error", error)
 
             if error < self.best_kV_error:
                 self.best_kV_error = error
@@ -369,11 +370,11 @@ class TrialErrorTuner:
                 return
 
         # Increment every 1.0 seconds
-        if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+        if elapsed > 2.0 and int(elapsed) != int(elapsed - 0.02):
             self.kV_trial += self.kV_increment
 
         # Timeout or simulation
-        if elapsed > 20.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -408,10 +409,10 @@ class TrialErrorTuner:
         else:
             self.current_motor.set_control(ControlMode.VELOCITY, self.velocity_setpoint)
 
-        self.nt.put("Trial kP", self.kP_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kP", self.kP_trial)
 
         # Check for oscillation after settling
-        if elapsed > 1.0 and len(self.position_samples) > 30:
+        if elapsed > 2.0 and len(self.position_samples) > 30:
             if self._detect_oscillation():
                 self.kP_trial = max(0.0, self.kP_trial - self.kP_increment)
                 self.results.trial_gains.kP = self.kP_trial
@@ -427,11 +428,11 @@ class TrialErrorTuner:
                 return
 
         # Increment every 1.0 seconds
-        if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+        if elapsed > 2.0 and int(elapsed) != int(elapsed - 0.02):
             self.kP_trial += self.kP_increment
 
         # Timeout or simulation
-        if elapsed > 20.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -461,7 +462,7 @@ class TrialErrorTuner:
             kG=self.kG_trial,
         )
         self.current_motor.set_control(ControlMode.VELOCITY, self.velocity_setpoint)
-        self.nt.put("Trial kI", self.kI_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kI", self.kI_trial)
 
         # Check for instability or oscillation
         if elapsed > 2.0 and len(self.velocity_samples) > 30:
@@ -478,11 +479,11 @@ class TrialErrorTuner:
                 return
 
         # Increment every 1.0 seconds
-        if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+        if elapsed > 2.0 and int(elapsed) != int(elapsed - 0.02):
             self.kI_trial += self.kI_increment
 
         # Timeout or simulation
-        if elapsed > 20.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -510,10 +511,10 @@ class TrialErrorTuner:
             kG=self.kG_trial,
         )
         self.current_motor.set_control(ControlMode.POSITION, self.position_setpoint)
-        self.nt.put("Trial kD", self.kD_trial)
+        self.nt.put(f"{self.results.mechanism_name}/Trial kD", self.kD_trial)
 
         # Check for jitter after settling
-        if elapsed > 1.0 and len(self.velocity_samples) > 30:
+        if elapsed > 2.0 and len(self.velocity_samples) > 30:
             if self._detect_jitter():
                 self.kD_trial = max(0.0, self.kD_trial - self.kD_increment)
                 self.results.trial_gains.kD = self.kD_trial
@@ -527,11 +528,11 @@ class TrialErrorTuner:
                 return
 
         # Increment every 1.0 seconds
-        if elapsed > 1.0 and int(elapsed) != int(elapsed - 0.02):
+        if elapsed > 2.0 and int(elapsed) != int(elapsed - 0.02):
             self.kD_trial += self.kD_increment
 
         # Timeout or simulation
-        if elapsed > 20.0 or (
+        if elapsed > 120.0 or (
             RobotBase.getRuntimeType() == RuntimeType.kSimulation and elapsed > 2.0
         ):
             if RobotBase.getRuntimeType() == RuntimeType.kSimulation:
@@ -568,3 +569,5 @@ class TrialErrorTuner:
             self._tune_kI(elapsed)
         elif self.current_test == "kD":
             self._tune_kD(elapsed)
+
+        self.current_motor.periodic()

@@ -10,24 +10,33 @@ import math
 from phoenix6.hardware import TalonFX, TalonFXS
 from phoenix6 import controls
 import wpilib
+from wpilib.interfaces import MotorController
 from phoenix6.configs import Slot0Configs
 from phoenix6.signals import GravityTypeValue, StaticFeedforwardSignValue
-from rev import SparkMax, SparkMaxConfig, ResetMode, PersistMode
+from wpimath.trajectory import TrapezoidProfile, TrapezoidProfileRadians
 from wpimath.controller import (
     ArmFeedforward,
     SimpleMotorFeedforwardMeters,
     SimpleMotorFeedforwardRadians,
     ElevatorFeedforward,
+    PIDController,
+    ProfiledPIDController,
+    ProfiledPIDControllerRadians,
 )
+from rev import SparkMax, SparkMaxConfig, ResetMode, PersistMode
+from wpimath import units
+from wpimath.geometry import Rotation2d
 from .tuning_data import GravityType
+from ..ctre.gains import PhoenixGains, MechanismType, PhoenixWPILibController
 
 
 class MotorType(Enum):
     """Supported motor controller types"""
 
     TALON_FX = "TalonFX"
-    TALON_FXS = "TalonFX"
+    TALON_FXS = "TalonFXS"
     SPARK_MAX = "SparkMax"
+    GENERIC = "Generic"
 
 
 class ControlMode(Enum):
@@ -104,12 +113,31 @@ class MotorInterface(ABC):
         """Get motor controller type"""
         pass
 
+    def periodic(self) -> None:
+        """Called periodically for any tasks"""
+        pass
+
+    def enable_wpilib_control(self, mechanism_type: "MechanismType") -> bool:
+        """Enable WPILib control mode (if supported)"""
+        return False
+
+    def disable_wpilib_control(self) -> None:
+        """Disable WPILib control mode"""
+        pass
+
+    def is_wpilib_control_enabled(self) -> bool:
+        """Check if WPILib control mode is active"""
+        return False
+
 
 class TalonFXInterface(MotorInterface):
-    """TalonFX motor controller interface"""
+    """TalonFX motor controller interface with WPILib wrapper (always enabled)"""
 
     def __init__(
-        self, motor: TalonFX, position_getter: Optional[Callable[[], float]] = None
+        self,
+        motor: TalonFX,
+        position_getter: Optional[Callable[[], float]] = None,
+        mechanism_type: MechanismType = MechanismType.SIMPLE_VELOCITY,
     ):
         """
         Initialize with a TalonFX motor object.
@@ -117,25 +145,92 @@ class TalonFXInterface(MotorInterface):
         Args:
             motor: phoenix6.hardware.TalonFX instance
             position_getter: Optional custom position getter (for mechanisms with gearing)
+            mechanism_type: Type of mechanism (ARM, ELEVATOR, POSITION, or SIMPLE_VELOCITY) for gravity compensation
         """
         self.motor = motor
         self.position_getter = position_getter
-        self._last_config_time = 0.0
-        self._config_delay = 0.1  # 100ms between configs
+        self._mechanism_type = mechanism_type
+
+        # WPILib controller (always enabled by default)
+        self._current_gains = PhoenixGains()
+        self._wpilib_controller = PhoenixWPILibController(
+            mechanism_type=mechanism_type, gains=self._current_gains
+        )
+
+    def enable_wpilib_control(self, mechanism_type: "MechanismType") -> bool:
+        """
+        Update WPILib control mechanism type.
+        Uses Phoenix units (rotations, rotations/sec) directly.
+        """
+        self._mechanism_type = mechanism_type
+        self._wpilib_controller = PhoenixWPILibController(
+            mechanism_type=mechanism_type, gains=self._current_gains
+        )
+        return True
+
+    def disable_wpilib_control(self) -> None:
+        """No-op: WPILib control is always enabled"""
+        pass
+
+    def is_wpilib_control_enabled(self) -> bool:
+        """Check if WPILib control mode is active"""
+        return True
 
     def set_control(self, mode: ControlMode, value: float = 0.0) -> None:
-        if mode == ControlMode.VOLTAGE:
+        """
+        Set motor control.
+        Uses WPILib controller with Phoenix units for position/velocity.
+        """
+        if mode in [ControlMode.POSITION, ControlMode.VELOCITY]:
+            self._apply_wpilib_control(mode, value)
+        elif mode == ControlMode.VOLTAGE:
             self.motor.set_control(controls.VoltageOut(value))
-        elif mode == ControlMode.VELOCITY:
-            self.motor.set_control(controls.VelocityVoltage(value))
-        elif mode == ControlMode.POSITION:
-            # TalonFX uses rotations, convert from radians
-            rotations = value / math.tau
-            self.motor.set_control(controls.PositionVoltage(rotations))
         elif mode == ControlMode.PERCENT:
             self.motor.set_control(controls.DutyCycleOut(value))
         elif mode == ControlMode.BRAKE:
             self.motor.set_control(controls.StaticBrake())
+
+    def _apply_wpilib_control(self, mode: ControlMode, value: float) -> None:
+        """Apply control using WPILib controller with Phoenix units"""
+        # Get current state in Phoenix units (rotations, rotations/sec)
+        current_position_rot = self.motor.get_position().value
+        current_velocity_rps = self.motor.get_velocity().value
+
+        if mode == ControlMode.POSITION:
+            # Convert radians to rotations for WPILib controller
+            setpoint_rot = value / math.tau
+
+            # Calculate angle for gravity compensation (ARM only)
+            angle = None
+            if self._mechanism_type == MechanismType.ARM:
+                angle = value  # Already in radians
+
+            # Calculate in Phoenix units
+            output_volts = self._wpilib_controller.calculate(
+                current_position=current_position_rot,
+                setpoint=setpoint_rot,
+                current_velocity=current_velocity_rps,
+                setpoint_velocity=0.0,
+                angle=angle,
+            )
+            self.motor.set_control(controls.VoltageOut(output_volts))
+
+        elif mode == ControlMode.VELOCITY:
+            # Convert radians/sec to rotations/sec
+            setpoint_rps = value / math.tau
+
+            angle = None
+            if self._mechanism_type == MechanismType.ARM:
+                # Use current position for gravity comp
+                angle = current_position_rot * math.tau  # Convert to radians
+
+            output_volts = self._wpilib_controller.calculate_velocity(
+                current_velocity=current_velocity_rps,
+                setpoint_velocity=setpoint_rps,
+                setpoint_acceleration=0.0,
+                angle=angle,
+            )
+            self.motor.set_control(controls.VoltageOut(output_volts))
 
     def get_position(self) -> float:
         """Returns position in radians or custom units"""
@@ -162,38 +257,21 @@ class TalonFXInterface(MotorInterface):
         static_feedforward_sign: Optional[StaticFeedforwardSignValue] = None,
         slot: int = 0,
     ) -> bool:
+        """
+        Apply gains to WPILib controller only (no Phoenix config application).
 
-        current_time = wpilib.Timer.getFPGATimestamp()
-        if current_time - self._last_config_time < self._config_delay:
-            return False
-
-        slot_config = Slot0Configs()
-        slot_config.k_s = kS
-        slot_config.k_v = kV
-        slot_config.k_a = kA
-        slot_config.k_p = kP
-        slot_config.k_i = kI
-        slot_config.k_d = kD
-        slot_config.k_g = kG
-        if gravity_type is not None:
-            slot_config.gravity_type = (
-                GravityTypeValue.ARM_COSINE
-                if gravity_type == GravityType.COSINE
-                else GravityTypeValue.ELEVATOR_STATIC
-            )
-        if static_feedforward_sign is not None:
-            slot_config.static_feedforward_sign = (
-                StaticFeedforwardSignValue.USE_VELOCITY_SIGN
-                if kS >= 0
-                else StaticFeedforwardSignValue.NEGATIVE_ONLY
-            )
-
-        status = self.motor.configurator.apply(slot_config, 0.050)
-
-        if status.is_ok():
-            self._last_config_time = current_time
-            return True
-        return False
+        Gains are in Phoenix units:
+        - kP: output per rotation error
+        - kD: output per rotations/sec error
+        - kV: volts per rotations/sec
+        - kA: volts per rotations/sec²
+        """
+        # Update WPILib controller gains
+        self._current_gains = PhoenixGains(
+            kP=kP, kI=kI, kD=kD, kS=kS, kV=kV, kA=kA, kG=kG
+        )
+        self._wpilib_controller.update_gains(self._current_gains)
+        return True
 
     def get_motor_id(self) -> int:
         return self.motor.device_id
@@ -203,10 +281,13 @@ class TalonFXInterface(MotorInterface):
 
 
 class TalonFXSInterface(MotorInterface):
-    """TalonFXS motor controller interface"""
+    """TalonFXS motor controller interface with WPILib wrapper (always enabled)"""
 
     def __init__(
-        self, motor: TalonFXS, position_getter: Optional[Callable[[], float]] = None
+        self,
+        motor: TalonFXS,
+        position_getter: Optional[Callable[[], float]] = None,
+        mechanism_type: MechanismType = MechanismType.SIMPLE_VELOCITY,
     ):
         """
         Initialize with a TalonFXS motor object.
@@ -214,25 +295,86 @@ class TalonFXSInterface(MotorInterface):
         Args:
             motor: phoenix6.hardware.TalonFXS instance
             position_getter: Optional custom position getter (for mechanisms with gearing)
+            mechanism_type: Type of mechanism (ARM, ELEVATOR, POSITION, or SIMPLE_VELOCITY) for gravity compensation
         """
         self.motor = motor
         self.position_getter = position_getter
-        self._last_config_time = 0.0
-        self._config_delay = 0.1  # 100ms between configs
+        self._mechanism_type = mechanism_type
+
+        # WPILib controller (always enabled by default)
+        self._current_gains = PhoenixGains()
+        self._wpilib_controller = PhoenixWPILibController(
+            mechanism_type=mechanism_type, gains=self._current_gains
+        )
+
+    def enable_wpilib_control(self, mechanism_type: "MechanismType") -> bool:
+        """
+        Update WPILib control mechanism type.
+        Uses Phoenix units (rotations, rotations/sec) directly.
+        """
+        self._mechanism_type = mechanism_type
+        self._wpilib_controller = PhoenixWPILibController(
+            mechanism_type=mechanism_type, gains=self._current_gains
+        )
+        return True
+
+    def disable_wpilib_control(self) -> None:
+        """No-op: WPILib control is always enabled"""
+        pass
+
+    def is_wpilib_control_enabled(self) -> bool:
+        """Check if WPILib control mode is active"""
+        return True
 
     def set_control(self, mode: ControlMode, value: float = 0.0) -> None:
-        if mode == ControlMode.VOLTAGE:
+        """Set motor control using WPILib controller"""
+        if mode in [ControlMode.POSITION, ControlMode.VELOCITY]:
+            self._apply_wpilib_control(mode, value)
+        elif mode == ControlMode.VOLTAGE:
             self.motor.set_control(controls.VoltageOut(value))
-        elif mode == ControlMode.VELOCITY:
-            self.motor.set_control(controls.VelocityVoltage(value))
-        elif mode == ControlMode.POSITION:
-            # TalonFXS uses rotations, convert from radians
-            rotations = value / math.tau
-            self.motor.set_control(controls.PositionVoltage(rotations))
         elif mode == ControlMode.PERCENT:
             self.motor.set_control(controls.DutyCycleOut(value))
         elif mode == ControlMode.BRAKE:
             self.motor.set_control(controls.StaticBrake())
+
+    def _apply_wpilib_control(self, mode: ControlMode, value: float) -> None:
+        """Apply control using WPILib controller with Phoenix units"""
+        # Get current state in Phoenix units (rotations, rotations/sec)
+        current_position_rot = self.motor.get_position().value
+        current_velocity_rps = self.motor.get_velocity().value
+
+        if mode == ControlMode.POSITION:
+            # Convert radians to rotations for WPILib controller
+            setpoint_rot = value / math.tau
+
+            angle = None
+            if self._mechanism_type == MechanismType.ARM:
+                angle = value  # Already in radians
+
+            output_volts = self._wpilib_controller.calculate(
+                current_position=current_position_rot,
+                setpoint=setpoint_rot,
+                current_velocity=current_velocity_rps,
+                setpoint_velocity=0.0,
+                angle=angle,
+            )
+            self.motor.set_control(controls.VoltageOut(output_volts))
+
+        elif mode == ControlMode.VELOCITY:
+            # Convert radians/sec to rotations/sec
+            setpoint_rps = value / math.tau
+
+            angle = None
+            if self._mechanism_type == MechanismType.ARM:
+                angle = current_position_rot * math.tau  # Convert to radians
+
+            output_volts = self._wpilib_controller.calculate_velocity(
+                current_velocity=current_velocity_rps,
+                setpoint_velocity=setpoint_rps,
+                setpoint_acceleration=0.0,
+                angle=angle,
+            )
+            self.motor.set_control(controls.VoltageOut(output_volts))
 
     def get_position(self) -> float:
         """Returns position in radians or custom units"""
@@ -255,28 +397,17 @@ class TalonFXSInterface(MotorInterface):
         kI: float = 0.0,
         kD: float = 0.0,
         kG: float = 0.0,
+        gravity_type: Optional[GravityType] = None,
+        static_feedforward_sign: Optional[StaticFeedforwardSignValue] = None,
         slot: int = 0,
     ) -> bool:
-
-        current_time = wpilib.Timer.getFPGATimestamp()
-        if current_time - self._last_config_time < self._config_delay:
-            return False
-
-        slot_config = Slot0Configs()
-        slot_config.k_s = kS
-        slot_config.k_v = kV
-        slot_config.k_a = kA
-        slot_config.k_p = kP
-        slot_config.k_i = kI
-        slot_config.k_d = kD
-        slot_config.k_g = kG
-
-        status = self.motor.configurator.apply(slot_config, 0.050)
-
-        if status.is_ok():
-            self._last_config_time = current_time
-            return True
-        return False
+        """Apply gains to WPILib controller only (no Phoenix config application)"""
+        # Update WPILib controller gains
+        self._current_gains = PhoenixGains(
+            kP=kP, kI=kI, kD=kD, kS=kS, kV=kV, kA=kA, kG=kG
+        )
+        self._wpilib_controller.update_gains(self._current_gains)
+        return True
 
     def get_motor_id(self) -> int:
         return self.motor.device_id
@@ -286,10 +417,7 @@ class TalonFXSInterface(MotorInterface):
 
 
 class SparkMaxInterface(MotorInterface):
-    """SparkMax motor controller interface\n
-    Note:
-    This does not currently work cause im or rev is stupid
-    """
+    """SparkMax motor controller interface"""
 
     def __init__(
         self,
@@ -312,21 +440,58 @@ class SparkMaxInterface(MotorInterface):
         self.position_getter = position_getter
         self._last_config_time = 0.0
         self._config_delay = 0.1
-
-        # Store kG separately since SparkMax doesn't have native support
-        self._kG = 0.0
+        self.gains = {
+            "kS": 0.0,
+            "kV": 0.0,
+            "kA": 0.0,
+            "kP": 0.0,
+            "kI": 0.0,
+            "kD": 0.0,
+            "kG": 0.0,
+        }
+        self.controller_set = False
 
     def set_control(self, mode: ControlMode, value: float = 0.0) -> None:
-
         if mode == ControlMode.VOLTAGE:
             self.motor.setVoltage(value)
+
         elif mode == ControlMode.VELOCITY:
-            # Convert radians/sec to RPM if needed
-            self.pid_controller.setReference(value, SparkMax.ControlType.kVelocity)
+            if self.controller_set == False:
+                self.pid_controller = PIDController(
+                    self.gains["kP"],
+                    self.gains["kI"],
+                    self.gains["kD"],
+                )
+                self.feedforward = SimpleMotorFeedforwardMeters(
+                    self.gains["kS"],
+                    self.gains["kV"],
+                    self.gains["kA"],
+                )
+            output = self.feedforward.calculate(value) + self.pid_controller.calculate(
+                self.get_velocity(), value
+            )
+            self.motor.setVoltage(output)
+
         elif mode == ControlMode.POSITION:
-            self.pid_controller.setReference(value, SparkMax.ControlType.kPosition)
+            if self.controller_set == False:
+                self.pid_controller = PIDController(
+                    self.gains["kP"],
+                    self.gains["kI"],
+                    self.gains["kD"],
+                )
+                self.feedforward = SimpleMotorFeedforwardMeters(
+                    self.gains["kS"],
+                    self.gains["kV"],
+                    self.gains["kA"],
+                )
+            output = self.feedforward.calculate(value) + self.pid_controller.calculate(
+                self.get_velocity(), value
+            )
+            self.motor.setVoltage(output)
+
         elif mode == ControlMode.PERCENT:
             self.motor.set(value)
+
         elif mode == ControlMode.BRAKE:
             self.motor.set(0.0)
             self.motor.configure(
@@ -343,9 +508,7 @@ class SparkMaxInterface(MotorInterface):
 
     def get_velocity(self) -> float:
         """Returns velocity in mechanism units/sec (based on conversion factor)"""
-        return (
-            self.encoder.getVelocity() * self.conversion_factor / 60.0
-        )  # RPM to units/sec
+        return self.encoder.getVelocity() * self.conversion_factor / 60.0
 
     def apply_gains(
         self,
@@ -358,23 +521,16 @@ class SparkMaxInterface(MotorInterface):
         kG: float = 0.0,
         slot: int = 0,
     ) -> bool:
-        import wpilib
-
         current_time = wpilib.Timer.getFPGATimestamp()
         if current_time - self._last_config_time < self._config_delay:
             return False
 
-        # SparkMax doesn't have kS, kA, kG in the same way
-        # Use FF for kV, store kG separately for manual application
-        self.pid_controller.setP(kP, slot)
-        self.pid_controller.setI(kI, slot)
-        self.pid_controller.setD(kD, slot)
-        self.pid_controller.setFF(kV, slot)  # Use kV as feedforward
-
-        self._kG = kG  # Store for manual gravity compensation
-
-        # Note: kS and kA need to be applied manually in user code
-        # You may want to use WPILib's SimpleMotorFeedforward
+        self.pid_controller.setP(kP)
+        self.pid_controller.setI(kI)
+        self.pid_controller.setD(kD)
+        self.feedforward.setKa(kA)
+        self.feedforward.setKv(kV)
+        self.feedforward.setKs(kS)
 
         self._last_config_time = current_time
         return True
@@ -384,3 +540,126 @@ class SparkMaxInterface(MotorInterface):
 
     def get_motor_type(self) -> MotorType:
         return MotorType.SPARK_MAX
+
+
+class WPIMotorControllerInterface(MotorInterface):
+    """Generic WPILib motor controller interface that uses wpilib pidf"""
+
+    def __init__(
+        self,
+        motor: MotorController,
+        position_getter: Callable[[], Rotation2d],
+        velocity_getter: Callable[[], units.meters_per_second],
+        conversion_factor: float = 1.0,
+    ):
+        """
+        Initialize with a MotorController motor object.
+
+        Args:
+            motor: MotorController instance
+            position_getter: position getter
+            conversion_factor: Position conversion factor (e.g., for encoder to mechanism units)
+        """
+        self.motor = motor
+        self.pid_controller = PIDController(0.0, 0.0, 0.0)
+        self.feedforward = SimpleMotorFeedforwardMeters(0.0, 0.0)
+        self.conversion_factor = conversion_factor
+        self.position_getter = position_getter
+        self.velocity_getter = velocity_getter
+        self._last_config_time = 0.0
+        self._config_delay = 0.1
+        self.gains = {
+            "kS": 0.0,
+            "kV": 0.0,
+            "kA": 0.0,
+            "kP": 0.0,
+            "kI": 0.0,
+            "kD": 0.0,
+            "kG": 0.0,
+        }
+        self.controller_set = False
+
+    def set_control(self, mode: ControlMode, value: float = 0.0) -> None:
+
+        if mode == ControlMode.VOLTAGE:
+            self.motor.setVoltage(value)
+
+        elif mode == ControlMode.VELOCITY:
+            if self.controller_set == False:
+                self.pid_controller = PIDController(
+                    self.gains["kP"],
+                    self.gains["kI"],
+                    self.gains["kD"],
+                )
+                self.feedforward = SimpleMotorFeedforwardMeters(
+                    self.gains["kS"],
+                    self.gains["kV"],
+                    self.gains["kA"],
+                )
+            output = self.feedforward.calculate(value) + self.pid_controller.calculate(
+                self.get_velocity(), value
+            )
+            self.motor.setVoltage(output)
+
+        elif mode == ControlMode.POSITION:
+            if self.controller_set == False:
+                self.pid_controller = PIDController(
+                    self.gains["kP"],
+                    self.gains["kI"],
+                    self.gains["kD"],
+                )
+                self.feedforward = SimpleMotorFeedforwardMeters(
+                    self.gains["kS"],
+                    self.gains["kV"],
+                    self.gains["kA"],
+                )
+            output = self.feedforward.calculate(value) + self.pid_controller.calculate(
+                self.get_velocity(), value
+            )
+            self.motor.setVoltage(output)
+
+        elif mode == ControlMode.PERCENT:
+            self.motor.set(value)
+
+        elif mode == ControlMode.BRAKE:
+            self.motor.set(0.0)
+            self.motor.stopMotor()
+
+    def get_position(self) -> float:
+        """Returns position in Rotation2d"""
+        return self.position_getter()
+
+    def get_velocity(self) -> float:
+        """Returns velocity in meters/sec"""
+        return self.velocity_getter()
+
+    def apply_gains(
+        self,
+        kS: float = 0.0,
+        kV: float = 0.0,
+        kA: float = 0.0,
+        kP: float = 0.0,
+        kI: float = 0.0,
+        kD: float = 0.0,
+        kG: float = 0.0,
+        slot: int = 0,
+    ) -> bool:
+        current_time = wpilib.Timer.getFPGATimestamp()
+        if current_time - self._last_config_time < self._config_delay:
+            return False
+
+        self.pid_controller.setP(kP)
+        self.pid_controller.setI(kI)
+        self.pid_controller.setD(kD)
+        self.feedforward.setKa(kA)
+        self.feedforward.setKv(kV)
+        self.feedforward.setKs(kS)
+
+        self._last_config_time = current_time
+        return True
+
+    def get_motor_id(self) -> int:
+        return 65
+
+    def get_motor_type(self) -> MotorType:
+        return MotorType.GENERIC

@@ -6,9 +6,6 @@ from phoenix6.hardware import CANcoder, TalonFX
 from phoenix6 import CANBus
 
 from components.swerve_wheel import SwerveWheel
-from components.swerve_tuner import SwerveTuner
-from components.analytical_tuner import AnalyticalTuner
-from components.trial_error_tuner import TrialErrorTuner
 from lemonlib.smart import SmartProfile
 from lemonlib.autopid.generic_motor_tuner import (
     GenericMotorTuner,
@@ -23,13 +20,7 @@ from lemonlib.autopid.motor_interface import TalonFXInterface, SparkMaxInterface
 
 
 class MyRobot(MagicRobot):
-
-    tuner: SwerveTuner
-
-    analytical_tuner: AnalyticalTuner
-    trial_tuner: TrialErrorTuner
-
-    front_left: SwerveWheel
+    rear_left: SwerveWheel
 
     def createObjects(self):
         """Initialize all robot objects here"""
@@ -42,12 +33,13 @@ class MyRobot(MagicRobot):
         # Flag to track if tuning is active
         self.tuning_active = False
         self.tuning_enabled = True
+        self.tuner_instance = None  # Will hold the active tuner
 
         self.canicore_canbus = CANBus("can0")
         # Front Left Module - CAN IDs: Speed=1, Direction=2, CANcoder=3
-        self.front_left_speed_motor = TalonFX(11, self.canicore_canbus)
-        self.front_left_direction_motor = TalonFX(12, self.canicore_canbus)
-        self.front_left_cancoder = CANcoder(13, self.canicore_canbus)
+        self.rear_left_speed_motor = TalonFX(41, self.canicore_canbus)
+        self.rear_left_direction_motor = TalonFX(42, self.canicore_canbus)
+        self.rear_left_cancoder = CANcoder(43, self.canicore_canbus)
 
         # Configure module parameters (adjust these for your robot)
         self.wheel_radius = 0.05
@@ -83,13 +75,29 @@ class MyRobot(MagicRobot):
         self.state = None
 
     def teleopPeriodic(self):
-        # self.tuner.engage()
         """Called periodically during teleop mode"""
-        # self.tuner.engage()
 
-        if self.joystick.getBackButtonPressed():
+        # Start tuning when back button is pressed
+        if self.joystick.getBackButtonPressed() and self.tuner_instance is None:
             print("Starting Swerve Tuning...")
-            self.tuner.start_tuning()
+            self.tuner_instance = tune_swerve_module(
+                self.rear_left.direction_motor,
+                "rear_left_direction_motor",
+            )
+            self.tuner_instance.start_tuning(
+                use_analytical=True, use_trial=True, timeout_seconds=180.0
+            )
+
+        # Run tuner periodic if active
+        if self.tuner_instance is not None:
+            if not self.tuner_instance.is_complete():
+                self.tuner_instance.periodic()
+            else:
+                # Tuning complete - get results
+                gains = self.tuner_instance.get_final_gains()
+                if gains:
+                    print(f"Tuning complete! Final gains: {gains}")
+                self.tuner_instance = None  # Clear tuner
 
 
 if __name__ == "__main__":

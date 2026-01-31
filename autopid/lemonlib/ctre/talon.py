@@ -5,6 +5,8 @@ from wpiutil import SendableBuilder, Sendable
 
 from wpilib.interfaces import MotorController
 import phoenix6
+from wpilib import Timer
+from phoenix6 import StatusCode
 
 
 class LemonTalonFX(phoenix6.hardware.TalonFX, MotorController):
