@@ -22,7 +22,7 @@ from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
 from wpiutil import Sendable
 
-from magicbot import will_reset_to
+from magicbot import will_reset_to, feedback
 from lemonlib.smart import SmartNT, SmartPreference, SmartProfile
 
 
@@ -35,6 +35,8 @@ class Shooter:
     tuning_enabled: bool
 
     shooter_velocity = will_reset_to(0.0)
+    shooter_voltage = will_reset_to(0.0)
+    manual_control = will_reset_to(False)
 
     def setup(self):
         self.shooter_motors_config = TalonFXConfiguration()
@@ -58,9 +60,6 @@ class Shooter:
             self.left_motor.device_id, MotorAlignmentValue.OPPOSED
         )
 
-    def set_velocity(self, speed: float):
-        self.shooter_velocity = speed
-
     def on_enable(self):
         if self.tuning_enabled:
             self.shooter_controller = (
@@ -73,8 +72,35 @@ class Shooter:
                 self.shooter_motors_config.with_slot0(self.shooter_controller)
             )
 
+    """
+    CONTROL METHODS
+    """
+
+    def set_velocity(self, speed: float):
+        self.manual_control = False
+        self.shooter_velocity = speed
+
+    def set_voltage(self, volts: float):
+        self.manual_control = True
+        self.shooter_voltage = volts
+
+    """
+    INFORMATIONAL METHODS
+    """
+
+    @feedback
+    def get_velocity(self) -> float:
+        return self.left_motor.get_velocity().value
+
+    @feedback
+    def get_target_velocity(self) -> float:
+        return self.shooter_velocity
+
     def execute(self):
-        self.left_motor.set_control(
-            self.shooter_control.with_velocity(self.shooter_velocity)
-        )
+        if self.manual_control:
+            self.left_motor.set_control(controls.VoltageOut(self.shooter_voltage))
+        else:
+            self.left_motor.set_control(
+                self.shooter_control.with_velocity(self.shooter_velocity)
+            )
         self.right_motor.set_control(self.shooter_follower)
