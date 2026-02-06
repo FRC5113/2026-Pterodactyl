@@ -61,6 +61,7 @@ class MyRobot(LemonRobot):
     rasing_slew_rate: SmartPreference = SmartPreference(5.0)
     falling_slew_rate: SmartPreference = SmartPreference(5.0)
     intake: Intake
+    auto_context: auto.AutoContext
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -249,7 +250,6 @@ class MyRobot(LemonRobot):
         else:
             self.alliance = False
 
-        self.auto_context = None
 
     def enabledperiodic(self):
         self.drive_control.engage()
@@ -262,12 +262,10 @@ class MyRobot(LemonRobot):
             it=self.intake,
             sc=self.shooter_controller,
         )
-        auto.ctx = self.auto_context
-        auto.tempAutoRoutine.ctx = self.auto_context
         auto.tempAutoRoutine.reset()
 
     def autonomousPeriodic(self):
-        auto.tempAutoRoutine.run()
+        auto.tempAutoRoutine.run(self.auto_context)
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes

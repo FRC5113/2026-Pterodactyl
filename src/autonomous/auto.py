@@ -1,12 +1,11 @@
 from enum import Enum
 from typing import List
 from wpimath.geometry import Pose2d, Rotation2d
-from wpimath.units import meters, degrees, volts
+from wpimath.units import meters, degrees
 from components.swerve_drive import SwerveDrive
 from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
-
 
 class StepStatus(Enum):
     RUNNING = 1
@@ -29,7 +28,7 @@ class AutoRunner:
     def reset(self):
         self.index = 0
 
-    def run(self):
+    def run(self, ctx: AutoContext):
         if self.index >= len(self.steps):
             return
 
@@ -139,11 +138,11 @@ class ShootAuto(AutoStep):
         return StepStatus.RUNNING
 
 
-ctx = None  # Must be initialized in robot.py
 
 
 # THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
 tempAutoRoutine = AutoRunner(
+
     [
         SwerveDriveAuto(1.5, 2.11, 45),
         ParallelStep(SwerveDriveAuto(1.5, 4.59, 135), IntakeAuto(True)),
@@ -153,5 +152,4 @@ tempAutoRoutine = AutoRunner(
         SwerveDriveAuto(2.51, 8.57, -135),
         ShootAuto(),
     ],
-    ctx,
 )
