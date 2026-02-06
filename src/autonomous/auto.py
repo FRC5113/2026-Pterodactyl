@@ -7,6 +7,7 @@ from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
 
+
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
@@ -138,11 +139,8 @@ class ShootAuto(AutoStep):
         return StepStatus.RUNNING
 
 
-
-
 # THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
 tempAutoRoutine = AutoRunner(
-
     [
         SwerveDriveAuto(1.5, 2.11, 45),
         ParallelStep(SwerveDriveAuto(1.5, 4.59, 135), IntakeAuto(True)),

@@ -250,7 +250,6 @@ class MyRobot(LemonRobot):
         else:
             self.alliance = False
 
-
     def enabledperiodic(self):
         self.drive_control.engage()
         self.shooter_controller.engage()
