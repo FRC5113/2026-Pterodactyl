@@ -29,7 +29,7 @@ from lemonlib.util import (
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib import LemonRobot, LemonCamera
 
-from autonomous.auto_base import AutoBase
+from autonomous import auto
 from components.swerve_drive import SwerveDrive
 from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
@@ -61,6 +61,7 @@ class MyRobot(LemonRobot):
     rasing_slew_rate: SmartPreference = SmartPreference(5.0)
     falling_slew_rate: SmartPreference = SmartPreference(5.0)
     intake: Intake
+    auto_context: auto.AutoContext
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -253,8 +254,17 @@ class MyRobot(LemonRobot):
         self.drive_control.engage()
         self.shooter_controller.engage()
 
+    def autonomousInit(self):
+        self.auto_context = auto.AutoContext(
+            sd=self.swerve_drive,
+            sh=self.shooter,
+            it=self.intake,
+            sc=self.shooter_controller,
+        )
+        auto.tempAutoRoutine.reset()
+
     def autonomousPeriodic(self):
-        self._display_auto_trajectory()
+        auto.tempAutoRoutine.run(self.auto_context)
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
@@ -328,18 +338,6 @@ class MyRobot(LemonRobot):
     @feedback
     def get_voltage(self) -> units.volts:
         return RobotController.getBatteryVoltage()
-
-    def _display_auto_trajectory(self) -> None:
-        selected_auto = self._automodes.chooser.getSelected()
-        if isinstance(selected_auto, AutoBase):
-            selected_auto.display_trajectory()
-
-    @feedback
-    def display_auto_state(self) -> None:
-        selected_auto = self._automodes.chooser.getSelected()
-        if isinstance(selected_auto, AutoBase):
-            return selected_auto.current_state
-        return "No Auto Selected"
 
 
 if __name__ == "__main__":
