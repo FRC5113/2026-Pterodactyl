@@ -112,24 +112,26 @@ class MyRobot(LemonRobot):
         self.speed_profile = SmartProfile(
             "speed",
             {
-                "kP": 7.8294,
+                "kP": 0.0,
                 "kI": 0.0,
                 "kD": 0.0,
-                "kS": 0.11742,
-                "kV": 2.3941,
-                "kA": 0.11426,
+                "kS": 0.17,
+                "kV": 0.104,
+                "kA": 0.01,
             },
-            not self.low_bandwidth,
+            (not self.low_bandwidth) and self.tuning_enabled,
         )
         self.direction_profile = SmartProfile(
             "direction",
             {
-                "kP": 92.079,
+                "kP": 3.0,
                 "kI": 0.0,
-                "kD": 1.6683,
-                "kS": 0.086374,
+                "kD": 0.0,
+                "kS": 0.14,
+                "kV": 0.375,
+                "kA": 0.0,
             },
-            not self.low_bandwidth,
+            (not self.low_bandwidth) and self.tuning_enabled,
         )
         self.translation_profile = SmartProfile(
             "translation",

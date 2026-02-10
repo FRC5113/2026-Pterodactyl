@@ -27,8 +27,8 @@ from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
 
 from wpiutil import Sendable
 from magicbot import will_reset_to
-from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib.smart import SmartNT
+from lemonlib.smart import SmartPreference, SmartProfile, SmartNT
+from lemonlib.ctre import tryUntilOk
 
 
 class SwerveWheel(Sendable):
@@ -116,9 +116,9 @@ class SwerveWheel(Sendable):
         self.direction_motor_configs.closed_loop_general = (
             ClosedLoopGeneralConfigs().with_continuous_wrap(True)
         )
-
-        self.direction_motor.configurator.apply(self.direction_motor_configs)
-        self.speed_motor.configurator.apply(self.speed_motor_configs)
+        tryUntilOk(5, lambda: self.direction_motor.configurator.apply(self.direction_motor_configs))
+        
+        tryUntilOk(5, lambda: self.speed_motor.configurator.apply(self.speed_motor_configs))
 
         self.drive_position = self.speed_motor.get_position()
         self.drive_velocity = self.speed_motor.get_velocity()
@@ -150,16 +150,15 @@ class SwerveWheel(Sendable):
                 self.direction_profile.create_ctre_turret_controller()
             )
             self.direction_motor_configs.slot0 = self.direction_controller
-
-            self.direction_motor.configurator.apply(self.direction_motor_configs)
-
             self.speed_motor_configs.slot0 = self.speed_controller
-            self.speed_motor.configurator.apply(self.speed_motor_configs)
 
-        self.direction_control = controls.PositionVoltage(0).with_enable_foc(
-            True
-        )  # FOC = Field Oriented Control for better motion
-        self.speed_control = controls.VelocityTorqueCurrentFOC(0)
+            tryUntilOk(5, lambda: self.direction_motor.configurator.apply(self.direction_motor_configs))
+            
+            tryUntilOk(5, lambda: self.speed_motor.configurator.apply(self.speed_motor_configs))
+
+        self.direction_control = controls.PositionVoltage(0)
+         
+        self.speed_control = controls.VelocityTorqueCurrentFOC(0) # FOC = Field Oriented Control for better motion
 
     """
     INFORMATIONAL METHODS
@@ -280,6 +279,10 @@ class SwerveWheel(Sendable):
             self.speed_motor.set_control(controls.static_brake.StaticBrake())
             self.direction_motor.set_control(controls.coast_out.CoastOut())
             return
+        
+        # Update position tracking before using it
+        self.getPosition(refresh=True)
+        
         state = self.desired_state
 
         current_angle = self.swerve_module_position.angle
@@ -304,7 +307,6 @@ class SwerveWheel(Sendable):
             return
 
         # Divide by tau to convert radians back to rotations for motor control
-        print(target_angle)
         self.direction_motor.set_control(
             self.direction_control.with_position(target_angle / math.tau)
         )
