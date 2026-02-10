@@ -1,9 +1,9 @@
 from commands2.sysid import SysIdRoutine
-
-from lemonlib.util import MagicSysIdRoutine
-from components.swerve_drive import SwerveDrive
-from components.drive_control import DriveControl
 from wpimath import units
+
+from components.drive_control import DriveControl
+from components.swerve_drive import SwerveDrive
+from lemonlib.util import MagicSysIdRoutine
 
 
 class SysIdDriveLinear(MagicSysIdRoutine):

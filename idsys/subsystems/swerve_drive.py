@@ -96,9 +96,7 @@ class SwerveDrive(SysidSubsystem):
                 drive_motor.get_motor_voltage().value
             ).position(
                 drive_motor.get_position().value * self.WHEEL_CIRCUMFERENCE
-            ).velocity(
-                drive_motor.get_velocity().value * self.WHEEL_CIRCUMFERENCE
-            )
+            ).velocity(drive_motor.get_velocity().value * self.WHEEL_CIRCUMFERENCE)
 
     @typing.override
     def drive(self, voltage: volts) -> None:

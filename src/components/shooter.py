@@ -1,29 +1,18 @@
-import math
-
-from phoenix6 import controls, StatusSignal
+from magicbot import feedback, will_reset_to
+from phoenix6 import controls
 from phoenix6.configs import (
-    ClosedLoopGeneralConfigs,
     FeedbackConfigs,
     TalonFXConfiguration,
-    TalonFXSConfiguration,
-    CANcoderConfiguration,
 )
-from phoenix6.hardware import CANcoder, TalonFX, TalonFXS
+from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
     FeedbackSensorSourceValue,
-    NeutralModeValue,
-    SensorDirectionValue,
     MotorAlignmentValue,
-    MotorArrangementValue,
-    ExternalFeedbackSensorSourceValue,
+    NeutralModeValue,
 )
 from wpimath import units
-from wpimath.geometry import Rotation2d
-from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
-from wpiutil import Sendable
 
-from magicbot import will_reset_to, feedback
-from lemonlib.smart import SmartNT, SmartPreference, SmartProfile
+from lemonlib.smart import SmartProfile
 
 
 class Shooter:

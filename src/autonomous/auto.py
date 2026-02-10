@@ -1,6 +1,5 @@
 from autonomous.auto_base import AutoBase
 
-
 """
 Trajectories: (start with trajectory:)
 - hub_climb

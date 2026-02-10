@@ -1,14 +1,12 @@
 import phoenix6
 from commands2.button import CommandXboxController, Trigger
 from commands2.sysid import SysIdRoutine
-
 from subsystems.flywheel import Flywheel
 from subsystems.swerve_drive import SwerveDrive
 from subsystems.sysid_subsystem import SysidSubsystem
 
 
 class SysIdRoutineBot:
-
     def __init__(self) -> None:
 
         # This is only for the drive motors

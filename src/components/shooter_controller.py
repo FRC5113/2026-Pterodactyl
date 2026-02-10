@@ -1,10 +1,12 @@
 import math
-from magicbot import will_reset_to, feedback, StateMachine, state, timed_state
+
+from magicbot import StateMachine, state, will_reset_to
+from wpilib import DriverStation
+
+from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
-from components.drive_control import DriveControl
 from game import get_hub_pos
-from wpilib import DriverStation
 from lemonlib.smart import SmartPreference
 
 

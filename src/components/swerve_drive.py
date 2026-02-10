@@ -1,6 +1,11 @@
 import math
 
-from wpilib import SmartDashboard, DriverStation
+from choreo.trajectory import SwerveSample
+from magicbot import feedback, will_reset_to
+from phoenix6 import BaseStatusSignal
+from phoenix6.hardware import Pigeon2
+from wpilib import DriverStation, SmartDashboard
+from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
 from wpimath.estimator import SwerveDrive4PoseEstimator
@@ -12,15 +17,10 @@ from wpimath.kinematics import (
     SwerveModuleState,
 )
 from wpiutil import Sendable, SendableBuilder
-from phoenix6.hardware import Pigeon2
-from phoenix6 import BaseStatusSignal
 
 from components.swerve_wheel import SwerveWheel
-from magicbot import will_reset_to, feedback
+from lemonlib.smart import SmartController, SmartProfile
 from lemonlib.util import Alert, AlertType
-from lemonlib.smart import SmartProfile, SmartController
-from choreo.trajectory import SwerveSample
-from wpilib.sysid import SysIdRoutineLog
 
 
 class SwerveDrive(Sendable):

@@ -1,22 +1,18 @@
 import math
+from typing import List
 
 import choreo
 import choreo.util
-import wpilib
-from wpilib import Field2d, RobotBase, SmartDashboard, DataLogManager, DriverStation
-from typing import List
-from choreo.trajectory import SwerveSample, SwerveTrajectory
-from magicbot import AutonomousStateMachine, state, timed_state, will_reset_to
-from wpimath.controller import PIDController
+from choreo.trajectory import SwerveTrajectory
+from magicbot import AutonomousStateMachine, state, timed_state
+from wpilib import Field2d, RobotBase, SmartDashboard
 from wpimath.geometry import Pose2d
-from wpimath.kinematics import ChassisSpeeds
-from magicbot import feedback
 
-from components.swerve_drive import SwerveDrive
 from components.drive_control import DriveControl
+from components.swerve_drive import SwerveDrive
 
 # from components.odometry import Odometry
-from lemonlib.util import AlertManager, is_red
+from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
@@ -45,7 +41,7 @@ class AutoBase(AutonomousStateMachine):
         for item in self.sequence:
             x = item.split(":")  # divides into tag and name
             assert len(x) == 2  # asserts there were not multiple :'s in item
-            match (x[0]):
+            match x[0]:
                 case "state":
                     pass
                 case "trajectory":

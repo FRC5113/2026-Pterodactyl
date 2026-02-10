@@ -2,42 +2,35 @@ import math
 from pathlib import Path
 
 import wpilib
+from magicbot import feedback
+from phoenix6 import CANBus
+from phoenix6.hardware import CANcoder, Pigeon2, TalonFX, TalonFXS
+from robotpy_apriltag import AprilTagFieldLayout
 from wpilib import (
-    Field2d,
-    RobotController,
     DriverStation,
+    Field2d,
     PowerDistribution,
 )
-
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Transform3d, Rotation3d
-
-from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
-
-from phoenix6.hardware import CANcoder, TalonFX, Pigeon2, TalonFXS
-from phoenix6 import CANBus
-
-from magicbot import feedback
-
-from lemonlib import LemonInput
-from lemonlib.util import (
-    curve,
-    AlertManager,
-    AlertType,
-)
-from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib import LemonRobot, LemonCamera
+from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
-from components.swerve_drive import SwerveDrive
-from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
-from components.sysid_drive import SysIdDriveLinear
 from components.intake import Intake
 from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
+from components.swerve_drive import SwerveDrive
+from components.swerve_wheel import SwerveWheel
+from components.sysid_drive import SysIdDriveLinear
+from lemonlib import LemonCamera, LemonInput, LemonRobot
+from lemonlib.smart import SmartPreference, SmartProfile
+from lemonlib.util import (
+    AlertManager,
+    AlertType,
+    curve,
+)
 
 
 class MyRobot(LemonRobot):
@@ -320,7 +313,6 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-
             if self.secondary.getAButton():
                 self.intake.set_voltage(12)
             if self.secondary.getBButton():

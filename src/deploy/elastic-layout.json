@@ -2141,10 +2141,7 @@
               "topic": "/CameraPublisher/photonvision_Port_1184_Output_MJPEG_Server",
               "period": 0.06,
               "rotation_turns": 0,
-              "resolution": [
-                320.0,
-                180.0
-              ]
+              "resolution": [320.0, 180.0]
             }
           },
           {

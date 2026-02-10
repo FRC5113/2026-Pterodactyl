@@ -1,21 +1,16 @@
 import math
+
 from phoenix6 import unmanaged
-from phoenix6.hardware.talon_fx import TalonFX
-from rev import SparkMaxSim, SparkRelativeEncoderSim, SparkMax, SparkAbsoluteEncoderSim
 from pyfrc.physics.core import PhysicsInterface
 from pyfrc.physics.drivetrains import four_motor_swerve_drivetrain
 
 # from photonlibpy.simulation.photonCameraSim import PhotonCameraSim
 # from photonlibpy.simulation.simCameraProperties import SimCameraProperties
 # from photonlibpy.simulation.visionSystemSim import VisionSystemSim
-from wpilib import DriverStation, Mechanism2d, SmartDashboard, Color8Bit
-from wpilib.simulation import SingleJointedArmSim, ElevatorSim, DIOSim
-from wpimath.system.plant import DCMotor, LinearSystemId
-from wpimath.geometry import Pose2d, Transform2d, Rotation3d
-from robot import MyRobot
+from wpimath.geometry import Pose2d, Transform2d
 
-from lemonlib.simulation import LemonCameraSim
-from lemonlib.simulation import FalconSim, FalconSimFOC, KrakenSim, KrakenSimFOC
+from lemonlib.simulation import KrakenSimFOC, LemonCameraSim
+from robot import MyRobot
 
 
 class PhysicsEngine:

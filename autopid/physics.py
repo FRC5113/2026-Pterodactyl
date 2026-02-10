@@ -13,19 +13,15 @@
 # Examples can be found at https://github.com/robotpy/examples
 
 import math
-from pyfrc.physics.core import PhysicsInterface
-from phoenix6.hardware.talon_fx import TalonFX
-from wpilib.simulation import DCMotorSim
-from wpimath.system.plant import DCMotor, LinearSystemId
+import typing
 
 from phoenix6 import unmanaged
 from phoenix6.hardware.talon_fx import TalonFX
 from pyfrc.physics.core import PhysicsInterface
+from wpilib.simulation import DCMotorSim
 from wpimath.system.plant import DCMotor, LinearSystemId
+
 from robot import MyRobot
-
-
-import typing
 
 if typing.TYPE_CHECKING:
     from .robot import MyRobot

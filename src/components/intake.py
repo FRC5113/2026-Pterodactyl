@@ -1,8 +1,8 @@
-from phoenix6.hardware import TalonFX
-from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
-from phoenix6.signals import NeutralModeValue
-from phoenix6.controls import VoltageOut
 from magicbot import will_reset_to
+from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
+from phoenix6.controls import VoltageOut
+from phoenix6.hardware import TalonFX
+from phoenix6.signals import NeutralModeValue
 from wpimath import units
 
 
