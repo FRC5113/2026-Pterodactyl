@@ -40,6 +40,7 @@ robotpy-native-wpilib==2026.2.1
 robotpy-native-wpimath==2026.2.1
 robotpy-native-wpinet==2026.2.1
 robotpy-native-wpiutil==2026.2.1
+robotpy-pykit==1.0.3
 robotpy-rev==2026.0.0
 robotpy-wpilib-utilities==2026.0.1
 robotpy-wpimath==2026.2.1

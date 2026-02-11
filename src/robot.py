@@ -1,4 +1,5 @@
 import math
+import os
 from pathlib import Path
 
 import wpilib
@@ -38,6 +39,8 @@ from components.intake import Intake
 from components.odometry import Odometry
 from components.shooter import Shooter
 
+from phoenix6 import SignalLogger
+
 
 class MyRobot(LemonRobot):
     sysid_drive: SysIdDriveLinear
@@ -67,8 +70,8 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        self.tuning_enabled = True
-
+        self.tuning_enabled = True 
+        SignalLogger.set_path(os.getcwd() + "/.wpilib/")#maybe should add a file name? I think it does it automaticaly
         self.canivore_canbus = CANBus("can0")
         self.rio_canbus = CANBus.roborio()
 
@@ -263,7 +266,10 @@ class MyRobot(LemonRobot):
             self.alliance = True
         else:
             self.alliance = False
-
+    def on_enable(self):
+        SignalLogger.start()
+    def on_disable(self):
+        SignalLogger.stop()
     def enabledperiodic(self):
         self.drive_control.engage()
 
