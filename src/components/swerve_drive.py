@@ -51,6 +51,7 @@ class SwerveDrive(Sendable):
     def __init__(self) -> None:
         Sendable.__init__(self)
 
+    @staticmethod
     def shouldFlipPath():
         # Boolean supplier that controls when the path will be mirrored for the red alliance
         # This will flip the path being followed to the red side of the field.
@@ -442,11 +443,10 @@ class SwerveDrive(Sendable):
                         chassis_rot,
                     )
                     if self.field_relative
-                    else ChassisSpeeds.fromFieldRelativeSpeeds(
+                    else ChassisSpeeds(
                         self.translationX,
                         self.translationY,
                         self.rotationX,
-                        Rotation2d(),  # Zero rotation = robot-relative
                     )
                 ),
                 self.period,

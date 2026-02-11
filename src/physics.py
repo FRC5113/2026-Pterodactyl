@@ -52,7 +52,7 @@ class PhysicsEngine:
         self.vision_sim_back_left = LemonCameraSim(
             robot.camera_back_left, robot.field_layout, fov=65.0, fps=60.0
         )
-        self.vision_sim_front_right = LemonCameraSim(
+        self.vision_sim_back_right = LemonCameraSim(
             robot.camera_back_right, robot.field_layout, fov=65.0, fps=60.0
         )
 
@@ -104,4 +104,4 @@ class PhysicsEngine:
         self.vision_sim_front_left.update(self.pose)
         self.vision_sim_front_right.update(self.pose)
         self.vision_sim_back_left.update(self.pose)
-        self.vision_sim_front_right.update(self.pose)
+        self.vision_sim_back_right.update(self.pose)

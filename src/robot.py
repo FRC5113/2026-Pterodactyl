@@ -295,7 +295,7 @@ class MyRobot(LemonRobot):
                 self.x_filter.calculate(
                     self.sammi_curve(self.primary.getLeftY()) * mult * self.top_speed
                 ),
-                self.y_filter.calculate(
+                -self.y_filter.calculate(
                     self.sammi_curve(self.primary.getLeftX()) * mult * self.top_speed
                 ),
                 self.theta_filter.calculate(
