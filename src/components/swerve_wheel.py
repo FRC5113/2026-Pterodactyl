@@ -8,6 +8,7 @@ from phoenix6.configs import (
     ClosedLoopGeneralConfigs,
     FeedbackConfigs,
     TalonFXConfiguration,
+    Slot0Configs
 )
 from phoenix6.hardware import CANcoder, TalonFX
 from phoenix6.signals import (
@@ -17,6 +18,7 @@ from phoenix6.signals import (
 )
 from wpimath import units
 from wpimath.geometry import Rotation2d
+from wpimath.controller import SimpleMotorFeedforwardMeters
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
 from wpiutil import Sendable
 
@@ -124,10 +126,10 @@ class SwerveWheel(Sendable):
             ),
         )
 
-        tryUntilOk(
-            5,
-            lambda: self.cancoder.configurator.apply(self.cancoder_config),
-        )
+        # tryUntilOk(
+        #     5,
+        #     lambda: self.cancoder.configurator.apply(self.cancoder_config),
+        # )
 
         tryUntilOk(
             5, lambda: self.speed_motor.configurator.apply(self.speed_motor_configs)
@@ -155,15 +157,19 @@ class SwerveWheel(Sendable):
         self.nt = SmartNT("Swerve Modules")
 
         self.cached_drive_rot = 0.0
+        self.feedforward = SimpleMotorFeedforwardMeters(0,0,0)
 
     def on_enable(self):
         if self.tuning_enabled:
-            self.speed_controller = self.speed_profile.create_ctre_flywheel_controller()
-            self.direction_controller = (
+            self.speed_controller = self.speed_profile.create_flywheel_controller(f"{self.speed_motor.device_id}_speed")
+            direction_ff = (
                 self.direction_profile.create_ctre_turret_controller()
             )
+            self.direction_controller = Slot0Configs().with_k_p(direction_ff.k_p).with_k_d(direction_ff.k_d).with_k_a(0.0).with_k_s(0.0).with_k_v(0.0)
             self.direction_motor_configs.slot0 = self.direction_controller
-            self.speed_motor_configs.slot0 = self.speed_controller
+            # self.speed_motor_configs.slot0 = self.speed_controller
+
+            self.feedforward = SimpleMotorFeedforwardMeters(direction_ff.k_s,direction_ff.k_v,direction_ff.k_a)
 
             tryUntilOk(
                 5,
@@ -333,10 +339,10 @@ class SwerveWheel(Sendable):
         # This prevents the robot from drifting while the wheel is still rotating
         target_speed = target_speed_rot * target_displacement.cos()
 
-        self.speed_motor.set_control(self.speed_control.with_velocity(target_speed))
+        speed_ff = self.speed_controller.calculate(self.drive_velocity.value,state.speed * (self.drive_gear_ratio / self.meters_per_wheel_rotation))
+        self.speed_motor.set_control(controls.VoltageOut(speed_ff))
 
-        # Convert radians back to rotations for motor control (wrap to [-0.5, 0.5])
-        target_rotations = math.remainder(target_angle / math.tau, 2.0)
+        ff_volts = self.feedforward.calculate(state.angle.radians())
         self.direction_motor.set_control(
-            self.direction_control.with_position(target_angle / math.tau)
+            self.direction_control.with_position(target_angle / math.tau).with_feed_forward(ff_volts)
         )

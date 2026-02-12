@@ -21,16 +21,16 @@ class SysIdRoutineBot:
         #  - swerve steer
         # if using a swerve steer make sure to comment out references to the drive
         # system to avoid double motor initialisation
-        self.flywheel = Flywheel(
-            phoenix6.hardware.TalonFX(51),
-            gearing=1
-        )
+        # self.flywheel = Flywheel(
+        #     phoenix6.hardware.TalonFX(51),
+        #     gearing=1
+        # )
 
         self.controller = CommandXboxController(0)
 
     def configureBindings(self) -> None:
         # self.swerve_drive.setDefaultCommand(self.swerve_drive.defaultCommand())
-        self.flywheel.setDefaultCommand(self.flywheel.defaultCommand())
+        # self.flywheel.setDefaultCommand(self.flywheel.defaultCommand())
         self.swerve_module.setDefaultCommand(self.swerve_module.defaultCommand())
 
         def bindSysId(subsystem: SysidSubsystem, pov: Trigger):
@@ -48,5 +48,5 @@ class SysIdRoutineBot:
             )
 
         # bindSysId(self.swerve_drive, self.controller.povUp())
-        bindSysId(self.flywheel, self.controller.povLeft())
+        # bindSysId(self.flywheel, self.controller.povLeft())
         bindSysId(self.swerve_module, self.controller.povDown())

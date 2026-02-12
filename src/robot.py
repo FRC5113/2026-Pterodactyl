@@ -91,10 +91,7 @@ class MyRobot(LemonRobot):
         self.offset_x: units.meters = 0.28575
         self.offset_y: units.meters = 0.28575
 
-        self.drive_gear_ratio = 1 / (
-            (14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0)
-        )  # gets more accurate gear ratio or something, idk dropbears did it
-
+        self.drive_gear_ratio = 6.75
         self.direction_gear_ratio = 150 / 7
         self.wheel_radius: units.meters = 0.0508
         self.max_speed: units.meters_per_second = 4.7
@@ -117,9 +114,9 @@ class MyRobot(LemonRobot):
         self.direction_profile = SmartProfile(
             "direction",
             {
-                "kP": 3.0,
+                "kP": 69.235,
                 "kI": 0.0,
-                "kD": 0.0,
+                "kD": 6.6971,
                 "kS": 0.14,
                 "kV": 0.375,
                 "kA": 0.0,
