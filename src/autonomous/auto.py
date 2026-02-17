@@ -128,15 +128,14 @@ class ShootAuto(AutoStep):
     def __init__(self):
         self.started = False
 
-    def execute(self, ctx: AutoContext) -> StepStatus:
-        if not self.started:
-            ctx.sc.request_shoot()
-            self.started = True
-
-        # Check if shooter is at speed and ready
-        if ctx.sc.at_speed:
+    def execute(self, durration: seconds, ctx: AutoContext) -> StepStatus:
+        if self.start == 0:
+            self.start = seconds(time.time())
+        if self.start + durration > time.time():
             return StepStatus.DONE
-        return StepStatus.RUNNING
+        ctx.sc._update_target() #type: ignore - I dont know if this call is nesscary
+        ctx.sc.
+
 
 
 # THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
