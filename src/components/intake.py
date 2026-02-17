@@ -2,14 +2,13 @@ from phoenix6.hardware import TalonFX
 from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
 from phoenix6.signals import NeutralModeValue
 from phoenix6.controls import VoltageOut
-from magicbot import will_reset_to
 from wpimath import units
 
 
 class Intake:
     motor: TalonFX
 
-    voltage = will_reset_to(0.0)
+    voltage = 0.0
 
     def setup(self):
         config = TalonFXConfiguration()
