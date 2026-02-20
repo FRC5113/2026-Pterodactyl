@@ -17,7 +17,7 @@ pyfrc.isolated = true
 components = [
     #"all",
     # "apriltag",
-     "commands2",
+    "commands2",
     # "cscore",
     # "romi",
     # "sim",

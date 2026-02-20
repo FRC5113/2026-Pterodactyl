@@ -2,42 +2,33 @@ import math
 from pathlib import Path
 
 import wpilib
-from wpilib import (
-    Field2d,
-    RobotController,
-    DriverStation,
-    PowerDistribution,
-)
-
+from magicbot import feedback
+from phoenix6 import CANBus
+from phoenix6.hardware import CANcoder, Pigeon2, TalonFX, TalonFXS
+from robotpy_apriltag import AprilTagFieldLayout
+from wpilib import DigitalInput, DriverStation, DutyCycleEncoder, Field2d
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Transform3d, Rotation3d
-
-from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
-
-from phoenix6.hardware import CANcoder, TalonFX, Pigeon2, TalonFXS
-from phoenix6 import CANBus
-
-from magicbot import feedback
-
-from lemonlib import LemonInput
-from lemonlib.util import (
-    curve,
-    AlertManager,
-    AlertType,
-)
-from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib import LemonRobot, LemonCamera
+from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous import auto
 from components.swerve_drive import SwerveDrive
 from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
-from components.sysid_drive import SysIdDriveLinear
 from components.intake import Intake
 from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
+from components.swerve_drive import SwerveDrive
+from components.swerve_wheel import SwerveWheel
+from components.sysid_drive import SysIdDriveLinear
+from lemonlib import LemonCamera, LemonInput, LemonRobot
+from lemonlib.smart import SmartPreference, SmartProfile
+from lemonlib.util import (
+    AlertManager,
+    AlertType,
+    curve,
+)
 
 
 class MyRobot(LemonRobot):
@@ -99,10 +90,7 @@ class MyRobot(LemonRobot):
         self.offset_x: units.meters = 0.28575
         self.offset_y: units.meters = 0.28575
 
-        self.drive_gear_ratio = 1 / (
-            (14.0 / 50.0) * (27.0 / 17.0) * (15.0 / 45.0)
-        )  # gets more accurate gear ratio or something, idk dropbears did it
-
+        self.drive_gear_ratio = 6.75
         self.direction_gear_ratio = 150 / 7
         self.wheel_radius: units.meters = 0.0508
         self.max_speed: units.meters_per_second = 4.7
@@ -113,24 +101,26 @@ class MyRobot(LemonRobot):
         self.speed_profile = SmartProfile(
             "speed",
             {
-                "kP": 7.8294,
+                "kP": 0.0,
                 "kI": 0.0,
                 "kD": 0.0,
-                "kS": 0.11742,
-                "kV": 2.3941,
-                "kA": 0.11426,
+                "kS": 0.17,
+                "kV": 0.104,
+                "kA": 0.01,
             },
-            not self.low_bandwidth,
+            (not self.low_bandwidth) and self.tuning_enabled,
         )
         self.direction_profile = SmartProfile(
             "direction",
             {
-                "kP": 92.079,
+                "kP": 69.235,
                 "kI": 0.0,
-                "kD": 1.6683,
-                "kS": 0.086374,
+                "kD": 6.6971,
+                "kS": 0.14,
+                "kV": 0.375,
+                "kA": 0.0,
             },
-            not self.low_bandwidth,
+            (not self.low_bandwidth) and self.tuning_enabled,
         )
         self.translation_profile = SmartProfile(
             "translation",
@@ -158,7 +148,30 @@ class MyRobot(LemonRobot):
         """
         INTAKE
         """
-        self.intake_motor = TalonFX(51)
+
+        self.intake_spin_motor = TalonFX(51)
+        self.intake_left_motor = TalonFX(52)
+        self.intake_right_motor = TalonFX(53)
+        self.intake_left_encoder = DutyCycleEncoder(DigitalInput(0))
+        self.intake_right_encoder = DutyCycleEncoder(DigitalInput(1))
+
+        self.intake_spin_amps: units.amperes = 40.0
+        self.intake_arm_amps: units.amperes = 20.0
+
+        self.intake_profile = SmartProfile(
+            "intake",
+            {
+                "kP": 0.0,
+                "kI": 0.0,
+                "kD": 0.0,
+                "kS": 0.0,
+                "kV": 0.0,
+                "kG": 0.0,
+                "kMaxV": 0.0,
+                "kMaxA": 0.0,
+            },
+            (not self.low_bandwidth) and self.tuning_enabled,
+        )
 
         """
         SHOOTER
@@ -167,7 +180,7 @@ class MyRobot(LemonRobot):
         self.shooter_right_motor = TalonFX(3, self.rio_canbus)
 
         self.shooter_gear_ratio = 1.0
-        self.shooter_amps: units.amperes = 40.0
+        self.shooter_amps: units.amperes = 60.0
 
         self.shooter_profile = SmartProfile(
             "shooter",
@@ -179,9 +192,16 @@ class MyRobot(LemonRobot):
                 "kV": 0.0,
                 "kA": 0.0,
             },
-            not self.low_bandwidth,
+            (not self.low_bandwidth) and self.tuning_enabled,
         )
 
+        """
+        INDEXER
+        """
+        self.shooter_left_kicker_motor = TalonFXS(4, self.rio_canbus)
+        self.shooter_right_kicker_motor = TalonFXS(5, self.rio_canbus)
+        self.shooter_kicker_amps: units.amperes = 20.0
+        self.shooter_conveyor_amps: units.amperes = 10.0
         """
         ODOMETRY
         """
@@ -241,8 +261,6 @@ class MyRobot(LemonRobot):
                 "Low Bandwidth Mode is active! Tuning is disabled.", AlertType.INFO
             )
 
-        self.pdh = PowerDistribution()
-
         self.estimated_field = Field2d()
 
         if DriverStation.getAlliance() == DriverStation.Alliance.kRed:
@@ -282,11 +300,10 @@ class MyRobot(LemonRobot):
         )
 
     def teleopPeriodic(self):
+        """
+        SWERVE
+        """
         with self.consumeExceptions():
-
-            """
-            SWERVE
-            """
             rotate_mult = 0.75
             mult = 1
             # if both 25% else 50 or 75
@@ -304,7 +321,7 @@ class MyRobot(LemonRobot):
                 self.x_filter.calculate(
                     self.sammi_curve(self.primary.getLeftY()) * mult * self.top_speed
                 ),
-                self.y_filter.calculate(
+                -self.y_filter.calculate(
                     self.sammi_curve(self.primary.getLeftX()) * mult * self.top_speed
                 ),
                 self.theta_filter.calculate(
@@ -314,21 +331,29 @@ class MyRobot(LemonRobot):
                 ),
                 not self.primary.getCreateButton(),  # temporary
             )
-            if self.primary.getSquareButton():
-                self.swerve_drive.reset_gyro()
-            self.swerve_drive.doTelemetry()
+        if self.primary.getSquareButton():
+            self.swerve_drive.reset_gyro()
+        self.swerve_drive.doTelemetry()
 
-            """
-            INTAKE
-            """
+        """
+        INTAKE
+        """
+        with self.consumeExceptions():
+            if self.secondary.getLeftBumper():
+                self.intake.set_voltage(8)
+
+        """
+        SHOOTER
+        """
+        with self.consumeExceptions():
+            if self.secondary.getStartButton():
+                self.shooter.set_voltage(4.75)
+            if self.secondary.getOptionsButton():
+                self.shooter.set_voltage(4.75)
             if self.secondary.getAButton():
-                self.intake.set_voltage(12)
+                self.shooter.set_voltage(5)
             if self.secondary.getBButton():
-                self.intake.set_voltage(-12)
-
-            """
-            SHOOTER
-            """
+                self.shooter.set_voltage(6)
             if self.secondary.getXButton():
                 self.shooter_controller.request_shoot()
 

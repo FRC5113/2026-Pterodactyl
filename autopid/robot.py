@@ -1,20 +1,20 @@
 import math
-import wpilib
-from wpilib import TimedRobot, Timer, Notifier, SmartDashboard
-from magicbot import MagicRobot
 
-from phoenix6.hardware import TalonFX, CANcoder
+import wpilib
+from magicbot import MagicRobot
+from phoenix6 import CANBus, controls
 from phoenix6.configs import (
-    TalonFXConfiguration,
-    FeedbackConfigs,
     ClosedLoopGeneralConfigs,
+    FeedbackConfigs,
+    TalonFXConfiguration,
 )
+from phoenix6.hardware import CANcoder, TalonFX
 from phoenix6.signals import (
     FeedbackSensorSourceValue,
     NeutralModeValue,
     StaticFeedforwardSignValue,
 )
-from phoenix6 import controls, CANBus
+from wpilib import Notifier, SmartDashboard, Timer
 
 
 class MyRobot(MagicRobot):

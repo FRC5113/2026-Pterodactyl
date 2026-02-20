@@ -1,15 +1,18 @@
 import math
-from magicbot import will_reset_to, feedback, StateMachine, state, timed_state
+
+from magicbot import StateMachine, state, will_reset_to
+from wpilib import DriverStation
+
+from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
-from components.drive_control import DriveControl
 from game import get_hub_pos
-from wpilib import DriverStation
-import numpy as np
 from lemonlib.smart import SmartPreference
 
 
 class ShooterController(StateMachine):
+    """ts is a high level component so it can manage the shooter state machine and coordinate between the shooter and drive control components"""
+
     drive_control: DriveControl
 
     shooter: Shooter
@@ -42,7 +45,26 @@ class ShooterController(StateMachine):
         hub_pos = get_hub_pos(is_red)
         distance = robot_pos.distance(hub_pos)
         self.target_angle = math.atan2(hub_pos.y - robot_pos.y, hub_pos.x - robot_pos.x)
-        self.target_rps = np.interp(distance, self.distance_lookup, self.speed_lookup)
+
+        # Linear interpolation without numpy
+        self.target_rps = self._linear_interp(
+            distance, self.distance_lookup, self.speed_lookup
+        )
+
+    def _linear_interp(self, x, xp, fp):
+        """Fast linear interpolation without numpy."""
+        if x <= xp[0]:
+            return fp[0]
+        if x >= xp[-1]:
+            return fp[-1]
+
+        for i in range(len(xp) - 1):
+            if xp[i] <= x <= xp[i + 1]:
+                # Linear interpolation formula
+                t = (x - xp[i]) / (xp[i + 1] - xp[i])
+                return fp[i] + t * (fp[i + 1] - fp[i])
+
+        return fp[-1]
 
     @state(first=True)
     def idle(self):
@@ -50,30 +72,22 @@ class ShooterController(StateMachine):
 
         self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
         if self.shooting:
-            self.next_state("align")
+            self.next_state("setting_up")
 
     @state
-    def align(self):
-        self._update_target()
-
-        self.shooter.set_velocity(self.target_rps)
-        self.drive_control.point_to(self.target_angle)
-        if self.shooting:
-            self.next_state("spin_up")
-        else:
-            self.next_state("idle")
-
-    @state
-    def spin_up(self):
+    def setting_up(self):
         self._update_target()
 
         self.shooter.set_velocity(self.target_rps)
         self.drive_control.point_to(self.target_angle)
 
         tolerance = self.speed_tolerance * self.target_rps  # 5% tolerance
+
         if not self.shooting:
             self.next_state("idle")
-        elif abs(self.current_rps() - self.target_rps) <= tolerance:
+        elif (
+            abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        ) and self.swerve_drive.at_angle():
             self.at_speed = True
             self.next_state("shoot")
         else:
@@ -85,7 +99,7 @@ class ShooterController(StateMachine):
 
         self.drive_control.point_to(self.target_angle)
         self.shooter.set_velocity(self.target_rps)
-        # TODO: Activate indexer here
+        self.shooter.set_kicker_voltage(8.0)  # TODO Tune this value
 
         if not self.shooting:
             self.next_state("idle")

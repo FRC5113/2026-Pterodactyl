@@ -1,22 +1,21 @@
+from phoenix6 import signals
+from phoenix6.configs import Slot0Configs
 from wpilib import Preferences, SmartDashboard
-from wpimath.trajectory import TrapezoidProfile, TrapezoidProfileRadians
-from wpiutil import Sendable, SendableBuilder
 from wpimath.controller import (
+    ArmFeedforward,
+    ElevatorFeedforward,
+    LTVUnicycleController,
     PIDController,
     ProfiledPIDController,
     ProfiledPIDControllerRadians,
     SimpleMotorFeedforwardMeters,
-    ElevatorFeedforward,
-    ArmFeedforward,
-    LTVDifferentialDriveController,
-    LTVUnicycleController,
 )
-from wpimath.units import meters, seconds
 from wpimath.system import LinearSystem_2_2_2
-from .controller import SmartController
-from phoenix6.configs import Slot0Configs
-from phoenix6 import signals
+from wpimath.trajectory import TrapezoidProfile, TrapezoidProfileRadians
+from wpimath.units import meters, seconds
+from wpiutil import Sendable, SendableBuilder
 
+from .controller import SmartController
 from .nettables import SmartNT
 
 

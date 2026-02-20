@@ -1,10 +1,10 @@
+from choreo.trajectory import SwerveSample
+from magicbot import StateMachine, will_reset_to
+from magicbot.state_machine import state
 from phoenix6.hardware import Pigeon2
 from wpilib import DriverStation
 from wpimath import units
 from wpimath.geometry import Pose2d
-from choreo.trajectory import SwerveSample
-from magicbot import StateMachine, will_reset_to
-from magicbot.state_machine import state
 
 from components.swerve_drive import SwerveDrive
 
