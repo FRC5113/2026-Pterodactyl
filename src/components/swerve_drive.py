@@ -72,6 +72,7 @@ class SwerveDrive(Sendable):
         This function is automatically called after the components have
         been injected.
         """
+
         # Define wheel positions relative to robot center (using standard WPILib coordinate system)
         # Positive X is forward, positive Y is left
         self.front_left_pose = Translation2d(self.offset_x, self.offset_y)
@@ -125,15 +126,14 @@ class SwerveDrive(Sendable):
         self.cached_yaw = 0.0
         self.cached_yaw_rate = 0.0
 
+        if RobotBase.isSimulation():
+            self.pigeon.get_fault_field().wait_for_update(timeout_seconds=5.0)
         # 4 signals per module + yaw + yaw rate
         self.all_signals = []
 
         for module in self.modules:
             self.all_signals.extend(module.getSignals())
 
-        # Set Pigeon2 yaw with longer timeout in simulation
-        pigeon_timeout = 1.0 if RobotBase.isSimulation() else 0.01
-        self.pigeon.get_yaw().set_update_frequency(250, pigeon_timeout)
         self.all_signals.append(self.pigeon.get_yaw())
 
         BaseStatusSignal.set_update_frequency_for_all(250, self.all_signals)

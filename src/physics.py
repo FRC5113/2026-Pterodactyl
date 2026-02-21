@@ -19,6 +19,7 @@ class PhysicsEngine:
         self.physics_controller = physics_controller
         self.robot = robot
         self.pose = Pose2d()
+
         self.speed_sims = (
             KrakenSimFOC(robot.front_left_speed_motor, 0.01, 6.75),
             KrakenSimFOC(robot.front_right_speed_motor, 0.01, 6.75),

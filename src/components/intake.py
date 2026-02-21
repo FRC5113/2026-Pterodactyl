@@ -37,6 +37,9 @@ class Intake:
     arm_voltage = will_reset_to(0.0)
     arm_angle = will_reset_to(IntakeAngle.UP.value)
 
+    INTAKEUP = IntakeAngle.UP.value
+    INTAKING = IntakeAngle.INTAKING.value
+
     def setup(self):
         spin_config = TalonFXConfiguration()
         spin_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
@@ -93,12 +96,14 @@ class Intake:
         self.arm_angle = angle
 
     def execute(self):
-        self.arm_voltage = self.controller.calculate(self.get_angle(), self.arm_angle)
+        angle = self.get_angle()
+        self.arm_voltage = self.controller.calculate(angle, self.arm_angle)
 
-        if (self.get_angle() < IntakeAngle.UP.value and self.arm_voltage < 0.0) or (
-            self.get_angle() > IntakeAngle.INTAKING.value and self.arm_voltage > 0.0
-        ):
-            self.arm_voltage = 0.0
+        # making sure we don't try to move the arm past its limits
+        if angle < self.INTAKEUP:
+            self.arm_voltage = max(self.arm_voltage, 0)
+        elif angle > self.INTAKING:
+            self.arm_voltage = min(self.arm_voltage, 0)
 
         self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
         self.left_motor.set_control(self.arm_follower)

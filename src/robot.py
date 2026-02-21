@@ -58,7 +58,7 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        self.tuning_enabled = True
+        self.tuning_enabled = False
 
         self.canivore_canbus = CANBus("can0")
         self.rio_canbus = CANBus.roborio()
@@ -182,12 +182,12 @@ class MyRobot(LemonRobot):
         self.shooter_profile = SmartProfile(
             "shooter",
             {
-                "kP": 0.0,
+                "kP": 0.11592,
                 "kI": 0.0,
                 "kD": 0.0,
                 "kS": 0.0,
-                "kV": 0.0,
-                "kA": 0.0,
+                "kV": 0.11137,
+                "kA": 0.29663,
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
@@ -273,6 +273,7 @@ class MyRobot(LemonRobot):
         self._display_auto_trajectory()
 
     def teleopInit(self):
+        print("Teleop Init")
         # initialize HIDs here in case they are changed after robot initializes
         self.primary = LemonInput(0)
         self.secondary = LemonInput(1)
@@ -288,40 +289,60 @@ class MyRobot(LemonRobot):
         )
 
     def teleopPeriodic(self):
+        # Cache inputs called multiple times
+        primary_r2 = self.primary.getR2Axis()
+        primary_l2 = self.primary.getL2Axis()
+        primary_ly = self.primary.getLeftY()
+        primary_lx = self.primary.getLeftX()
+        primary_rx = self.primary.getRightX()
+        primary_ry = self.primary.getRightY()
+
         """
         SWERVE
         """
         with self.consumeExceptions():
             rotate_mult = 0.75
-            mult = 1
+
             # if both 25% else 50 or 75
-            if not (
-                (self.primary.getR2Axis() >= 0.8) and (self.primary.getL2Axis() >= 0.8)
-            ):
-                if self.primary.getR2Axis() >= 0.8:
-                    mult *= 0.75
-                if self.primary.getL2Axis() >= 0.8:
-                    mult *= 0.5
+            if (primary_r2 >= 0.8) and (primary_l2 >= 0.8):
+                mult = 0.25
+            elif primary_r2 >= 0.8:
+                mult = 0.75
+            elif primary_l2 >= 0.8:
+                mult = 0.5
             else:
-                mult *= 0.25
+                mult = 1.0
+
+            # only apply the curve and slew rate if the input is above the deadband, otherwise set to 0 to avoid useless math
+            if abs(primary_ly) <= 0.0:
+                vx = 0.0
+            else:
+                vx = self.x_filter.calculate(
+                    self.sammi_curve(primary_ly) * mult * self.top_speed
+                )
+            if abs(primary_lx) <= 0.0:
+                vy = 0.0
+            else:
+                vy = self.y_filter.calculate(
+                    self.sammi_curve(primary_lx) * mult * self.top_speed
+                )
+            if abs(primary_rx) <= 0.0:
+                omega = 0.0
+            else:
+                omega = self.theta_filter.calculate(
+                    -self.sammi_curve(primary_rx) * rotate_mult * self.top_omega
+                )
 
             self.drive_control.drive_manual(
-                self.x_filter.calculate(
-                    self.sammi_curve(self.primary.getLeftY()) * mult * self.top_speed
-                ),
-                -self.y_filter.calculate(
-                    self.sammi_curve(self.primary.getLeftX()) * mult * self.top_speed
-                ),
-                self.theta_filter.calculate(
-                    -self.sammi_curve(self.primary.getRightX())
-                    * rotate_mult
-                    * self.top_omega
-                ),
+                vx,
+                -vy,
+                -omega,
                 not self.primary.getCreateButton(),  # temporary
             )
-        if self.primary.getSquareButton():
-            self.swerve_drive.reset_gyro()
-        self.swerve_drive.doTelemetry()
+
+            if self.primary.getSquareButton():
+                self.swerve_drive.reset_gyro()
+            self.swerve_drive.doTelemetry()
 
         """
         INTAKE
@@ -349,6 +370,10 @@ class MyRobot(LemonRobot):
 
             if self.secondary.getRightTriggerAxis() >= 0.8:
                 self.shooter.set_kicker_voltage(8)
+
+    def disabledPeriodic(self):
+        # make magicbot happy
+        pass
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()

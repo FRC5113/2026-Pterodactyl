@@ -1,11 +1,11 @@
 from commands2.sysid import SysIdRoutine
+from phoenix6 import SignalLogger
+from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 
 from components.drive_control import DriveControl
 from components.swerve_drive import SwerveDrive
 from lemonlib.util import MagicSysIdRoutine
-from phoenix6 import SignalLogger
-from wpilib.sysid import SysIdRoutineLog
 
 
 class SysIdDriveLinear(MagicSysIdRoutine):
