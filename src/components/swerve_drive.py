@@ -128,8 +128,6 @@ class SwerveDrive(Sendable):
         self.cached_yaw = 0.0
         self.cached_yaw_rate = 0.0
 
-        if RobotBase.isSimulation():
-            self.pigeon.get_fault_field().wait_for_update(timeout_seconds=5.0)
         # 4 signals per module + yaw + yaw rate
         self.all_signals = []
 

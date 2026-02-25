@@ -38,8 +38,7 @@ class DriveControl(StateMachine):
     sample: SwerveSample = None  # Trajectory sample for autonomous path following
 
     def setup(self):
-        if RobotBase.isSimulation():
-            self.pigeon.get_fault_field().wait_for_update(timeout_seconds=5.0)
+        pass
 
     def drive_manual(
         self,

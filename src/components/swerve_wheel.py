@@ -73,9 +73,9 @@ class SwerveWheel(Sendable):
         """
 
         # set fault update frequencies
-        # Use longer timeout in simulation to avoid CAN frame timeouts
-        fault_timeout = 1.0 if wpilib.RobotBase.isSimulation() else 0.01
-        signal_timeout = 1.0 if wpilib.RobotBase.isSimulation() else 0.01
+        # Use shorter timeout to avoid blocking during test initialization
+        fault_timeout = 0.01
+        signal_timeout = 0.01
 
         self.direction_motor.get_fault_field().set_update_frequency(
             frequency_hz=4, timeout_seconds=fault_timeout
