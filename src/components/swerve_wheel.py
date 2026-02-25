@@ -1,12 +1,14 @@
 import math
 from typing import List
 
+import wpilib
 from magicbot import will_reset_to
 from phoenix6 import BaseStatusSignal, StatusSignal, controls
 from phoenix6.configs import (
     CANcoderConfiguration,
     ClosedLoopGeneralConfigs,
     FeedbackConfigs,
+    Slot0Configs,
     TalonFXConfiguration,
     Slot0Configs,
 )
@@ -17,8 +19,8 @@ from phoenix6.signals import (
     SensorDirectionValue,
 )
 from wpimath import units
-from wpimath.geometry import Rotation2d
 from wpimath.controller import SimpleMotorFeedforwardMeters
+from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
 from wpiutil import Sendable
 
@@ -64,21 +66,38 @@ class SwerveWheel(Sendable):
         """
         This function is automatically called after the motors and encoders have been injected.
         """
+
         # set fault update frequencies
+        # Use longer timeout in simulation to avoid CAN frame timeouts
+        fault_timeout = 1.0 if wpilib.RobotBase.isSimulation() else 0.01
+        signal_timeout = 1.0 if wpilib.RobotBase.isSimulation() else 0.01
+
         self.direction_motor.get_fault_field().set_update_frequency(
-            frequency_hz=4, timeout_seconds=0.01
+            frequency_hz=4, timeout_seconds=fault_timeout
         )
         self.speed_motor.get_fault_field().set_update_frequency(
-            frequency_hz=4, timeout_seconds=0.01
+            frequency_hz=4, timeout_seconds=fault_timeout
         )
 
-        self.direction_motor.get_closed_loop_error().set_update_frequency(20)
-        self.direction_motor.get_closed_loop_reference().set_update_frequency(20)
-        self.direction_motor.get_closed_loop_output().set_update_frequency(20)
+        self.direction_motor.get_closed_loop_error().set_update_frequency(
+            20, signal_timeout
+        )
+        self.direction_motor.get_closed_loop_reference().set_update_frequency(
+            20, signal_timeout
+        )
+        self.direction_motor.get_closed_loop_output().set_update_frequency(
+            20, signal_timeout
+        )
 
-        self.speed_motor.get_closed_loop_error().set_update_frequency(20)
-        self.speed_motor.get_closed_loop_reference().set_update_frequency(20)
-        self.speed_motor.get_closed_loop_output().set_update_frequency(20)
+        self.speed_motor.get_closed_loop_error().set_update_frequency(
+            20, signal_timeout
+        )
+        self.speed_motor.get_closed_loop_reference().set_update_frequency(
+            20, signal_timeout
+        )
+        self.speed_motor.get_closed_loop_output().set_update_frequency(
+            20, signal_timeout
+        )
 
         # apply configs
         self.speed_motor_configs = TalonFXConfiguration()
@@ -119,6 +138,7 @@ class SwerveWheel(Sendable):
         self.direction_motor_configs.closed_loop_general = (
             ClosedLoopGeneralConfigs().with_continuous_wrap(True)
         )
+
         tryUntilOk(
             5,
             lambda: self.direction_motor.configurator.apply(
@@ -132,7 +152,8 @@ class SwerveWheel(Sendable):
         # )
 
         tryUntilOk(
-            5, lambda: self.speed_motor.configurator.apply(self.speed_motor_configs)
+            5,
+            lambda: self.speed_motor.configurator.apply(self.speed_motor_configs),
         )
 
         self.drive_position = self.speed_motor.get_position()
@@ -165,11 +186,32 @@ class SwerveWheel(Sendable):
             self.direction_motor_configs.slot0 = self.direction_controller[0]
             self.direction_motor_configs.motion_magic = self.direction_controller[1]
             self.speed_motor_configs.slot0 = self.speed_controller
+        self.feedforward = SimpleMotorFeedforwardMeters(0, 0, 0)
 
+    def on_enable(self):
+        self.speed_controller = self.speed_profile.create_flywheel_controller(
+            f"{self.speed_motor.device_id}_speed"
+        )
+        direction_ff = self.direction_profile.create_ctre_turret_controller()
+        self.direction_controller = (
+            Slot0Configs()
+            .with_k_p(direction_ff.k_p)
+            .with_k_d(direction_ff.k_d)
+            .with_k_a(0.0)
+            .with_k_s(0.0)
+            .with_k_v(0.0)
+        )
+        self.direction_motor_configs.slot0 = self.direction_controller
+        # self.speed_motor_configs.slot0 = self.speed_controller
+
+        self.feedforward = SimpleMotorFeedforwardMeters(
+            direction_ff.k_s, direction_ff.k_v, direction_ff.k_a
+        )
+        if self.tuning_enabled:
             tryUntilOk(
                 5,
                 lambda: self.direction_motor.configurator.apply(
-                    self.direction_motor_configs
+                    self.direction_motor_configs,
                 ),
             )
 

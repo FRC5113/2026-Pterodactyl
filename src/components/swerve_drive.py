@@ -4,7 +4,7 @@ from choreo.trajectory import SwerveSample
 from magicbot import feedback, will_reset_to
 from phoenix6 import BaseStatusSignal
 from phoenix6.hardware import Pigeon2
-from wpilib import DriverStation, SmartDashboard
+from wpilib import DriverStation, RobotBase, SmartDashboard, Timer
 from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
@@ -19,7 +19,7 @@ from wpimath.kinematics import (
 from wpiutil import Sendable, SendableBuilder
 
 from components.swerve_wheel import SwerveWheel
-from lemonlib.smart import SmartController, SmartProfile
+from lemonlib.smart import SmartController, SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
 
@@ -37,6 +37,10 @@ class SwerveDrive(Sendable):
     pigeon: Pigeon2  # IMU/gyroscope for heading measurement
     translation_profile: SmartProfile
     rotation_profile: SmartProfile
+    telemetry_enabled = SmartPreference(True)
+    telemetry_period = SmartPreference(0.1)
+    adv_scope_enabled = SmartPreference(True)
+    adv_scope_period = SmartPreference(0.1)
 
     # will_reset_to ensures these values reset to defaults each robot loop iteration
     translationX = will_reset_to(0)
@@ -46,7 +50,7 @@ class SwerveDrive(Sendable):
     has_desired_pose = will_reset_to(False)
 
     doing_sysid = will_reset_to(False)
-    sysid_rot = will_reset_to(False)
+    sysid_rotate = will_reset_to(False)
     sysid_volts = will_reset_to(0.0)
 
     def __init__(self) -> None:
@@ -68,6 +72,7 @@ class SwerveDrive(Sendable):
         This function is automatically called after the components have
         been injected.
         """
+
         # Define wheel positions relative to robot center (using standard WPILib coordinate system)
         # Positive X is forward, positive Y is left
         self.front_left_pose = Translation2d(self.offset_x, self.offset_y)
@@ -121,6 +126,8 @@ class SwerveDrive(Sendable):
         self.cached_yaw = 0.0
         self.cached_yaw_rate = 0.0
 
+        if RobotBase.isSimulation():
+            self.pigeon.get_fault_field().wait_for_update(timeout_seconds=5.0)
         # 4 signals per module + yaw + yaw rate
         self.all_signals = []
 
@@ -130,6 +137,9 @@ class SwerveDrive(Sendable):
         self.all_signals.append(self.pigeon.get_yaw())
 
         BaseStatusSignal.set_update_frequency_for_all(250, self.all_signals)
+
+        self._last_adv_scope_time = 0.0
+        self._last_telem_time = 0.0
 
     def initSendable(self, builder: SendableBuilder) -> None:
         # Configure data sent to SmartDashboard's swerve widget
@@ -347,6 +357,12 @@ class SwerveDrive(Sendable):
     def sendAdvantageScopeData(self):
         """Put swerve module setpoints and measurements to NT.
         This is used mainly for AdvantageScope's swerve tab"""
+        if not self.adv_scope_enabled:
+            return
+        now = Timer.getFPGATimestamp()
+        if now - self._last_adv_scope_time < self.adv_scope_period:
+            return
+        self._last_adv_scope_time = now
         # Format: [angle1, speed1, angle2, speed2, ...] for each module
         swerve_setpoints = []
         for state in self.swerve_module_states:
@@ -375,6 +391,12 @@ class SwerveDrive(Sendable):
             )
 
     def doTelemetry(self):
+        if not self.telemetry_enabled:
+            return
+        now = Timer.getFPGATimestamp()
+        if now - self._last_telem_time < self.telemetry_period:
+            return
+        self._last_telem_time = now
         self.front_left.putTelem()
         self.front_right.putTelem()
         self.rear_left.putTelem()
