@@ -68,7 +68,6 @@ class MyRobot(LemonRobot):
 
         self.canivore_canbus = CANBus("can0")
         self.rio_canbus = CANBus.roborio()
-
         """
         SWERVE
         """

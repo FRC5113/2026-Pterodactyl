@@ -31,21 +31,6 @@ class hub_outpost_shoot(AutoBase):
         )
 
 
-class hub_outpost_shoot_climb(AutoBase):
-    MODE_NAME = "Hub>Outpost>Shoot>Climb"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "trajectory:hub_outpost",
-                "state:outpost_wait",
-                "trajectory:outpost_shoot",
-                "state:shoot",
-                "trajectory:shoot_climb",
-                "state:climb",
-            ]
-        )
-
 
 class hub_shoot(AutoBase):
     MODE_NAME = "Hub>Shoot"
@@ -59,16 +44,3 @@ class hub_shoot(AutoBase):
             ]
         )
 
-
-class hub_shoot_climb(AutoBase):
-    MODE_NAME = "Hub>Shoot>Climb"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "trajectory:hub_shoot",
-                "state:shoot",
-                "trajectory:shoot_climb",
-                "state:climb",
-            ]
-        )

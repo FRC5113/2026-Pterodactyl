@@ -77,10 +77,10 @@ class SwerveDrive(Sendable):
 
         # Define wheel positions relative to robot center (using standard WPILib coordinate system)
         # Positive X is forward, positive Y is left
-        self.front_left_pose = Translation2d(self.offset_x, self.offset_y)
-        self.front_right_pose = Translation2d(-self.offset_x, self.offset_y)
-        self.rear_left_pose = Translation2d(self.offset_x, -self.offset_y)
-        self.rear_right_pose = Translation2d(-self.offset_x, -self.offset_y)
+        self.front_left_pose  = Translation2d( self.offset_x,  self.offset_y)
+        self.front_right_pose = Translation2d( self.offset_x, -self.offset_y)
+        self.rear_left_pose   = Translation2d(-self.offset_x,  self.offset_y)
+        self.rear_right_pose  = Translation2d(-self.offset_x, -self.offset_y)
         # Kinematics converts between chassis speeds and individual module states
         self.kinematics = SwerveDrive4Kinematics(
             self.front_left_pose,

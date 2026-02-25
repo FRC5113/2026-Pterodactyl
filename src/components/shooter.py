@@ -36,9 +36,6 @@ class Shooter:
     kicker_duty = will_reset_to(0.0)
     manual_control = will_reset_to(False)
 
-    use_motion_magic = will_reset_to(False)
-    motion_magic_acceleration = 200  # rps/s, TUNE
-    motion_magic_jerk = 2000  # rps/s/s, TUNE
 
     def setup(self):
         self.shooter_motors_config = TalonFXConfiguration()
@@ -47,13 +44,6 @@ class Shooter:
             FeedbackConfigs()
             .with_feedback_sensor_source(FeedbackSensorSourceValue.ROTOR_SENSOR)
             .with_sensor_to_mechanism_ratio(self.shooter_gear_ratio)
-        )
-        self.shooter_motors_config.motion_magic = (
-            MotionMagicConfigs()
-            .with_motion_magic_acceleration(
-                self.motion_magic_acceleration
-            )  # RPS/s - TUNE THIS
-            .with_motion_magic_jerk(self.motion_magic_jerk)  # RPS/s² - TUNE THIS
         )
 
         self.shooter_motors_config.current_limits.stator_current_limit = (
@@ -66,9 +56,6 @@ class Shooter:
 
         self.shooter_control = (
             controls.VelocityVoltage(0).with_enable_foc(True).with_slot(0)
-        )
-        self.shooter_motion_magic_control = (
-            controls.MotionMagicVelocityVoltage(0).with_enable_foc(True).with_slot(0)
         )
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
@@ -103,9 +90,8 @@ class Shooter:
     CONTROL METHODS
     """
 
-    def set_velocity(self, speed: float, use_motion_magic: bool = False):
+    def set_velocity(self, speed: float):
         self.manual_control = False
-        self.use_motion_magic = use_motion_magic
         self.shooter_velocity = speed
 
     def set_voltage(self, volts: units.volts):

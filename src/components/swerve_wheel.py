@@ -373,7 +373,7 @@ class SwerveWheel(Sendable):
         target_angle = state.angle.radians()
 
         # Convert m/s to rotations/s for motor control
-        target_speed_rot = state.speed * self.drive_rot_per_meter
+        target_speed_rot = state.speed * (self.drive_gear_ratio / self.meters_per_wheel_rotation)
 
         # Cosine compensation: reduce speed when wheel isn't pointing the right direction
         # This prevents the robot from drifting while the wheel is still rotating
@@ -381,7 +381,7 @@ class SwerveWheel(Sendable):
 
         if self.wpimode:
             direct_control = controls.VoltageOut(
-                self.direction_ff.calculate(target_speed)
+                self.direction_ff.calculate(target_angle)
                 + self.direction_pid.calculate(current_angle.radians(), target_angle)
             )
             speed_control = controls.VoltageOut(
@@ -389,9 +389,10 @@ class SwerveWheel(Sendable):
                 + self.speed_pid.calculate(self.getVelocity(), target_speed)
             )
         else:
-            direct_control = controls.MotionMagicExpoVoltage(
+            direct_control = controls.PositionVoltage(
                 target_angle / math.tau
             ).with_enable_foc(True)
+            
             speed_control = controls.VelocityVoltage(target_speed).with_enable_foc(True)
 
         self.speed_motor.set_control(speed_control)
