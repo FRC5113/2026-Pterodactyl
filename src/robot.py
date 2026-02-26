@@ -2,9 +2,8 @@ import math
 from pathlib import Path
 
 import wpilib
-from magicbot import feedback
 from phoenix6 import CANBus
-from phoenix6.hardware import CANcoder, Pigeon2, TalonFX, TalonFXS
+from phoenix6.hardware import TalonFX, TalonFXS
 from robotpy_apriltag import AprilTagFieldLayout
 from wpilib import (
     DigitalInput,
@@ -24,9 +23,9 @@ from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
-from components.swerve_wheel import SwerveWheel
 from components.sysid_drive import SysIdDriveLinear
-from lemonlib import LemonCamera, LemonInput, LemonRobot
+from generated.tuner_constants import TunerConstants
+from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import (
     AlertManager,
@@ -42,10 +41,6 @@ class MyRobot(LemonRobot):
     odometry: Odometry
 
     swerve_drive: SwerveDrive
-    front_left: SwerveWheel
-    front_right: SwerveWheel
-    rear_left: SwerveWheel
-    rear_right: SwerveWheel
 
     shooter: Shooter
 
@@ -66,70 +61,22 @@ class MyRobot(LemonRobot):
         """
         self.tuning_enabled = True
 
-        self.canivore_canbus = CANBus("can0")
         self.rio_canbus = CANBus.roborio()
+
         """
         SWERVE
+        Swerve hardware (TalonFX drive/steer motors, CANcoders, Pigeon2)
+        is now created internally by the Phoenix 6 SwerveDrivetrain via
+        generated/tuner_constants.py.  Only the high-level constants needed
+        by SwerveDrive are set here.
         """
-        # hardware
-        self.front_left_speed_motor = TalonFX(11, self.canivore_canbus)
-        self.front_left_direction_motor = TalonFX(12, self.canivore_canbus)
-        self.front_left_cancoder = CANcoder(13, self.canivore_canbus)
 
-        self.front_right_speed_motor = TalonFX(21, self.canivore_canbus)
-        self.front_right_direction_motor = TalonFX(22, self.canivore_canbus)
-        self.front_right_cancoder = CANcoder(23, self.canivore_canbus)
+        self.max_speed: units.meters_per_second = TunerConstants.speed_at_12_volts
 
-        self.rear_left_speed_motor = TalonFX(41, self.canivore_canbus)
-        self.rear_left_direction_motor = TalonFX(42, self.canivore_canbus)
-        self.rear_left_cancoder = CANcoder(43, self.canivore_canbus)
-
-        self.rear_right_speed_motor = TalonFX(31, self.canivore_canbus)
-        self.rear_right_direction_motor = TalonFX(32, self.canivore_canbus)
-        self.rear_right_cancoder = CANcoder(33, self.canivore_canbus)
-
-        # physical constants
-        self.offset_x: units.meters = 0.28575
-        self.offset_y: units.meters = 0.28575
-
-        self.drive_gear_ratio = 6.75
-        self.direction_gear_ratio = 150 / 7
-        self.wheel_radius: units.meters = 0.0508
-        self.max_speed: units.meters_per_second = 4.7
-        self.direction_amps: units.amperes = 40.0
-        self.speed_amps: units.amperes = 60.0
-
-        # profiles
-        self.speed_profile = SmartProfile(
-            "speed",
-            {
-                "kP": 0.0,
-                "kI": 0.0,
-                "kD": 0.0,
-                "kS": 0.17,
-                "kV": 0.104,
-                "kA": 0.01,
-            },
-            (not self.low_bandwidth) and self.tuning_enabled,
-        )
-        self.direction_profile = SmartProfile(
-            "direction",
-            {
-                "kP": 41.0,
-                "kI": 0.0,
-                "kD": 1.0,
-                "kS": 0.23,
-                "kV": 2.6,
-                "kA": 0.11,
-                "kMaxA": 0.11,
-                "kMaxV": 2.6
-            },
-            (not self.low_bandwidth) and self.tuning_enabled,
-        )
         self.translation_profile = SmartProfile(
             "translation",
             {
-                "kP": 1.0,
+                "kP": 5.0,
                 "kI": 0.0,
                 "kD": 0.0,
             },
@@ -138,11 +85,11 @@ class MyRobot(LemonRobot):
         self.rotation_profile = SmartProfile(
             "rotation",
             {
-                "kP": 0.0,
+                "kP": 7.0,
                 "kI": 0.0,
-                "kD": 0.0,
-                "kMaxV": 10.0,
-                "kMaxA": 100.0,
+                "kD": 0.1,
+                "kMaxV": 8.0,
+                "kMaxA": 40.0,
                 "kMinInput": -math.pi,
                 "kMaxInput": math.pi,
             },
@@ -219,18 +166,12 @@ class MyRobot(LemonRobot):
         # )
 
         # Robot to Camera Transforms
-        self.rtc_front_left = Transform3d(
-            -self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, 45)
-        )
-        self.rtc_front_right = Transform3d(
-            self.offset_x, self.offset_y, 0.0, Rotation3d(0, 30, -45)
-        )
-        self.rtc_back_left = Transform3d(
-            -self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, 135)
-        )
-        self.rtc_back_right = Transform3d(
-            self.offset_x, -self.offset_y, 0.0, Rotation3d(0, 30, -135)
-        )
+        _ox = TunerConstants.offset_x
+        _oy = TunerConstants.offset_y
+        self.rtc_front_left = Transform3d(-_ox, _oy, 0.0, Rotation3d(0, 30, 45))
+        self.rtc_front_right = Transform3d(_ox, _oy, 0.0, Rotation3d(0, 30, -45))
+        self.rtc_back_left = Transform3d(-_ox, -_oy, 0.0, Rotation3d(0, 30, 135))
+        self.rtc_back_right = Transform3d(_ox, -_oy, 0.0, Rotation3d(0, 30, -135))
         self.temp_cam = Transform3d(-0.31115, 0.0, 0.5715, Rotation3d())
 
         # self.camera_front_left = LemonCamera(
@@ -249,8 +190,6 @@ class MyRobot(LemonRobot):
         """
         MISCELLANEOUS
         """
-
-        self.pigeon = Pigeon2(30, self.canivore_canbus)
 
         self.fms = DriverStation.isFMSAttached()
 
@@ -275,7 +214,7 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        # self.shooter_controller.engage()
+        self.shooter_controller.engage()
 
     def autonomousPeriodic(self):
         self._display_auto_trajectory()
@@ -292,9 +231,6 @@ class MyRobot(LemonRobot):
         self.y_filter = SlewRateLimiter(
             self.rasing_slew_rate  # , self.falling_slew_rate
         )
-        self.theta_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
-        )
 
     def teleopPeriodic(self):
         # Cache inputs called multiple times
@@ -309,8 +245,6 @@ class MyRobot(LemonRobot):
         SWERVE
         """
         with self.consumeExceptions():
-            rotate_mult = 0.75
-
             # if both 25% else 50 or 75
             if (primary_r2 >= 0.8) and (primary_l2 >= 0.8):
                 mult = 0.25
@@ -334,19 +268,18 @@ class MyRobot(LemonRobot):
                 vy = self.y_filter.calculate(
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
-            if abs(primary_rx) <= 0.0:
-                omega = 0.0
+            # Right stick: if deflected, point the robot in that direction;
+            # otherwise fall back to normal rotational-velocity control.
+            right_stick_moved = abs(primary_rx) > 0.1 or abs(primary_ry) > 0.1
+            if right_stick_moved:
+                self.drive_control.drive_point_joy(-vx, vy, -primary_rx, -primary_ry)
             else:
-                omega = self.theta_filter.calculate(
-                    -self.sammi_curve(primary_rx) * rotate_mult * self.top_omega
+                self.drive_control.drive_manual(
+                    -vx,
+                    vy,
+                    0.0,
+                    not self.primary.getCreateButton(),  # temporary
                 )
-
-            self.drive_control.drive_manual(
-                vx,
-                -vy,
-                -omega,
-                not self.primary.getCreateButton(),  # temporary
-            )
 
             if self.primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
@@ -357,33 +290,20 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getLeftBumper():
-                self.intake.set_voltage(0.5)
+                self.intake.set_voltage(6.0)
 
         """
         SHOOTER
         """
         with self.consumeExceptions():
-            if self.secondary.getStartButton():
-                self.shooter.set_velocity(10)
-            if self.secondary.getOptionsButton():
-                self.shooter.set_velocity(40)
-            if self.secondary.getAButton():
-                self.shooter.set_velocity(43)
-            if self.secondary.getBButton():
-                self.shooter.set_velocity(45)
-            if self.secondary.getXButton():
-                self.shooter.set_velocity(47)
-            if self.secondary.getYButton():
-                self.shooter.set_velocity(50)
-
             if self.secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter.set_kicker(0.5)
+                self.shooter_controller.request_shoot()
 
     def disabledPeriodic(self):
         # make magicbot happy
         pass
 
-    @feedback
+    @fms_feedback
     def get_voltage(self) -> units.volts:
         return RobotController.getBatteryVoltage()
 
@@ -392,7 +312,7 @@ class MyRobot(LemonRobot):
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
 
-    @feedback
+    @fms_feedback
     def display_auto_state(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):

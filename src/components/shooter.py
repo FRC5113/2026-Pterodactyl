@@ -1,8 +1,7 @@
-from magicbot import feedback, will_reset_to
+from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
-    MotionMagicConfigs,
     TalonFXConfiguration,
     TalonFXSConfiguration,
 )
@@ -15,6 +14,7 @@ from phoenix6.signals import (
 )
 from wpimath import units
 
+from lemonlib import fms_feedback
 from lemonlib.smart import SmartProfile
 
 
@@ -35,7 +35,6 @@ class Shooter:
     shooter_voltage = will_reset_to(0.0)
     kicker_duty = will_reset_to(0.0)
     manual_control = will_reset_to(False)
-
 
     def setup(self):
         self.shooter_motors_config = TalonFXConfiguration()
@@ -105,11 +104,11 @@ class Shooter:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    @fms_feedback
     def get_velocity(self) -> float:
         return self.left_motor.get_velocity().value
 
-    @feedback
+    @fms_feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 

@@ -1,12 +1,13 @@
 import math
 
-from magicbot import StateMachine, feedback, state, will_reset_to
+from magicbot import StateMachine, state, will_reset_to
 from wpilib import DriverStation
 
 from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
+from lemonlib import fms_feedback
 from lemonlib.smart import SmartPreference
 
 
@@ -94,15 +95,15 @@ class ShooterController(StateMachine):
 
         return fp[-1]
 
-    @feedback
+    @fms_feedback
     def get_target_rps(self) -> float:
         return self.target_rps
 
-    @feedback
+    @fms_feedback
     def get_distance(self) -> float:
         return self.distance
 
-    @feedback
+    @fms_feedback
     def is_at_speed(self) -> bool:
         return self.at_speed
 

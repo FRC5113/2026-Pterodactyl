@@ -1,6 +1,6 @@
 import enum
 
-from magicbot import feedback, will_reset_to
+from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import TalonFXConfiguration
 from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
@@ -12,6 +12,7 @@ from phoenix6.signals import (
 from wpilib import DutyCycleEncoder
 from wpimath import units
 
+from lemonlib import fms_feedback
 from lemonlib.smart import SmartProfile
 
 
@@ -76,7 +77,7 @@ class Intake:
     def get_position(self) -> float:
         return (self.get_left_angle() + self.get_right_angle()) / 2
 
-    @feedback
+    @fms_feedback
     def get_angle(self) -> units.degrees:
         """Return the angle of the hinge normalized to [-180,180].
         An angle of 0 refers to the intake in the up/stowed position.
