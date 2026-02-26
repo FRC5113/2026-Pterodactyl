@@ -189,13 +189,12 @@ class MyRobot(LemonRobot):
         # )
 
         # Robot to Camera Transforms
-        _ox = TunerConstants.offset_x
-        _oy = TunerConstants.offset_y
-        self.rtc_front_left = Transform3d(-_ox, _oy, 0.0, Rotation3d(0, 30, 45))
-        self.rtc_front_right = Transform3d(_ox, _oy, 0.0, Rotation3d(0, 30, -45))
-        self.rtc_back_left = Transform3d(-_ox, -_oy, 0.0, Rotation3d(0, 30, 135))
-        self.rtc_back_right = Transform3d(_ox, -_oy, 0.0, Rotation3d(0, 30, -135))
-        self.temp_cam = Transform3d(-0.31115, 0.0, 0.5715, Rotation3d())
+        ox = 0.3429
+        oy = 0.3429
+        self.rtc_front_left = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, 45))
+        self.rtc_front_right = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, -45))
+        self.rtc_back_left = Transform3d(-ox, -oy, 0.0, Rotation3d(0, 30, 135))
+        self.rtc_back_right = Transform3d(ox, -oy, 0.0, Rotation3d(0, 30, -135))
 
         # self.camera_front_left = LemonCamera(
         #     "Front_Left", self.temp_cam, self.field_layout

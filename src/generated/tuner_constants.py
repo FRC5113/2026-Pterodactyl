@@ -4,7 +4,6 @@ from phoenix6 import CANBus, configs, signals, swerve, units
 class TunerConstants:
     """
     Swerve drivetrain constants matching the existing SDS MK4i module configuration.
-    Converted from the custom swerve implementation to use the Phoenix 6 Swerve API.
     """
 
     # The steer motor uses any SwerveModule.SteerRequestType control request
