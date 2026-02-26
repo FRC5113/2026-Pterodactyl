@@ -8,7 +8,6 @@ from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
 from lemonlib import fms_feedback
-from lemonlib.smart import SmartPreference
 
 
 class ShooterController(StateMachine):
@@ -20,9 +19,10 @@ class ShooterController(StateMachine):
     at_speed: bool = will_reset_to(False)
     shooting: bool = will_reset_to(False)
 
-    idle_speed_scalar = SmartPreference(0.8)
-    kicker_duty_cycle = SmartPreference(0.67)  # ~8V / 12V
-    angle_tolerance = SmartPreference(0.035)  # ~2 degrees in radians
+    idle_speed_scalar = 0.8
+    kicker_duty = 0.6  # Volts
+    angle_tolerance = 0.035  # ~2 degrees in radians
+    speed_tolerance = 0.05  # 5% relative tolerance
 
     def setup(self):
         # Meters
@@ -34,9 +34,7 @@ class ShooterController(StateMachine):
         # Seconds — measured flight times at each distance
         self.time_lookup = [0.15, 0.25, 0.35, 0.45, 0.55]  # TODO Tune these values
 
-        self.drive_scalar = 1.0
         self.target_rps = 0.0
-        self.speed_tolerance = 0.05  # 5% tolerance
         self.target_angle = 0.0
         self.distance = 0.0
 
@@ -74,7 +72,10 @@ class ShooterController(StateMachine):
             predicted_y - robot_pos.y, predicted_x - robot_pos.x
         )
 
-        self.distance = robot_pos.distance(hub_pos)
+        # Use the compensated distance (to the predicted aim point, not the raw hub)
+        dx = predicted_x - robot_pos.x
+        dy = predicted_y - robot_pos.y
+        self.distance = math.hypot(dx, dy)
         self.target_rps = self._linear_interp(
             self.distance, self.distance_lookup, self.speed_lookup
         )
@@ -114,6 +115,15 @@ class ShooterController(StateMachine):
         if self.shooting:
             self.next_state("spin_up")
 
+    def _is_aimed(self) -> bool:
+        """Check if the robot heading is within tolerance of the target angle."""
+        heading = self.swerve_drive.get_estimated_pose().rotation().radians()
+        error = math.atan2(
+            math.sin(self.target_angle - heading),
+            math.cos(self.target_angle - heading),
+        )
+        return abs(error) <= self.angle_tolerance
+
     @state
     def spin_up(self):
         self._update_target()
@@ -125,18 +135,28 @@ class ShooterController(StateMachine):
             return
 
         tolerance = self.speed_tolerance * self.target_rps
-        if abs(self.shooter.get_velocity() - self.target_rps) <= tolerance:
-            self.at_speed = True
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        aim_ready = self._is_aimed()
+
+        self.at_speed = speed_ready and aim_ready
+        if self.at_speed:
             self.next_state("shoot")
-        else:
-            self.at_speed = False
 
     @state
     def shoot(self):
         self._update_target()
         self.drive_control.point_to(self.target_angle)
         self.shooter.set_velocity(self.target_rps)
-        self.shooter.set_kicker(self.kicker_duty_cycle)
+
+        # Re-verify conditions — fall back to spin_up if speed or aim drifts
+        tolerance = self.speed_tolerance * self.target_rps
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        aim_ready = self._is_aimed()
+        self.at_speed = speed_ready and aim_ready
 
         if not self.shooting:
             self.next_state("idle")
+        elif not self.at_speed:
+            self.next_state("spin_up")
+        else:
+            self.shooter.set_kicker(self.kicker_duty)

@@ -13,7 +13,6 @@ from wpilib import (
     RobotController,
 )
 from wpimath import units
-from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
@@ -27,11 +26,7 @@ from components.sysid_drive import SysIdDriveLinear
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib.util import (
-    AlertManager,
-    AlertType,
-    curve,
-)
+from lemonlib.util import AlertManager, AlertType, AsymmetricSlewLimiter, curve
 
 
 class MyRobot(LemonRobot):
@@ -45,11 +40,11 @@ class MyRobot(LemonRobot):
     shooter: Shooter
 
     # greatest speed that chassis should move (not greatest possible speed)
-    top_speed = SmartPreference(3.0)
+    top_speed = SmartPreference(4.7)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate: SmartPreference = SmartPreference(5.0)
-    falling_slew_rate: SmartPreference = SmartPreference(5.0)
+    rasing_slew_rate: SmartPreference = SmartPreference(8.0)
+    falling_slew_rate: SmartPreference = SmartPreference(20.0)
     intake: Intake
 
     def createObjects(self):
@@ -92,6 +87,34 @@ class MyRobot(LemonRobot):
                 "kMaxA": 40.0,
                 "kMinInput": -math.pi,
                 "kMaxInput": math.pi,
+            },
+            (not self.low_bandwidth) and self.tuning_enabled,
+        )
+
+        # Steer motor closed-loop gains (applied to all 4 steer TalonFXs)
+        self.steer_profile = SmartProfile(
+            "swerve_steer",
+            {
+                "kP": TunerConstants.steer_gains.k_p,
+                "kI": TunerConstants.steer_gains.k_i,
+                "kD": TunerConstants.steer_gains.k_d,
+                "kS": TunerConstants.steer_gains.k_s,
+                "kV": TunerConstants.steer_gains.k_v,
+                "kA": TunerConstants.steer_gains.k_a,
+            },
+            (not self.low_bandwidth) and self.tuning_enabled,
+        )
+
+        # Drive motor closed-loop gains (applied to all 4 drive TalonFXs)
+        self.drive_profile = SmartProfile(
+            "swerve_drive",
+            {
+                "kP": TunerConstants.drive_gains.k_p,
+                "kI": TunerConstants.drive_gains.k_i,
+                "kD": TunerConstants.drive_gains.k_d,
+                "kS": TunerConstants.drive_gains.k_s,
+                "kV": TunerConstants.drive_gains.k_v,
+                "kA": TunerConstants.drive_gains.k_a,
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
@@ -225,11 +248,11 @@ class MyRobot(LemonRobot):
         self.primary = LemonInput(0)
         self.secondary = LemonInput(1)
 
-        self.x_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
+        self.x_filter = AsymmetricSlewLimiter(
+            self.rasing_slew_rate, self.falling_slew_rate
         )
-        self.y_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
+        self.y_filter = AsymmetricSlewLimiter(
+            self.rasing_slew_rate, self.falling_slew_rate
         )
 
     def teleopPeriodic(self):
@@ -300,8 +323,7 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_shoot()
 
     def disabledPeriodic(self):
-        # make magicbot happy
-        pass
+        self.odometry.execute()
 
     @fms_feedback
     def get_voltage(self) -> units.volts:

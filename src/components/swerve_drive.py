@@ -1,7 +1,8 @@
 import math
 
 from choreo.trajectory import SwerveSample
-from phoenix6 import hardware, swerve, utils
+from phoenix6 import configs, hardware, swerve, utils
+from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
 from wpilib import DriverStation, SmartDashboard, Timer
 from wpilib.sysid import SysIdRoutineLog
@@ -32,6 +33,9 @@ class SwerveDrive(Sendable):
     max_speed: units.meters_per_second
     translation_profile: SmartProfile
     rotation_profile: SmartProfile
+    steer_profile: SmartProfile
+    drive_profile: SmartProfile
+    tuning_enabled: bool
 
     telemetry_enabled = SmartPreference(True)
     telemetry_period = SmartPreference(0.1)
@@ -177,6 +181,10 @@ class SwerveDrive(Sendable):
             if max_rot > 0:
                 req.with_max_abs_rotational_rate(max_rot)
 
+        # Apply steer & drive gains from SmartProfiles to all modules
+        if self.tuning_enabled:
+            self._apply_motor_gains()
+
         # Set operator perspective based on alliance colour
         if DriverStation.getAlliance() == DriverStation.Alliance.kRed:
             self._drivetrain.set_operator_perspective_forward(
@@ -244,6 +252,40 @@ class SwerveDrive(Sendable):
             ).degrees()
         )
         return angle_error < 3.0
+
+    def _apply_motor_gains(self) -> None:
+        """Read the latest SmartProfile gains and push them to every module."""
+        # Build Slot0 for steer motors
+        sg = self.steer_profile.gains
+        steer_slot0 = (
+            configs.Slot0Configs()
+            .with_k_p(sg["kP"])
+            .with_k_i(sg["kI"])
+            .with_k_d(sg["kD"])
+            .with_k_s(sg["kS"])
+            .with_k_v(sg["kV"])
+            .with_k_a(sg["kA"])
+            .with_static_feedforward_sign(
+                StaticFeedforwardSignValue.USE_CLOSED_LOOP_SIGN
+            )
+        )
+
+        # Build Slot0 for drive motors
+        dg = self.drive_profile.gains
+        drive_slot0 = (
+            configs.Slot0Configs()
+            .with_k_p(dg["kP"])
+            .with_k_i(dg["kI"])
+            .with_k_d(dg["kD"])
+            .with_k_s(dg["kS"])
+            .with_k_v(dg["kV"])
+            .with_k_a(dg["kA"])
+        )
+
+        for i in range(4):
+            mod = self._drivetrain.get_module(i)
+            mod.steer_motor.configurator.apply(steer_slot0)
+            mod.drive_motor.configurator.apply(drive_slot0)
 
     """
     CONTROL METHODS
