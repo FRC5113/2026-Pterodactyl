@@ -35,12 +35,13 @@ globalProfiler = cProfile.Profile()
 class MyRobot(LemonRobot):
     sysid_drive: SysIdDriveLinear
     shooter_controller: ShooterController
+
     drive_control: DriveControl
     odometry: Odometry
 
     swerve_drive: SwerveDrive
-
     shooter: Shooter
+    intake: Intake
 
     # greatest speed that chassis should move (not greatest possible speed)
     top_speed = SmartPreference(4.7)
@@ -48,7 +49,6 @@ class MyRobot(LemonRobot):
 
     rasing_slew_rate: SmartPreference = SmartPreference(8.0)
     falling_slew_rate: SmartPreference = SmartPreference(20.0)
-    intake: Intake
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -314,16 +314,9 @@ class MyRobot(LemonRobot):
                     omega,
                     not self.primary.getCreateButton(),  # temporary
                 )
-            elif abs(primary_rx) > 0.707 or abs(primary_ry) > 0.707:
-                self.drive_control.drive_point_joy(
-                    vx, vy, primary_rx, primary_ry
-                )  # keaton mode
             else:
-                self.drive_control.drive_manual(
-                    vx,
-                    vy,
-                    0.0,
-                    not self.primary.getCreateButton(),  # temporary
+                self.drive_control.drive_point_joy(  # Keaton mode
+                    vx, vy, primary_rx, primary_ry
                 )
 
             if self.primary.getSquareButton():

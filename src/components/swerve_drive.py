@@ -15,6 +15,7 @@ from wpimath.kinematics import (
     SwerveModuleState,
 )
 from wpiutil import Sendable, SendableBuilder
+from magicbot import will_reset_to
 
 from generated.tuner_constants import TunerConstants
 from lemonlib import fms_feedback
@@ -42,17 +43,13 @@ class SwerveDrive(Sendable):
     adv_scope_enabled = SmartPreference(False)
     adv_scope_period = SmartPreference(0.1)
 
+    stopped = will_reset_to(True)
+
     def __init__(self) -> None:
         Sendable.__init__(self)
-        # The request to apply on the next execute() call.
-        # Set by control methods, consumed (and cleared) in execute().
-        # NOT will_reset_to — it persists across one cycle boundary so that
-        # execute() (which runs before drive_control) can read the request
-        # that drive_control set on the previous cycle.
-        self._pending_request = None
         # Cached drivetrain state — updated once per execute() cycle.
-        # Avoids repeated get_state() calls (each copies C++ → Python objects).
-        self._cached_pose = Pose2d()
+        # Avoids repeated get_state() calls (each copies C++ > Python objects).
+        self.cached_pose = Pose2d()
         self.chassis_speeds = ChassisSpeeds()
         self.swerve_module_states = (
             SwerveModuleState(),
@@ -74,7 +71,7 @@ class SwerveDrive(Sendable):
         tc = TunerConstants
 
         # Build the Phoenix 6 SwerveDrivetrain — it creates all hardware internally
-        self._drivetrain = swerve.SwerveDrivetrain(
+        self.drivetrain = swerve.SwerveDrivetrain(
             hardware.TalonFX,
             hardware.TalonFX,
             hardware.CANcoder,
@@ -82,57 +79,47 @@ class SwerveDrive(Sendable):
             [tc.front_left, tc.front_right, tc.back_left, tc.back_right],
         )
 
-        self.kinematics: SwerveDrive4Kinematics = self._drivetrain.kinematics
+        self.kinematics: SwerveDrive4Kinematics = self.drivetrain.kinematics
 
         # Pre-built SwerveRequest objects (mutated in-place each cycle)
-        self._field_centric_req = (
+        self.field_centric_req = (
             requests.FieldCentric()
             .with_deadband(0.0)
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
-            .with_steer_request_type(
-                swerve.SwerveModule.SteerRequestType.MOTION_MAGIC_EXPO
-            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
-        self._robot_centric_req = (
+        self.robot_centric_req = (
             requests.RobotCentric()
             .with_deadband(0.0)
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
-            .with_steer_request_type(
-                swerve.SwerveModule.SteerRequestType.MOTION_MAGIC_EXPO
-            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
-        self._facing_angle_req = (
+        self.facing_angle_req = (
             requests.FieldCentricFacingAngle()
             .with_deadband(0.0)
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
-            .with_steer_request_type(
-                swerve.SwerveModule.SteerRequestType.MOTION_MAGIC_EXPO
-            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
         # Field-absolute version (no operator-perspective rotation) — used by
         # the shooter controller whose target_angle is already in field coords.
-        self._facing_angle_field_req = (
+        self.facing_angle_field_req = (
             requests.FieldCentricFacingAngle()
             .with_deadband(0.0)
             .with_rotational_deadband(0.0)
             .with_forward_perspective(requests.ForwardPerspectiveValue.BLUE_ALLIANCE)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
-            .with_steer_request_type(
-                swerve.SwerveModule.SteerRequestType.MOTION_MAGIC_EXPO
-            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
-        self._brake_req = requests.SwerveDriveBrake()
-        self._sysid_translation_req = requests.SysIdSwerveTranslation()
-        self._sysid_rotation_req = requests.SysIdSwerveRotation()
-        self._apply_speeds_req = (
+        self.x_brake_req = requests.SwerveDriveBrake()
+        self.sysid_translation_req = requests.SysIdSwerveTranslation()
+        self.sysid_rotation_req = requests.SysIdSwerveRotation()
+        self.apply_speeds_req = (
             requests.ApplyRobotSpeeds()
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
-            .with_steer_request_type(
-                swerve.SwerveModule.SteerRequestType.MOTION_MAGIC_EXPO
-            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
 
         self.still_states = self.swerve_module_states
@@ -146,11 +133,11 @@ class SwerveDrive(Sendable):
             "Pigeon heading has been reset.", AlertType.INFO, timeout=3.0
         )
 
-        self._last_adv_scope_time = 0.0
-        self._last_telem_time = 0.0
+        self.last_adv_scope_time = 0.0
+        self.last_telem_time = 0.0
 
         # Register telemetry callback (called from the odometry thread)
-        self._drivetrain.register_telemetry(self._telemetry_callback)
+        self.drivetrain.register_telemetry(self._telemetry_callback)
 
     def _telemetry_callback(
         self, state: swerve.SwerveDrivetrain.SwerveDriveState
@@ -168,18 +155,14 @@ class SwerveDrive(Sendable):
         self.holonomic_controller = HolonomicDriveController(
             self.x_controller, self.y_controller, self.theta_controller
         )
-        self.theta_controller.enableContinuousInput(-math.pi, math.pi)
-        self.smart_theta_controller = SmartController(
-            "Theta Controller", self.theta_controller.calculate, True
-        )
 
         # Sync facing-angle request PID from the rotation profile
         rp = self.rotation_profile.gains
-        heading_kp = rp.get("kP", 1.0)
+        heading_kp = rp.get("kP", 7.0)
         heading_ki = rp.get("kI", 0.0)
         heading_kd = rp.get("kD", 0.0)
         max_rot = rp.get("kMaxV", 0)
-        for req in (self._facing_angle_req, self._facing_angle_field_req):
+        for req in (self.facing_angle_req, self.facing_angle_field_req):
             req.with_heading_pid(heading_kp, heading_ki, heading_kd)
             if max_rot > 0:
                 req.with_max_abs_rotational_rate(max_rot)
@@ -190,11 +173,11 @@ class SwerveDrive(Sendable):
 
         # Set operator perspective based on alliance colour
         if DriverStation.getAlliance() == DriverStation.Alliance.kRed:
-            self._drivetrain.set_operator_perspective_forward(
+            self.drivetrain.set_operator_perspective_forward(
                 Rotation2d.fromDegrees(180)
             )
         else:
-            self._drivetrain.set_operator_perspective_forward(Rotation2d())
+            self.drivetrain.set_operator_perspective_forward(Rotation2d())
 
     def initSendable(self, builder: SendableBuilder) -> None:
         builder.setSmartDashboardType("SwerveDrive")
@@ -222,7 +205,7 @@ class SwerveDrive(Sendable):
     """
 
     def get_estimated_pose(self) -> Pose2d:
-        return self._cached_pose
+        return self.cached_pose
 
     def get_velocity(self) -> ChassisSpeeds:
         return self.chassis_speeds
@@ -281,7 +264,7 @@ class SwerveDrive(Sendable):
         )
 
         for i in range(4):
-            mod = self._drivetrain.get_module(i)
+            mod = self.drivetrain.get_module(i)
             mod.steer_motor.configurator.apply(steer_slot0)
             mod.drive_motor.configurator.apply(drive_slot0)
 
@@ -295,17 +278,17 @@ class SwerveDrive(Sendable):
         translationY: units.meters_per_second,
         rotationX: units.radians_per_second,
         field_relative: bool,
-        period: units.seconds,
     ):
+        self.stopped = False
         if field_relative:
-            self._pending_request = (
-                self._field_centric_req.with_velocity_x(translationX)
+            self.pending_request = (
+                self.field_centric_req.with_velocity_x(translationX)
                 .with_velocity_y(translationY)
                 .with_rotational_rate(rotationX)
             )
         else:
-            self._pending_request = (
-                self._robot_centric_req.with_velocity_x(translationX)
+            self.pending_request = (
+                self.robot_centric_req.with_velocity_x(translationX)
                 .with_velocity_y(translationY)
                 .with_rotational_rate(rotationX)
             )
@@ -318,8 +301,9 @@ class SwerveDrive(Sendable):
     ):
         """Drive while pointing the robot at a field-absolute angle.
         Uses BLUE_ALLIANCE perspective (for shooter / field-relative targets)."""
-        self._pending_request = (
-            self._facing_angle_field_req.with_velocity_x(vx)
+        self.stopped = False
+        self.pending_request = (
+            self.facing_angle_field_req.with_velocity_x(vx)
             .with_velocity_y(vy)
             .with_target_direction(Rotation2d(angle))
         )
@@ -334,20 +318,24 @@ class SwerveDrive(Sendable):
         """Drive while pointing the robot in the direction of the right
         joystick.  Uses OPERATOR_PERSPECTIVE so 'push forward' = face away
         from the driver."""
-        angle = math.atan2(joy_y, joy_x) - math.radians(90)
-        self._pending_request = (
-            self._facing_angle_req.with_velocity_x(vx)
+        self.stopped = False
+        angle = math.atan2(joy_y, joy_x)
+        self.pending_request = (
+            self.facing_angle_req.with_velocity_x(vx)
             .with_velocity_y(vy)
             .with_target_direction(Rotation2d(angle))
         )
 
     def sysid_drive(self, volts: float, rot: float = 0.0) -> None:
-        self._pending_request = self._sysid_translation_req.with_volts(volts)
+        self.stopped = False
+        self.pending_request = self.sysid_translation_req.with_volts(volts)
 
     def sysid_rot(self, volts: float, rot: float = 0.0) -> None:
-        self._pending_request = self._sysid_rotation_req.with_rotational_rate(volts)
+        self.stopped = False
+        self.pending_request = self.sysid_rotation_req.with_rotational_rate(volts)
 
     def set_desired_pose(self, pose: Pose2d):
+        self.stopped = False
         self.desired_pose = pose
         if self.get_distance_from_pose(pose) > 0.02:
             speeds = self.holonomic_controller.calculate(
@@ -356,18 +344,19 @@ class SwerveDrive(Sendable):
                 0.0,
                 pose.rotation(),
             )
-            self._pending_request = self._apply_speeds_req.with_speeds(speeds)
+            self.pending_request = self.apply_speeds_req.with_speeds(speeds)
 
     def reset_gyro(self) -> None:
-        self._drivetrain.seed_field_centric()
+        self.drivetrain.seed_field_centric()
         self.pigeon_alert.enable()
 
     def addVisionPoseEstimate(self, pose: Pose2d, timestamp: units.seconds):
-        self._drivetrain.add_vision_measurement(
+        self.drivetrain.add_vision_measurement(
             pose, utils.fpga_to_current_time(timestamp)
         )
 
     def follow_trajectory(self, sample: SwerveSample):
+        self.stopped = False
         pose = self.get_estimated_pose()
         # Compute field-relative speeds: feedforward from trajectory + PID feedback
         field_speeds = ChassisSpeeds(
@@ -382,7 +371,7 @@ class SwerveDrive(Sendable):
         robot_speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
             field_speeds.vx, field_speeds.vy, field_speeds.omega, pose.rotation()
         )
-        self._pending_request = self._apply_speeds_req.with_speeds(robot_speeds)
+        self.pending_request = self.apply_speeds_req.with_speeds(robot_speeds)
 
     def point_towards_joy(
         self,
@@ -391,17 +380,17 @@ class SwerveDrive(Sendable):
         translationX: units.meters_per_second = 0.0,
         translationY: units.meters_per_second = 0.0,
         field_relative: bool = True,
-        period: units.seconds = 0.02,
     ):
         """Point the robot in the direction the right joystick is pushed.
         Uses operator-perspective so "push forward" = face away from driver."""
-        moved = abs(rightX) > 0.1 or abs(rightY) > 0.1
+        self.stopped = False
+        moved = abs(rightX) > 0.707 or abs(rightY) > 0.707
         if not moved:
-            self.drive(translationX, translationY, 0.0, field_relative, period)
+            self.drive(translationX, translationY, 0.0, field_relative)
             return
-        angle = math.atan2(rightY, rightX) - math.radians(90)
-        self._pending_request = (
-            self._facing_angle_req.with_velocity_x(translationX)
+        angle = math.atan2(rightY, rightX)
+        self.pending_request = (
+            self.facing_angle_req.with_velocity_x(translationX)
             .with_velocity_y(translationY)
             .with_target_direction(Rotation2d(angle))
         )
@@ -411,28 +400,28 @@ class SwerveDrive(Sendable):
         angle: units.radians,
         translationX: units.meters_per_second = 0.0,
         translationY: units.meters_per_second = 0.0,
-        field_relative: bool = True,
-        period: units.seconds = 0.02,
     ):
         """Point the robot at a field-absolute angle while translating.
         Used by the shooter controller."""
-        self._pending_request = (
-            self._facing_angle_field_req.with_velocity_x(translationX)
+        self.stopped = False
+        self.pending_request = (
+            self.facing_angle_field_req.with_velocity_x(translationX)
             .with_velocity_y(translationY)
             .with_target_direction(Rotation2d(angle))
         )
 
     def driveRobotRelative(self, speeds: ChassisSpeeds):
-        return self.drive(speeds.vx, speeds.vy, speeds.omega, False, 0.02)
+        self.stopped = False
+        return self.drive(speeds.vx, speeds.vy, speeds.omega, False)
 
     def set_starting_pose(self, pose: Pose2d):
         """ONLY USE IN SIM!"""
         self.starting_pose = pose
         if pose is not None:
-            self._drivetrain.reset_pose(pose)
+            self.drivetrain.reset_pose(pose)
 
     def resetPose(self):
-        self._drivetrain.reset_pose(Pose2d())
+        self.drivetrain.reset_pose(Pose2d())
 
     """
     TELEMETRY
@@ -442,9 +431,9 @@ class SwerveDrive(Sendable):
         if not self.adv_scope_enabled:
             return
         now = Timer.getFPGATimestamp()
-        if now - self._last_adv_scope_time < self.adv_scope_period:
+        if now - self.last_adv_scope_time < self.adv_scope_period:
             return
-        self._last_adv_scope_time = now
+        self.last_adv_scope_time = now
 
         swerve_setpoints = []
         for state in self.swerve_module_states:
@@ -460,7 +449,7 @@ class SwerveDrive(Sendable):
     def log(self, sys_id_routine: SysIdRoutineLog) -> None:
         """SysId logging: record voltage, position, and velocity for each drive motor."""
         for i, name in enumerate(("fl", "fr", "rl", "rr")):
-            mod = self._drivetrain.get_module(i)
+            mod = self.drivetrain.get_module(i)
             drive_motor = mod.drive_motor
             sys_id_routine.motor(f"swerve/drive/{name}").voltage(
                 drive_motor.get_motor_voltage().value
@@ -468,21 +457,21 @@ class SwerveDrive(Sendable):
                 drive_motor.get_velocity().value
             )
 
-    def doTelemetry(self):
-        """Placeholder — Phoenix 6 odometry thread handles telemetry."""
-        pass
-
     """
     EXECUTE
     """
 
     def execute(self) -> None:
+        if self.stopped:
+            self.drivetrain.set_control(self.x_brake_req)
+            return
+
         # Refresh cached state — single get_state() per cycle.
         # All getters (get_estimated_pose, get_velocity, get_module_states)
         # return these cached values to avoid repeated C++→Python copies.
-        drive_state = self._drivetrain.get_state()
+        drive_state = self.drivetrain.get_state()
         if drive_state:
-            self._cached_pose = drive_state.pose if drive_state.pose else Pose2d()
+            self.cached_pose = drive_state.pose if drive_state.pose else Pose2d()
             self.chassis_speeds = (
                 drive_state.speeds if drive_state.speeds else ChassisSpeeds()
             )
@@ -491,13 +480,4 @@ class SwerveDrive(Sendable):
 
         self.sendAdvantageScopeData(drive_state)
 
-        # Apply the pending request (set by a control method on the previous
-        # cycle, since drive_control runs after swerve_drive
-        # If nothing was requested, brake.
-        if self._pending_request is not None:
-            self._drivetrain.set_control(self._pending_request)
-        else:
-            self._drivetrain.set_control(self._brake_req)
-
-        # Clear so that if nothing calls a control method next cycle we brake.
-        self._pending_request = None
+        self.drivetrain.set_control(self.pending_request)
