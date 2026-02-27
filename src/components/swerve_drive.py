@@ -50,6 +50,16 @@ class SwerveDrive(Sendable):
         # execute() (which runs before drive_control) can read the request
         # that drive_control set on the previous cycle.
         self._pending_request = None
+        # Cached drivetrain state — updated once per execute() cycle.
+        # Avoids repeated get_state() calls (each copies C++ → Python objects).
+        self._cached_pose = Pose2d()
+        self.chassis_speeds = ChassisSpeeds()
+        self.swerve_module_states = (
+            SwerveModuleState(),
+            SwerveModuleState(),
+            SwerveModuleState(),
+            SwerveModuleState(),
+        )
 
     @staticmethod
     def shouldFlipPath():
@@ -125,13 +135,6 @@ class SwerveDrive(Sendable):
             )
         )
 
-        self.chassis_speeds = ChassisSpeeds()
-        self.swerve_module_states = (
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
-        )
         self.still_states = self.swerve_module_states
         SmartDashboard.putData("Swerve Drive", self)
 
@@ -219,22 +222,17 @@ class SwerveDrive(Sendable):
     """
 
     def get_estimated_pose(self) -> Pose2d:
-        state = self._drivetrain.get_state()
-        return state.pose if state else Pose2d()
+        return self._cached_pose
 
     def get_velocity(self) -> ChassisSpeeds:
-        state = self._drivetrain.get_state()
-        return state.speeds if state else ChassisSpeeds()
+        return self.chassis_speeds
 
     def get_module_states(
         self,
     ) -> tuple[
         SwerveModuleState, SwerveModuleState, SwerveModuleState, SwerveModuleState
     ]:
-        state = self._drivetrain.get_state()
-        if state and state.module_states:
-            return tuple(state.module_states)
-        return self.still_states
+        return self.swerve_module_states
 
     @fms_feedback
     def get_distance_from_desired_pose(self) -> units.meters:
@@ -440,7 +438,7 @@ class SwerveDrive(Sendable):
     TELEMETRY
     """
 
-    def sendAdvantageScopeData(self):
+    def sendAdvantageScopeData(self, drive_state=None):
         if not self.adv_scope_enabled:
             return
         now = Timer.getFPGATimestamp()
@@ -453,7 +451,6 @@ class SwerveDrive(Sendable):
             swerve_setpoints += [state.angle.degrees(), state.speed]
         SmartDashboard.putNumberArray("Swerve Setpoints", swerve_setpoints)
 
-        drive_state = self._drivetrain.get_state()
         if drive_state and drive_state.module_states:
             swerve_measurements = []
             for ms in drive_state.module_states:
@@ -480,13 +477,19 @@ class SwerveDrive(Sendable):
     """
 
     def execute(self) -> None:
-        # Refresh cached state for local use
+        # Refresh cached state — single get_state() per cycle.
+        # All getters (get_estimated_pose, get_velocity, get_module_states)
+        # return these cached values to avoid repeated C++→Python copies.
         drive_state = self._drivetrain.get_state()
-        if drive_state and drive_state.module_states:
-            self.swerve_module_states = tuple(drive_state.module_states)
-            self.chassis_speeds = drive_state.speeds
+        if drive_state:
+            self._cached_pose = drive_state.pose if drive_state.pose else Pose2d()
+            self.chassis_speeds = (
+                drive_state.speeds if drive_state.speeds else ChassisSpeeds()
+            )
+            if drive_state.module_states:
+                self.swerve_module_states = tuple(drive_state.module_states)
 
-        self.sendAdvantageScopeData()
+        self.sendAdvantageScopeData(drive_state)
 
         # Apply the pending request (set by a control method on the previous
         # cycle, since drive_control runs after swerve_drive

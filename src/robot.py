@@ -1,6 +1,6 @@
 import math
 from pathlib import Path
-import cProfile
+
 import wpilib
 from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
@@ -54,7 +54,6 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        wpilib.Preferences.removeAll()
         self.tuning_enabled = True
 
         self.rio_canbus = CANBus.roborio()
@@ -257,16 +256,7 @@ class MyRobot(LemonRobot):
         self.omega_filter = AsymmetricSlewLimiter(
             self.rasing_slew_rate, self.falling_slew_rate
         )
-    def disabledInit(self):
-        try:
-            globalProfiler.dump_stats("/home/lvuser/teleop.prof")
-            globalProfiler.disable()
-            print("[DEBUG] Profile files written")
-        except FileNotFoundError:
-            globalProfiler.dump_stats("./temp.prof")
-        except Exception as e:
-            #prob fine
-            pass
+
     def teleopPeriodic(self):
         # Cache inputs called multiple times
         primary_r2 = self.primary.getR2Axis()
@@ -303,24 +293,31 @@ class MyRobot(LemonRobot):
                 vy = self.omega_filter.calculate(
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
-            if abs(primary_rx) <= 0.0:
-                omega = 0.0
-            else:
-                omega = self.y_filter.calculate(
-                    self.sammi_curve(primary_rx) * self.top_omega
+
+            if self.primary.getLeftBumper():
+                if abs(primary_rx) <= 0.0:
+                    omega = 0.0
+                else:
+                    omega = self.y_filter.calculate(
+                        self.sammi_curve(primary_rx) * self.top_omega
+                    )
+                self.drive_control.drive_manual(
+                    vx,
+                    vy,
+                    omega,
+                    not self.primary.getCreateButton(),  # temporary
                 )
-            # Right stick: if deflected, point the robot in that direction;
-            # otherwise fall back to normal rotational-velocity control.
-            right_stick_moved = abs(primary_rx) > 0.1 or abs(primary_ry) > 0.1
-            # if right_stick_moved:
-            #     self.drive_control.drive_point_joy(vx, vy, primary_rx, primary_ry)
-            # else:
-            self.drive_control.drive_manual(
-                vx,
-                vy,
-                omega,
-                not self.primary.getCreateButton(),  # temporary
-            )
+            elif abs(primary_rx) > 0.707 or abs(primary_ry) > 0.707:
+                self.drive_control.drive_point_joy(
+                    vx, vy, primary_rx, primary_ry
+                )  # keaton mode
+            else:
+                self.drive_control.drive_manual(
+                    vx,
+                    vy,
+                    0.0,
+                    not self.primary.getCreateButton(),  # temporary
+                )
 
             if self.primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
@@ -360,8 +357,5 @@ class MyRobot(LemonRobot):
         return "No Auto Selected"
 
 
-globalProfiler = cProfile.Profile
-globalProfilerStart = wpilib.Timer.getFPGATimestamp()
 if __name__ == "__main__":
-    globalProfiler.enable()
     wpilib.run(MyRobot)

@@ -37,6 +37,7 @@ class Shooter:
     manual_control = will_reset_to(False)
 
     def setup(self):
+        self._cached_velocity = 0.0
         self.shooter_motors_config = TalonFXConfiguration()
         self.shooter_motors_config.motor_output.neutral_mode = NeutralModeValue.COAST
         self.shooter_motors_config.feedback = (
@@ -107,13 +108,16 @@ class Shooter:
 
     @fms_feedback
     def get_velocity(self) -> float:
-        return self.left_motor.get_velocity().value
+        return self._cached_velocity
 
     @fms_feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 
     def execute(self):
+        # Cache velocity once per cycle for feedback and shooter_controller use
+        self._cached_velocity = self.left_motor.get_velocity().value
+
         self.right_kicker_motor.set_control(
             self.voltage_control.with_output(self.kicker_duty)
         )
