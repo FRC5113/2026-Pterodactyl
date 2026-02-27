@@ -342,9 +342,11 @@ class MyRobot(LemonRobot):
 
     def disabledInit(self):
         try:
+            globalProfiler.dump_stats("/home/lvuser/teleop.prof")
             globalProfiler.disable()
+            print("[DEBUG] Profile files written")
+        except FileNotFoundError:
             globalProfiler.dump_stats("./temp.prof")
-            print("[DEBUG] Profile written to ./temp.prof")
         except Exception as e:
             print(f"[DEBUG] Profile dump failed: {e}")
 
