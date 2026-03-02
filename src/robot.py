@@ -189,6 +189,8 @@ class MyRobot(LemonRobot):
         self.shooter_gear_ratio = 1.0
         self.shooter_amps: units.amperes = 60.0
 
+        self.shooter_angle = 23 # degrees
+
         self.shooter_profile = SmartProfile(
             "shooter",
             {
@@ -222,12 +224,12 @@ class MyRobot(LemonRobot):
         # )
 
         # Robot to Camera Transforms
-        ox = 0.3429
-        oy = 0.3429
+        ox = 0.298
+        oy = 0.298
         self.rtc_front_left = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, 45))
         self.rtc_front_right = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, -45))
-        self.rtc_back_left = Transform3d(-ox, -oy, 0.0, Rotation3d(0, 30, 135))
-        self.rtc_back_right = Transform3d(ox, -oy, 0.0, Rotation3d(0, 30, -135))
+        self.rtc_back_left = Transform3d(-ox, -oy, 0.21, Rotation3d(0, 1.0472, (5 * math.pi) / 4))
+        self.rtc_back_right = Transform3d(ox, -oy, 0.21, Rotation3d(0, 1.0472, (7 * math.pi) / 4))
 
         # self.camera_front_left = LemonCamera(
         #     "Front_Left", self.temp_cam, self.field_layout
@@ -243,10 +245,10 @@ class MyRobot(LemonRobot):
         _photon_set_version_check(False)
 
         self.camera_back_left = LemonCamera(
-            "Back_Left", self.rtc_back_left, self.field_layout
+            "Arducam OV9281 USB Camera", self.rtc_back_left, self.field_layout
         )
         self.camera_back_right = LemonCamera(
-            "Back_Right", self.rtc_back_right, self.field_layout
+            "PC_Camera", self.rtc_back_right, self.field_layout
         )
 
         """
@@ -367,10 +369,10 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(6.0)
 
             if self.secondary.getBButton():
-                self.intake.set_arm_voltage(-4.0)
+                self.intake.set_arm_voltage(-8.0)
 
             if self.secondary.getXButton():
-                self.intake.set_arm_voltage(4.0)
+                self.intake.set_arm_voltage(8.0)
 
         """
         SHOOTER

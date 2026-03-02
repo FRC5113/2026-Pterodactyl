@@ -17,8 +17,8 @@ from lemonlib.smart import SmartProfile
 
 
 class IntakeAngle(enum.Enum):
-    UP = -119.0
-    INTAKING = 0.0
+    UP = 0.8
+    INTAKING = 0.55
 
 
 class Intake:
@@ -62,38 +62,38 @@ class Intake:
 
         self.spin_control = controls.VoltageOut(0).with_enable_foc(True)
 
+        self.right_encoder.setInverted(True)
+
+        self.right_offset = 0.0#-0.21
+        self.left_offset = 0.0#0.48
+
     def on_enable(self):
         self.controller = self.profile.create_arm_controller("intake_arm")
 
     """
     INFORMATIONAL METHODS
     """
-
     @fms_feedback
     def get_left_angle(self) -> units.degrees:
-        return self.left_encoder.get()
-
+        pos = (self.left_encoder.get() - self.left_offset) 
+        if pos < 0.0:
+            pos += 1.0
+        elif pos >= 1.0:
+            pos -= 1.0
+        return pos
     @fms_feedback
     def get_right_angle(self) -> units.degrees:
-        return 1 - (self.right_encoder.get() - 0.25)
+        pos = (self.right_encoder.get() - self.right_offset)
+        if pos < 0.0:
+            pos += 1.0
+        elif pos >= 1.0:
+            pos -= 1.0
+        return pos
 
     @fms_feedback
     def get_position(self) -> float:
-        return (self.get_left_angle() + self.get_right_angle()) / 2
-
-    def _compute_angle(self) -> units.degrees:
-        """Read and normalize the hinge angle from encoders."""
-        angle = self.get_position() * 360
-        if angle > 180:
-            angle -= 360
-        return angle
-
-    @fms_feedback
-    def get_angle(self) -> units.degrees:
-        """Return the cached angle of the hinge normalized to [-180,180].
-        An angle of 0 refers to the intake in the up/stowed position.
-        """
-        return self._cached_angle
+        # return (self.get_left_angle() + self.get_right_angle()) / 2
+        return self.get_left_angle()
 
     """
     CONTROL METHODS
@@ -110,15 +110,14 @@ class Intake:
 
     def execute(self):
         # Cache angle once per cycle for feedback and control use
-        self._cached_angle = self._compute_angle()
-        angle = self._cached_angle
+        pos = self.get_position()
         # self.arm_voltage = self.controller.calculate(angle, self.arm_angle)
 
         # making sure we don't try to move the arm past its limits
-        # if angle < self.INTAKEUP:
-        #     self.arm_voltage = max(self.arm_voltage, 0)
-        # elif angle > self.INTAKING:
-        #     self.arm_voltage = min(self.arm_voltage, 0)
+        if pos > self.INTAKEUP:
+            self.arm_voltage = max(self.arm_voltage, 0)
+        elif pos < self.INTAKING:
+            self.arm_voltage = min(self.arm_voltage, 0)
 
         self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
         self.left_motor.set_control(self.arm_follower)
