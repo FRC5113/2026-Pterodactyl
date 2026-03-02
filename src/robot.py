@@ -29,7 +29,6 @@ from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
-from components.sysid_drive import SysIdDriveLinear
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
@@ -60,7 +59,6 @@ _phx_parent_device.report_status_code = _report_status_no_traceback
 
 
 class MyRobot(LemonRobot):
-    sysid_drive: SysIdDriveLinear
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -276,7 +274,7 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        # self.shooter_controller.engage()
+        self.shooter_controller.engage()
 
     def autonomousInit(self):
         # globalProfiler.enable()
@@ -377,12 +375,12 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getRightTriggerAxis() >= 0.8:
-                # self.shooter_controller.request_shoot()
-                self.shooter.set_kicker(8)
+                self.shooter_controller.request_shoot()
+                # self.shooter.set_kicker(8)
 
             if self.secondary.getAButton():
                 self.shooter.set_velocity(self.flywheel_speed)
-            
+
             if self.secondary.getYButton():
                 self.shooter.set_velocity(15.0)
 

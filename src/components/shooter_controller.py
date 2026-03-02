@@ -17,7 +17,7 @@ class ShooterController(StateMachine):
 
     at_speed = will_reset_to(False)
     shooting = will_reset_to(False)
-    
+
     def setup(self):
         # MUST BE SORTED BY DISTANCE
         # TODO Tune these
@@ -34,19 +34,20 @@ class ShooterController(StateMachine):
         self.lead_iterations = 15
 
         self.shooter_offsetX = 0.25  # meters forward of robot center
-        self.shooter_offsetY = 0.0   # meters left (+) / right (-)
+        self.shooter_offsetY = 0.0  # meters left (+) / right (-)
 
         self.min_distance = 1.0
         self.max_distance = 6.0
 
-        idle_speed_scalar = 0.8
-        kicker_duty = 8  # Volts
-        angle_tolerance = 0.035  # radians (~2 deg)
-        speed_tolerance = 0.05   # 5%
+        self.idle_speed_scalar = 0.8
+        self.kicker_duty = 8  # Volts
+        self.angle_tolerance = 0.035  # radians (~2 deg)
+        self.speed_tolerance = 0.05  # 5%
 
     """
     CONTROL METHODS
     """
+
     def request_shoot(self):
         self.shooting = True
 
@@ -65,15 +66,11 @@ class ShooterController(StateMachine):
         sin_h = math.sin(future_heading)
 
         launcher_x = (
-            future_x
-            + self.shooter_offsetX * cos_h
-            - self.shooter_offsetY * sin_h
+            future_x + self.shooter_offsetX * cos_h - self.shooter_offsetY * sin_h
         )
 
         launcher_y = (
-            future_y
-            + self.shooter_offsetX * sin_h
-            + self.shooter_offsetY * cos_h
+            future_y + self.shooter_offsetX * sin_h + self.shooter_offsetY * cos_h
         )
 
         rot_vx = -chassis.omega * self.shooter_offsetY
@@ -120,9 +117,7 @@ class ShooterController(StateMachine):
             self.speed_lookup,
         )
 
-        self.valid_shot = (
-            self.min_distance <= self.distance <= self.max_distance
-        )
+        self.valid_shot = self.min_distance <= self.distance <= self.max_distance
 
     def _linear_interp(self, x, xp, fp):
         if x <= xp[0]:
@@ -140,6 +135,7 @@ class ShooterController(StateMachine):
     """
     INFORMATIONAL METHODS
     """
+
     @fms_feedback
     def get_target_rps(self):
         return self.target_rps
