@@ -6,7 +6,7 @@
 [tool.robotpy]
 
 # Version of robotpy this project depends on
-robotpy_version = "2026.2.1"
+robotpy_version = "2026.2.1.1"
 
 # Run tests in isolated mode to prevent hanging and weird errors
 pyfrc.isolated = true
@@ -27,7 +27,7 @@ requires = [
     "phoenix6",
     "robotpy-rev",
     "sleipnirgroup-choreolib",
-    "photonlibpy==2026.1.1rc4",
+    "photonlibpy",
 ]
 
 [tool.pytest.ini_options]
