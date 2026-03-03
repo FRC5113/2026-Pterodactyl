@@ -259,7 +259,7 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        # self.shooter_controller.engage()
+        self.shooter_controller.engage()
 
     def autonomousInit(self):
         # globalProfiler.enable()
@@ -367,8 +367,8 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getRightTriggerAxis() >= 0.8:
-                # self.shooter_controller.request_shoot()
-                self.shooter.set_kicker(8)
+                self.shooter_controller.request_shoot()
+                # self.shooter.set_kicker(8)
 
             if self.secondary.getAButton():
                 self.shooter.set_velocity(self.flywheel_speed)
