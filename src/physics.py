@@ -4,7 +4,7 @@ from phoenix6 import unmanaged
 from pyfrc.physics.core import PhysicsInterface
 from wpilib import RobotController
 
-from lemonlib.simulation import LemonCameraSim
+from lemonlib.simulation import LemonCameraSim, FalconSim
 
 if typing.TYPE_CHECKING:
     from robot import MyRobot
@@ -27,6 +27,15 @@ class PhysicsEngine:
         )
         self.vision_sim_back_right = LemonCameraSim(
             robot.camera_back_right, robot.field_layout, fov=65.0, fps=60.0
+        )
+        self.robot.sim_intake_left_motor = FalconSim(
+            self.robot.intake_left_motor, 0.1, 100
+        )
+        self.robot.sim_intake_spin_motor = FalconSim(
+            self.robot.intake_spin_motor, 0.1, 100
+        )
+        self.robot.sim_intake_right_motor = FalconSim(
+            self.robot.intake_right_motor, 0.1, 100
         )
 
     def update_sim(self, now, tm_diff):
@@ -54,3 +63,8 @@ class PhysicsEngine:
         # self.vision_sim_front_right.update(pose)
         self.vision_sim_back_left.update(pose)
         self.vision_sim_back_right.update(pose)
+
+        """Intake"""
+        self.robot.sim_intake_left_motor.update(pose)
+        self.robot.sim_intake_right_motor.update(pose)
+        self.robot.sim_intake_spin_motor.update(pose)
