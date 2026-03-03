@@ -3,7 +3,15 @@
  "version":2,
  "type":"Swerve",
  "variables":{
-  "expressions":{},
+  "expressions":{
+   "left_ball_front":{
+    "dimension":"Number",
+    "var":{
+     "exp":"0",
+     "val":0.0
+    }
+   }
+  },
   "poses":{
    "climber":{
     "x":{
@@ -29,8 +37,36 @@
      "val":4.035
     },
     "heading":{
-     "exp":"180 degrees",
-     "val":3.141592653589793
+     "exp":"0 degrees",
+     "val":0.0
+    }
+   },
+   "left_ball_enter":{
+    "x":{
+     "exp":"7.021 m",
+     "val":7.021
+    },
+    "y":{
+     "exp":"5.663 m",
+     "val":5.663
+    },
+    "heading":{
+     "exp":"0 rad",
+     "val":0.0
+    }
+   },
+   "left_trench":{
+    "x":{
+     "exp":"3.616 m",
+     "val":3.616
+    },
+    "y":{
+     "exp":"7.367 m",
+     "val":7.367
+    },
+    "heading":{
+     "exp":"0 rad",
+     "val":0.0
     }
    },
    "outpost":{
@@ -41,6 +77,20 @@
     "y":{
      "exp":"0.66 m",
      "val":0.66
+    },
+    "heading":{
+     "exp":"0 rad",
+     "val":0.0
+    }
+   },
+   "right_trench":{
+    "x":{
+     "exp":"3.616 m",
+     "val":3.616
+    },
+    "y":{
+     "exp":"0.72 m",
+     "val":0.72
     },
     "heading":{
      "exp":"0 rad",

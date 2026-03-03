@@ -7,17 +7,19 @@ from choreo.trajectory import SwerveTrajectory
 from magicbot import AutonomousStateMachine, state, timed_state
 from wpilib import Field2d, RobotBase, SmartDashboard
 from wpimath.geometry import Pose2d
-
+from components.shooter_controller import ShooterController
 from components.drive_control import DriveControl
 from components.swerve_drive import SwerveDrive
-
+from components.intake import Intake, IntakeAngle
 # from components.odometry import Odometry
 from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
-    swerve_drive: SwerveDrive
+    shooter_controller: ShooterController
     drive_control: DriveControl
+    swerve_drive: SwerveDrive
+    intake: Intake
     # odometry: Odometry
     estimated_field: Field2d
 
@@ -167,10 +169,10 @@ class AutoBase(AutonomousStateMachine):
     STATES
     """
 
-    @state
+    @timed_state(duration=5.0)
     def shoot(self):
         """Placeholder for shooting state."""
-        print("Shooting State Placeholder")
+        self.shooter_controller.request_shoot()
         self.next_state("next_step")
 
     @state
@@ -178,7 +180,16 @@ class AutoBase(AutonomousStateMachine):
         """Placeholder for climbing state."""
         print("Climbing State Placeholder")
         self.next_state("next_step")
-
+    @timed_state(duration=5.0)
+    def go_foward_and_intake_lt(self):
+        self.drive_control.drive_auto_manual(0.0, 1, 0.0, False)
+        self.intake.set_arm_angle(IntakeAngle.INTAKING)
+        self.intake.set_voltage(8)
+            @timed_state(duration=5.0)
+    def go_foward_and_intake_rt(self):
+        self.drive_control.drive_auto_manual(0.0, -1, 0.0, False)
+        self.intake.set_arm_angle(IntakeAngle.INTAKING)
+        self.intake.set_voltage(8)
     @timed_state(duration=5.0, next_state="next_step")
     def outpost_wait(self):
         """Wait for 5 seconds before moving to the next step."""

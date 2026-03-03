@@ -1,3 +1,4 @@
+import cProfile
 import math
 from pathlib import Path
 
@@ -295,9 +296,12 @@ class MyRobot(LemonRobot):
         self.theta_filter = SlewRateLimiter(
             self.rasing_slew_rate  # , self.falling_slew_rate
         )
+        self.profiler = cProfile.Profile()
+        self.profiler_start = wpilib.Timer.getFPGATimestamp()
+        self.profiler.enable()
+        # Cache inputs called multiple times
 
     def teleopPeriodic(self):
-        # Cache inputs called multiple times
         primary_r2 = self.primary.getR2Axis()
         primary_l2 = self.primary.getL2Axis()
         primary_ly = self.primary.getLeftY()
@@ -380,8 +384,10 @@ class MyRobot(LemonRobot):
                 self.shooter.set_kicker(0.5)
 
     def disabledPeriodic(self):
-        # make magicbot happy
-        pass
+        self.profiler.disable()
+        self.profiler.dump_stats("/home/lvuser/teleop.prof")
+        self.profiler = None
+        print("[DEBUG] Done Profiling.")
 
     @feedback
     def get_voltage(self) -> units.volts:
