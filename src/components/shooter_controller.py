@@ -19,11 +19,15 @@ class ShooterController(StateMachine):
     shooting = will_reset_to(False)
 
     def setup(self):
-        # MUST BE SORTED BY DISTANCE
-        # TODO Tune these
-        self.distance_lookup = [4.0]
-        self.speed_lookup = [53.0]
-        self.time_lookup = [1.0]
+
+        # Meters
+        self.distance_lookup = [1.597,4.597]  # TODO Tune these values
+
+        # RPS
+        self.speed_lookup = [43.0, 53.0]  # TODO Tune these values
+
+        # Seconds — measured flight times at each distance
+        self.time_lookup = [0.45]  # TODO Tune these values
 
         self.target_rps = 0.0
         self.target_angle = 0.0

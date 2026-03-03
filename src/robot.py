@@ -1,17 +1,12 @@
 # import cProfile
 
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
-import ctypes as _ctypes
 import math
-from pathlib import Path
 
-import phoenix6.hardware.parent_device as _phx_parent_device
 import wpilib
 from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
-from phoenix6.phoenix_native import Native as _PhxNative
-from photonlibpy.photonCamera import setVersionCheckEnabled as _photon_set_version_check
-from robotpy_apriltag import AprilTagFieldLayout
+from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 from wpilib import (
     DigitalInput,
     DriverStation,
@@ -25,6 +20,7 @@ from wpimath.geometry import Rotation3d, Transform3d
 from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
 from components.intake import Intake
+from components.leds import LEDStrip
 from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
@@ -32,33 +28,19 @@ from components.swerve_drive import SwerveDrive
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
-from lemonlib.util import AlertManager, AlertType, AsymmetricSlewLimiter, curve
-
-
-def _report_status_no_traceback(status, location: str) -> None:
-    # Same as phoenix6.error_reporting.report_status_code but skips
-    # traceback.format_stack(). The stock version calls format_stack() on every
-    # set_control() call while firmware hasn't been verified yet, which walks
-    # every Python frame and hits lstat() hundreds of times (~35 ms/call).
-    # Errors still reach the Driver Station; we just drop the Python callstack.
-    # TODO: remove once motor firmware is updated and report_if_too_old passes.
-    _PhxNative.instance().c_ctre_phoenix_report_error(
-        status.is_error(),
-        status.value,
-        0,
-        _ctypes.c_char_p(b""),
-        _ctypes.c_char_p(bytes(location, encoding="utf-8")),
-        _ctypes.c_char_p(b""),  # stack trace — leave empty to skip the overhead
-    )
-
-
-# Swap out the binding before any hardware objects are created.
-_phx_parent_device.report_status_code = _report_status_no_traceback
+from lemonlib.util import (
+    AlertManager,
+    AlertType,
+    AsymmetricSlewLimiter,
+    LEDController,
+    curve,
+)
 
 # globalProfiler = cProfile.Profile()
 
 
 class MyRobot(LemonRobot):
+    led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -187,10 +169,12 @@ class MyRobot(LemonRobot):
         self.shooter_gear_ratio = 1.0
         self.shooter_amps: units.amperes = 60.0
 
+        self.shooter_angle = 23  # degrees
+
         self.shooter_profile = SmartProfile(
             "shooter",
             {
-                "kP": 0.002,
+                "kP": 0.3,
                 "kI": 0.0,
                 "kD": 0.0,
                 "kS": 0.0,
@@ -211,21 +195,25 @@ class MyRobot(LemonRobot):
         ODOMETRY
         """
         # Custom apriltag field layout
-        self.field_layout = AprilTagFieldLayout(
-            str(Path(__file__).parent.resolve() / "2026_test_field.json")
-        )
-
-        # self.field_layout = AprilTagFieldLayout.loadField(
-        #     AprilTagField.k2026RebuiltWelded
+        # self.field_layout = AprilTagFieldLayout(
+        #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
         # )
 
+        self.field_layout = AprilTagFieldLayout.loadField(
+            AprilTagField.k2026RebuiltWelded
+        )
+
         # Robot to Camera Transforms
-        ox = 0.3429
-        oy = 0.3429
+        ox = 0.298
+        oy = 0.298
         self.rtc_front_left = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, 45))
         self.rtc_front_right = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, -45))
-        self.rtc_back_left = Transform3d(-ox, -oy, 0.0, Rotation3d(0, 30, 135))
-        self.rtc_back_right = Transform3d(ox, -oy, 0.0, Rotation3d(0, 30, -135))
+        self.rtc_back_left = Transform3d(
+            -ox, -oy, 0.21, Rotation3d(0, 1.0472, (5 * math.pi) / 4)
+        )
+        self.rtc_back_right = Transform3d(
+            ox, -oy, 0.21, Rotation3d(0, 1.0472, (7 * math.pi) / 4)
+        )
 
         # self.camera_front_left = LemonCamera(
         #     "Front_Left", self.temp_cam, self.field_layout
@@ -234,17 +222,11 @@ class MyRobot(LemonRobot):
         #     "Front_Right", self.rtc_front_right, self.field_layout
         # )
 
-        # _versionCheck() fires reportWarning(stackTrace=True) when the camera
-        # name or photonlibpy version doesn't match the coprocessor, which was
-        # costing ~2.9 s per profile run. Disable until versions are aligned.
-        # TODO: remove once PhotonVision firmware and photonlibpy match.
-        _photon_set_version_check(False)
-
         self.camera_back_left = LemonCamera(
-            "Back_Left", self.rtc_back_left, self.field_layout
+            "Arducam OV9281 USB Camera", self.rtc_back_left, self.field_layout
         )
         self.camera_back_right = LemonCamera(
-            "Back_Right", self.rtc_back_right, self.field_layout
+            "PC_Camera", self.rtc_back_right, self.field_layout
         )
 
         """
@@ -257,6 +239,9 @@ class MyRobot(LemonRobot):
         self.sammi_curve = curve(
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
+
+        self.led_length = 112
+        self.leds = LEDController(2, self.led_length)
 
         # alerts
         AlertManager(self.logger)
@@ -365,10 +350,17 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(6.0)
 
             if self.secondary.getBButton():
-                self.intake.set_arm_voltage(-4.0)
+                self.intake.set_arm_voltage(-8.0)
 
             if self.secondary.getXButton():
-                self.intake.set_arm_voltage(4.0)
+                self.intake.set_arm_voltage(8.0)
+
+            if (
+                self.secondary.getRightBumper()
+                and self.secondary.getLeftBumper()
+                and self.secondary.getAButton()
+            ):
+                self.intake.zero_encoders()
 
         """
         SHOOTER

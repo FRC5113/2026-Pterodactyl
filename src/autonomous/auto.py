@@ -1,4 +1,8 @@
+from magicbot import AutonomousStateMachine, timed_state
+
 from autonomous.auto_base import AutoBase
+from components.drive_control import DriveControl
+from components.shooter_controller import ShooterController
 
 """
 Trajectories: (start with trajectory:)
@@ -17,6 +21,24 @@ States: (start with state:)
 """
 
 
+class hard_code_shoot(AutonomousStateMachine):
+    MODE_NAME = "Hard Code Shoot"
+    DEFAULT = True
+
+    shooter_controller: ShooterController
+    drive_control: DriveControl
+
+    @timed_state(first=True, duration=1.5, next_state="shoot")
+    def move_back(self):
+        self.drive_control.drive_auto_manual(
+            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
+        )
+
+    @timed_state(duration=5.0)
+    def shoot(self):
+        self.shooter_controller.request_shoot()
+
+
 class hub_outpost_shoot(AutoBase):
     MODE_NAME = "Hub>Outpost>Shoot"
 
@@ -33,7 +55,6 @@ class hub_outpost_shoot(AutoBase):
 
 class hub_shoot(AutoBase):
     MODE_NAME = "Hub>Shoot"
-    DEFAULT = True
 
     def __init__(self):
         super().__init__(
