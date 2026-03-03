@@ -13,7 +13,8 @@ from wpilib import DutyCycleEncoder
 from wpimath import units
 
 from lemonlib import fms_feedback
-from lemonlib.smart import SmartProfile
+from lemonlib.smart import SmartPreference, SmartProfile
+from lemonlib.util import Alert, AlertType
 
 
 class IntakeAngle(enum.Enum):
@@ -37,10 +38,14 @@ class Intake:
 
     spin_voltage = will_reset_to(0.0)
     arm_voltage = will_reset_to(0.0)
+    arm_manual_control = will_reset_to(False)
     arm_angle = will_reset_to(IntakeAngle.UP.value)
 
     INTAKEUP = IntakeAngle.UP.value
     INTAKING = IntakeAngle.INTAKING.value
+
+    right_offset = SmartPreference(0.79)
+    left_offset = SmartPreference(0.48)
 
     def setup(self):
         self._cached_angle = 0.0
@@ -64,8 +69,14 @@ class Intake:
 
         self.right_encoder.setInverted(True)
 
-        self.right_offset = 0.0#-0.21
-        self.left_offset = 0.0#0.48
+        self.hinge_alert = Alert(
+            "intake hinge has rotated too far!", type=AlertType.ERROR
+        )
+
+        self.break_alert = Alert(
+            "intake arm may be breaking! Check for mechanical issues.",
+            type=AlertType.ERROR,
+        )
 
     def on_enable(self):
         self.controller = self.profile.create_arm_controller("intake_arm")
@@ -73,17 +84,17 @@ class Intake:
     """
     INFORMATIONAL METHODS
     """
-    @fms_feedback
+
     def get_left_angle(self) -> units.degrees:
-        pos = (self.left_encoder.get() - self.left_offset) 
+        pos = self.left_encoder.get() - self.left_offset
         if pos < 0.0:
             pos += 1.0
         elif pos >= 1.0:
             pos -= 1.0
         return pos
-    @fms_feedback
+
     def get_right_angle(self) -> units.degrees:
-        pos = (self.right_encoder.get() - self.right_offset)
+        pos = self.right_encoder.get() - self.right_offset
         if pos < 0.0:
             pos += 1.0
         elif pos >= 1.0:
@@ -92,18 +103,22 @@ class Intake:
 
     @fms_feedback
     def get_position(self) -> float:
-        # return (self.get_left_angle() + self.get_right_angle()) / 2
-        return self.get_left_angle()
+        return (self.get_left_angle() + self.get_right_angle()) / 2
 
     """
     CONTROL METHODS
     """
+
+    def zero_encoders(self):
+        self.left_offset = self.left_encoder.get() + 0.5
+        self.right_offset = self.right_encoder.get() + 0.5
 
     def set_voltage(self, voltage: units.volts):
         self.spin_voltage = voltage
 
     def set_arm_voltage(self, volts):
         self.arm_voltage = volts
+        self.arm_manual_control = True
 
     def set_arm_angle(self, angle: units.degrees):
         self.arm_angle = angle
@@ -111,13 +126,29 @@ class Intake:
     def execute(self):
         # Cache angle once per cycle for feedback and control use
         pos = self.get_position()
-        # self.arm_voltage = self.controller.calculate(angle, self.arm_angle)
 
-        # making sure we don't try to move the arm past its limits
+        if not self.arm_manual_control:
+            self.arm_voltage = self.controller.calculate(pos, self.arm_angle)
+
+        # making sure we don't try to move the arm past its limits or break
+        if abs(self.get_right_angle() - self.get_left_angle()) > 0.2:
+            self.arm_voltage = 0.0
+            self.break_alert.enable()
+            self.break_alert.set_text(
+                f"Intake arm may be breaking! Left: {self.get_left_angle():.2f}, Right: {self.get_right_angle():.2f}"
+            )
         if pos > self.INTAKEUP:
             self.arm_voltage = max(self.arm_voltage, 0)
+            self.hinge_alert.enable()
+            self.hinge_alert.set_text(
+                f"Intake hinge has rotated too far! Position: {pos:.2f}"
+            )
         elif pos < self.INTAKING:
             self.arm_voltage = min(self.arm_voltage, 0)
+            self.hinge_alert.enable()
+            self.hinge_alert.set_text(
+                f"Intake hinge has rotated too far! Position: {pos:.2f}"
+            )
 
         self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
         self.left_motor.set_control(self.arm_follower)
