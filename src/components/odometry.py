@@ -1,6 +1,6 @@
 from photonlibpy.photonPoseEstimator import PhotonPoseEstimator
 from robotpy_apriltag import AprilTagFieldLayout
-from wpilib import Field2d, SmartDashboard
+from wpilib import Field2d
 
 from components.swerve_drive import SwerveDrive
 from lemonlib.vision import LemonCamera

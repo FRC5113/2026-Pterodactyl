@@ -1,6 +1,7 @@
 import math
 
 from choreo.trajectory import SwerveSample
+from magicbot import will_reset_to
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
@@ -14,16 +15,15 @@ from wpimath.kinematics import (
     SwerveDrive4Kinematics,
     SwerveModuleState,
 )
-from wpiutil import Sendable, SendableBuilder
-from magicbot import will_reset_to
+from wpiutil import SendableBuilder
 
 from generated.tuner_constants import TunerConstants
 from lemonlib import fms_feedback
-from lemonlib.smart import SmartController, SmartPreference, SmartProfile
+from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
 
-class SwerveDrive:#(Sendable):
+class SwerveDrive:  # (Sendable):
     """Swerve drive using the Phoenix 6 Swerve API (SwerveDrivetrain).
 
     The underlying ``phoenix6.swerve.SwerveDrivetrain`` owns the hardware,

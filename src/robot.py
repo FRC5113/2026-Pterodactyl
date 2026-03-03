@@ -15,6 +15,7 @@ from wpilib import (
     RobotController,
 )
 from wpimath import units
+from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
@@ -31,7 +32,6 @@ from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import (
     AlertManager,
     AlertType,
-    AsymmetricSlewLimiter,
     LEDController,
     curve,
 )
@@ -189,6 +189,7 @@ class MyRobot(LemonRobot):
         """
         self.shooter_left_kicker_motor = TalonFXS(4, self.rio_canbus)
         self.shooter_right_kicker_motor = TalonFXS(5, self.rio_canbus)
+        self.shooter_conveyor_motor = TalonFXS(6, self.rio_canbus)
         self.shooter_kicker_amps: units.amperes = 20.0
         self.shooter_conveyor_amps: units.amperes = 10.0
         """
@@ -274,14 +275,14 @@ class MyRobot(LemonRobot):
         self.primary = LemonInput(0)
         self.secondary = LemonInput(1)
 
-        self.x_filter = AsymmetricSlewLimiter(
-            self.rasing_slew_rate, self.falling_slew_rate
+        self.x_filter = SlewRateLimiter(
+            self.rasing_slew_rate  # , self.falling_slew_rate
         )
-        self.y_filter = AsymmetricSlewLimiter(
-            self.rasing_slew_rate, self.falling_slew_rate
+        self.y_filter = SlewRateLimiter(
+            self.rasing_slew_rate  # , self.falling_slew_rate
         )
-        self.omega_filter = AsymmetricSlewLimiter(
-            self.rasing_slew_rate, self.falling_slew_rate
+        self.omega_filter = SlewRateLimiter(
+            self.rasing_slew_rate  # , self.falling_slew_rate
         )
 
     def teleopPeriodic(self):
@@ -321,7 +322,7 @@ class MyRobot(LemonRobot):
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
 
-            if self.primary.getLeftBumper() or True:
+            if self.primary.getLeftBumper():
                 if abs(primary_rx) <= 0.0:
                     omega = 0.0
                 else:
@@ -367,8 +368,8 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter_controller.request_shoot()
-                # self.shooter.set_kicker(8)
+                # self.shooter_controller.request_shoot()
+                self.shooter.set_kicker(8)
 
             if self.secondary.getAButton():
                 self.shooter.set_velocity(self.flywheel_speed)

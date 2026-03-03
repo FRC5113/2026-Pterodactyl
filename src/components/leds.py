@@ -1,5 +1,5 @@
-from magicbot import will_reset_to
-from wpilib import Color, DriverStation, SmartDashboard
+from magicbot import feedback, will_reset_to
+from wpilib import Color, DriverStation
 
 from components.swerve_drive import SwerveDrive
 from lemonlib.util import AlertManager, AlertType, LEDController
@@ -31,6 +31,7 @@ class LEDStrip:
     INFORMATIONAL METHODS
     """
 
+    @feedback
     def get_colors(self) -> list[str]:
         """Returns LED colors in list of hex strings"""
         return [Color(led.r, led.g, led.b).hexString() for led in self.leds.buffer]
@@ -61,5 +62,3 @@ class LEDStrip:
             self.leds.move_across(self.auton_color, 20, 50)
         else:
             self.leds.scolling_rainbow()
-
-        SmartDashboard.putStringArray("LED Colors", self.get_colors())

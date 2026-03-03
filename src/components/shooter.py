@@ -25,6 +25,7 @@ class Shooter:
     left_motor: TalonFX
     left_kicker_motor: TalonFXS
     right_kicker_motor: TalonFXS
+    conveyor_motor: TalonFXS
 
     shooter_profile: SmartProfile
     shooter_gear_ratio: float
@@ -69,6 +70,15 @@ class Shooter:
 
         self.left_kicker_motor.configurator.apply(self.kicker_motor_configs)
         self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
+
+        self.conveyor_motor_configs = TalonFXSConfiguration()
+        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.COAST
+        self.conveyor_motor_configs.commutation.motor_arrangement = (
+            MotorArrangementValue.NEO550_JST
+        )
+
+        self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
+
         self.voltage_control = controls.VoltageOut(0).with_enable_foc(True)
         self.duty_control = controls.DutyCycleOut(0).with_enable_foc(True)
         self.kicker_follower = controls.Follower(
@@ -122,6 +132,7 @@ class Shooter:
             self.voltage_control.with_output(self.kicker_duty)
         )
         self.left_kicker_motor.set_control(self.kicker_follower)
+        self.conveyor_motor.set_control(self.kicker_follower)
 
         if self.manual_control:
             self.right_motor.set_control(
