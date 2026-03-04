@@ -16,7 +16,7 @@ from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Rotation3d, Transform3d, Translation3d
+from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
 
@@ -38,8 +38,6 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
-
-from FuelSim.fuel_sim import FuelSim
 
 
 class MyRobot(LemonRobot):
@@ -68,10 +66,6 @@ class MyRobot(LemonRobot):
         self.tuning_enabled = True  # Enable NetworkTables tuning for PID values
 
         self.rio_canbus = CANBus.roborio()
-
-        self.robot_width: units.meters = 0.5
-        self.robot_length: units.meters = 0.5
-        self.bumper_height: units.meters = 0.08
 
         """""""""""""""
         SWERVE CONFIG
@@ -251,37 +245,10 @@ class MyRobot(LemonRobot):
             self.alliance = True  # Red alliance
         else:
             self.alliance = False  # Blue alliance
-
-        self.fuel_sim = FuelSim()
-
-        self.fuel_sim.spawn_fuel(Translation3d(8.0, 4.0, 0.05), Translation3d(0, 0, 0))
-        self.fuel_sim.spawn_fuel(Translation3d(8.2, 4.0, 0.05), Translation3d(0, 0, 0))
-
-        self.fuel_sim.register_robot(
-            self.robot_width,
-            self.robot_length,
-            self.bumper_height,
-            lambda: self.swerve_drive.get_estimated_pose(),
-            lambda: self.swerve_drive.get_field_speeds()
-        )
-
-        self.fuel_sim.register_intake(
-            0, 0.3, 0, 0.3
-        )
-
-        self.fuel_sim.set_subticks(1)
-
-        self.fuel_sim.start()
-        self.fuel_sim.log_fuels()
     
     def enabledperiodic(self) -> None:
         self.drive_control.engage()
         self.shooter_controller.engage()
-
-    def robotPeriodic(self) -> None:
-        # Adds simulationPeriodic - Magic does not natively support.
-        if self.isSimulation():
-            self.simulationPeriodic()
 
     def autonomousPeriodic(self) -> None:
         self._display_auto_trajectory()
@@ -357,7 +324,7 @@ class MyRobot(LemonRobot):
         """""""""""""""
         INTAKE CONTROL
         """""""""""""""
-
+    
         if self.secondary.getLeftBumper():
             self.intake.set_voltage(6.0)
 
@@ -390,12 +357,6 @@ class MyRobot(LemonRobot):
         if self.secondary.getStartButton():
             self.shooter.set_voltage(-6)
             self.shooter.set_kicker(-10)
-
-    def simulationPeriodic(self) -> None:
-        """
-        Method called in robotPeriodic on simulation.
-        """
-        self.fuel_sim.update_sim()
 
     @fms_feedback
     def get_battery_voltage(self) -> units.volts:

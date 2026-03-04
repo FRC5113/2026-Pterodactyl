@@ -29,11 +29,13 @@ class FuelSim:
             self.pos = pos
             self.vel = vel if vel is not None else Translation3d()
 
-        def update(self, simulate_air_resistance: bool, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub'):
+        def update(self, simulate_air_resistance: bool, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub', 
+                   relevant_lines: Optional[List[int]] = None, relevant_trenches: Optional[List[int]] = None):
             """Update fuel position and velocity."""
             self.pos = self.pos + self.vel * (const.PERIOD / subticks)
             
             if self.pos.Z() > const.FUEL_RADIUS:
+                Fg = const.GRAVITY * const.FUEL_MASS
                 Fd = Translation3d()
 
                 if simulate_air_resistance:
@@ -41,14 +43,14 @@ class FuelSim:
                     if speed > 1e-6:
                         Fd = self.vel * (-const.DRAG_FORCE_FACTOR * speed)
 
-                accel = const.GRAVITY + (Fd / const.FUEL_MASS)
+                accel = Fg + (Fd) / (const.FUEL_MASS)
                 self.vel = self.vel + (accel * (const.PERIOD / subticks))
             
             if abs(self.vel.Z()) < 0.05 and self.pos.Z() <= const.FUEL_RADIUS + 0.03:
                 self.vel = Translation3d(self.vel.X(), self.vel.Y(), 0)
                 self.vel = self.vel * (1 - const.FRICTION * const.PERIOD / subticks)
 
-            self._handle_field_collisions(subticks, blue_hub, red_hub)
+            self._handle_field_collisions(subticks, blue_hub, red_hub, relevant_lines, relevant_trenches)
 
         def _handle_xz_line_collision(self, line_start: Translation3d, line_end: Translation3d):
             """Handle collision with a line in the XZ plane."""
@@ -83,14 +85,23 @@ class FuelSim:
             
             self.vel = self.vel - (normal * ((1 + const.FIELD_COR) * self.vel.dot(normal)))
 
-        def _handle_field_collisions(self, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub'):
+        def _handle_field_collisions(self, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub', 
+                                    relevant_lines: Optional[List[int]] = None, relevant_trenches: Optional[List[int]] = None):
             """Handle all field collisions."""
-            # floor and bumps
-            for i in range(len(const.FIELD_XZ_LINE_STARTS)):
-                self._handle_xz_line_collision(
-                    const.FIELD_XZ_LINE_STARTS[i],
-                    const.FIELD_XZ_LINE_ENDS[i]
-                )
+            # floor and bumps - only check relevant line segments for this fuel's position
+            if relevant_lines is not None:
+                for line_idx in relevant_lines:
+                    self._handle_xz_line_collision(
+                        const.FIELD_XZ_LINE_STARTS[line_idx],
+                        const.FIELD_XZ_LINE_ENDS[line_idx]
+                    )
+            else:
+                # Fallback: check all lines if no spatial partitioning info available
+                for i in range(len(const.FIELD_XZ_LINE_STARTS)):
+                    self._handle_xz_line_collision(
+                        const.FIELD_XZ_LINE_STARTS[i],
+                        const.FIELD_XZ_LINE_ENDS[i]
+                    )
 
             # edges - X axis
             if self.pos.X() < const.FUEL_RADIUS and self.vel.X() < 0:
@@ -112,7 +123,7 @@ class FuelSim:
             blue_hub.handle_hub_interaction(self, subticks)
             red_hub.handle_hub_interaction(self, subticks)
 
-            self._handle_trench_collisions()
+            self._handle_trench_collisions(relevant_trenches)
 
         def _handle_hub_collisions(self, hub: 'FuelSim.Hub', subticks: int):
             """Handle collisions with hubs."""
@@ -126,49 +137,17 @@ class FuelSim:
                                         self.vel.Y() * const.NET_COR, 
                                         self.vel.Z())
 
-        def _handle_trench_collisions(self):
+        def _handle_trench_collisions(self, relevant_trenches: Optional[List[int]] = None):
             """Handle collisions with trenches."""
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(3.96, const.TRENCH_WIDTH, 0),
-                Translation3d(5.18, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(3.96, const.FIELD_WIDTH - 1.57, 0),
-                Translation3d(5.18, const.FIELD_WIDTH - 1.57 + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(const.FIELD_LENGTH - 5.18, const.TRENCH_WIDTH, 0),
-                Translation3d(const.FIELD_LENGTH - 3.96, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(const.FIELD_LENGTH - 5.18, const.FIELD_WIDTH - 1.57, 0),
-                Translation3d(const.FIELD_LENGTH - 3.96, const.FIELD_WIDTH - 1.57 + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(4.61 - const.TRENCH_BAR_WIDTH / 2, 0, const.TRENCH_HEIGHT),
-                Translation3d(
-                    4.61 + const.TRENCH_BAR_WIDTH / 2,
-                    const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH,
-                    const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(4.61 - const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH - 1.57, const.TRENCH_HEIGHT),
-                Translation3d(4.61 + const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH, const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(const.FIELD_LENGTH - 4.61 - const.TRENCH_BAR_WIDTH / 2, 0, const.TRENCH_HEIGHT),
-                Translation3d(
-                    const.FIELD_LENGTH - 4.61 + const.TRENCH_BAR_WIDTH / 2,
-                    const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH,
-                    const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT))
-            FuelSim._fuel_collide_rectangle(
-                self,
-                Translation3d(const.FIELD_LENGTH - 4.61 - const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH - 1.57, const.TRENCH_HEIGHT),
-                Translation3d(
-                    const.FIELD_LENGTH - 4.61 + const.TRENCH_BAR_WIDTH / 2,
-                    const.FIELD_WIDTH,
-                    const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT))
+            if relevant_trenches is not None:
+                # Only check relevant trenches for this fuel's position
+                for trench_idx in relevant_trenches:
+                    start, end = FuelSim.TRENCH_RECTANGLES[trench_idx]
+                    FuelSim._fuel_collide_rectangle(self, start, end)
+            else:
+                # Fallback: check all trenches
+                for start, end in FuelSim.TRENCH_RECTANGLES:
+                    FuelSim._fuel_collide_rectangle(self, start, end)
 
         def add_impulse(self, impulse: Translation3d):
             """Add an impulse to the fuel's velocity."""
@@ -236,6 +215,32 @@ class FuelSim:
     CELL_SIZE = const.CELL_SIZE
     GRID_COLS = const.GRID_COLS
     GRID_ROWS = const.GRID_ROWS
+    
+    # Cached constants for hot path
+    FUEL_COLLISION_RADIUS_SQUARED = (const.FUEL_RADIUS * 2) ** 2
+    
+    # Static trench rectangles for spatial partitioning
+    TRENCH_RECTANGLES = [
+        (Translation3d(3.96, const.TRENCH_WIDTH, 0), 
+         Translation3d(5.18, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT)),
+        (Translation3d(3.96, const.FIELD_WIDTH - 1.57, 0),
+         Translation3d(5.18, const.FIELD_WIDTH - 1.57 + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT)),
+        (Translation3d(const.FIELD_LENGTH - 5.18, const.TRENCH_WIDTH, 0),
+         Translation3d(const.FIELD_LENGTH - 3.96, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT)),
+        (Translation3d(const.FIELD_LENGTH - 5.18, const.FIELD_WIDTH - 1.57, 0),
+         Translation3d(const.FIELD_LENGTH - 3.96, const.FIELD_WIDTH - 1.57 + const.TRENCH_BLOCK_WIDTH, const.TRENCH_HEIGHT)),
+        (Translation3d(4.61 - const.TRENCH_BAR_WIDTH / 2, 0, const.TRENCH_HEIGHT),
+         Translation3d(4.61 + const.TRENCH_BAR_WIDTH / 2, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH, 
+                      const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT)),
+        (Translation3d(4.61 - const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH - 1.57, const.TRENCH_HEIGHT),
+         Translation3d(4.61 + const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH, const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT)),
+        (Translation3d(const.FIELD_LENGTH - 4.61 - const.TRENCH_BAR_WIDTH / 2, 0, const.TRENCH_HEIGHT),
+         Translation3d(const.FIELD_LENGTH - 4.61 + const.TRENCH_BAR_WIDTH / 2, const.TRENCH_WIDTH + const.TRENCH_BLOCK_WIDTH,
+                      const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT)),
+        (Translation3d(const.FIELD_LENGTH - 4.61 - const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH - 1.57, const.TRENCH_HEIGHT),
+         Translation3d(const.FIELD_LENGTH - 4.61 + const.TRENCH_BAR_WIDTH / 2, const.FIELD_WIDTH,
+                      const.TRENCH_HEIGHT + const.TRENCH_BAR_HEIGHT)),
+    ]
 
     def __init__(self, table_key: str = "/Fuel Simulation"):
         """Initialize the FuelSim. Creates a new instance of FuelSim.
@@ -245,6 +250,18 @@ class FuelSim:
         """
         # Initialize grid
         self.grid: List[List[List['FuelSim.Fuel']]] = [
+            [[] for _ in range(self.GRID_ROWS)] 
+            for _ in range(self.GRID_COLS)
+        ]
+        
+        # Pre-compute which line segments are relevant to each grid cell
+        self.grid_to_lines: List[List[List[int]]] = [
+            [[] for _ in range(self.GRID_ROWS)] 
+            for _ in range(self.GRID_COLS)
+        ]
+        
+        # Pre-compute which trench rectangles are relevant to each grid cell
+        self.grid_to_trenches: List[List[List[int]]] = [
             [[] for _ in range(self.GRID_ROWS)] 
             for _ in range(self.GRID_COLS)
         ]
@@ -278,7 +295,51 @@ class FuelSim:
         self.fuel_publisher = NetworkTableInstance.getDefault() \
             .getStructArrayTopic(table_key + "/Fuels", Translation3d) \
             .publish()
+        
+        # Pre-compute static collision geometry
+        self._precompute_static_collisions()
 
+    def _precompute_static_collisions(self):
+        """Pre-compute which static obstacles (line segments and trenches) are in each grid cell."""
+        # Pre-compute line segments
+        for line_idx in range(len(const.FIELD_XZ_LINE_STARTS)):
+            start = const.FIELD_XZ_LINE_STARTS[line_idx]
+            end = const.FIELD_XZ_LINE_ENDS[line_idx]
+            
+            # Find bounding box of line segment (with fuel radius buffer)
+            min_x = min(start.X(), end.X()) - const.FUEL_RADIUS
+            max_x = max(start.X(), end.X()) + const.FUEL_RADIUS
+            min_y = min(start.Y(), end.Y())
+            max_y = max(start.Y(), end.Y())
+            
+            # Mark all grid cells this line could affect
+            col_min = max(0, int(min_x / const.CELL_SIZE))
+            col_max = min(const.GRID_COLS - 1, int(max_x / const.CELL_SIZE))
+            row_min = max(0, int(min_y / const.CELL_SIZE))
+            row_max = min(const.GRID_ROWS - 1, int(max_y / const.CELL_SIZE))
+            
+            for col in range(col_min, col_max + 1):
+                for row in range(row_min, row_max + 1):
+                    self.grid_to_lines[col][row].append(line_idx)
+        
+        # Pre-compute trench rectangles
+        for trench_idx, (start, end) in enumerate(self.TRENCH_RECTANGLES):
+            # Find bounding box of rectangle (with fuel radius buffer)
+            min_x = start.X() - const.FUEL_RADIUS
+            max_x = end.X() + const.FUEL_RADIUS
+            min_y = start.Y() - const.FUEL_RADIUS
+            max_y = end.Y() + const.FUEL_RADIUS
+            
+            # Mark all grid cells this trench could affect
+            col_min = max(0, int(min_x / const.CELL_SIZE))
+            col_max = min(const.GRID_COLS - 1, int(max_x / const.CELL_SIZE))
+            row_min = max(0, int(min_y / const.CELL_SIZE))
+            row_max = min(const.GRID_ROWS - 1, int(max_y / const.CELL_SIZE))
+            
+            for col in range(col_min, col_max + 1):
+                for row in range(row_min, row_max + 1):
+                    self.grid_to_trenches[col][row].append(trench_idx)
+    
     def clear_fuel(self):
         """Clear the field of fuel."""
         self.fuels.clear()
@@ -369,13 +430,24 @@ class FuelSim:
         """Run the simulation forward 1 time step (0.02s)."""
         for _ in range(self.subticks):
             for fuel in self.fuels:
-                fuel.update(self.simulate_air_resistance, self.subticks, self.blue_hub, self.red_hub)
+                # Get relevant static collision geometry for this fuel's position
+                col = int(fuel.pos.X() / const.CELL_SIZE)
+                row = int(fuel.pos.Y() / const.CELL_SIZE)
+                relevant_lines = []
+                relevant_trenches = []
+                if 0 <= col < const.GRID_COLS and 0 <= row < const.GRID_ROWS:
+                    relevant_lines = self.grid_to_lines[col][row]
+                    relevant_trenches = self.grid_to_trenches[col][row]
+                
+                fuel.update(self.simulate_air_resistance, self.subticks, self.blue_hub, self.red_hub, 
+                          relevant_lines, relevant_trenches)
 
-            self._handle_fuel_collisions(self.fuels)
+        self._handle_fuel_collisions(self.fuels)
 
-            if self.robot_pose_supplier is not None:
-                self._handle_robot_collisions(self.fuels)
-                self._handle_intakes(self.fuels)
+        if self.robot_pose_supplier is not None:
+            self._handle_robot_collisions(self.fuels)
+            
+            self._handle_intakes(self.fuels)
 
         if self.logging_timer.advanceIfElapsed(1.0 / self.logging_freq_hz):
             self.log_fuels()
@@ -434,10 +506,13 @@ class FuelSim:
 
             if 0 <= col < const.GRID_COLS and 0 <= row < const.GRID_ROWS:
                 self.grid[col][row].append(fuel)
+
+
+
                 if len(self.grid[col][row]) == 1:
                     self.active_cells.append(self.grid[col][row])
 
-        # Check collisions
+        collision_radius_sq = self.FUEL_COLLISION_RADIUS_SQUARED
         for fuel in fuels:
             col = int(fuel.pos.X() / const.CELL_SIZE)
             row = int(fuel.pos.Y() / const.CELL_SIZE)
@@ -447,8 +522,13 @@ class FuelSim:
                 for j in range(row - 1, row + 2):
                     if 0 <= i < const.GRID_COLS and 0 <= j < const.GRID_ROWS:
                         for other in self.grid[i][j]:
-                            if fuel is not other and fuel.pos.distance(other.pos) < const.FUEL_RADIUS * 2:
-                                if id(fuel) < id(other):
+                            if fuel is not other and id(fuel) < id(other):
+                                # Use squared distance to avoid sqrt
+                                dx = fuel.pos.X() - other.pos.X()
+                                dy = fuel.pos.Y() - other.pos.Y()
+                                dz = fuel.pos.Z() - other.pos.Z()
+                                dist_sq = dx*dx + dy*dy + dz*dz
+                                if dist_sq < collision_radius_sq:
                                     FuelSim._handle_fuel_collision(fuel, other)
 
     def _handle_robot_collision(self, fuel: 'FuelSim.Fuel', robot: Pose2d, robot_vel: Translation2d):
