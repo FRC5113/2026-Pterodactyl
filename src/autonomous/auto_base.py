@@ -187,7 +187,8 @@ class AutoBase(AutonomousStateMachine):
         self.drive_control.drive_auto_manual(0.0, 1, 0.0, False)
         self.intake.set_arm_angle(IntakeAngle.INTAKING)
         self.intake.set_voltage(8)
-            @timed_state(duration=5.0)
+        
+    @timed_state(duration=5.0)
     def go_foward_and_intake_rt(self):
         self.drive_control.drive_auto_manual(0.0, -1, 0.0, False)
         self.intake.set_arm_angle(IntakeAngle.INTAKING)
