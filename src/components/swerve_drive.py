@@ -1,7 +1,7 @@
 import math
 
 from choreo.trajectory import SwerveSample
-from magicbot import will_reset_to
+from magicbot import will_reset_to, feedback
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
@@ -114,6 +114,7 @@ class SwerveDrive:  # (Sendable):
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
         self.x_brake_req = requests.SwerveDriveBrake()
+        self.idle_req = requests.Idle()
         self.sysid_translation_req = requests.SysIdSwerveTranslation()
         self.sysid_rotation_req = requests.SysIdSwerveRotation()
         self.apply_speeds_req = (
@@ -137,13 +138,8 @@ class SwerveDrive:  # (Sendable):
         self.last_telem_time = 0.0
 
         # Register telemetry callback (called from the odometry thread)
-        self.drivetrain.register_telemetry(self._telemetry_callback)
+        # self.drivetrain.register_telemetry(self._telemetry_callback)
 
-    def _telemetry_callback(
-        self, state: swerve.SwerveDrivetrain.SwerveDriveState
-    ) -> None:
-        """Called from the odometry thread — keep it cheap."""
-        pass  # state is cached internally by SwerveDrivetrain.get_state()
 
     def on_enable(self):
         # PID controllers for autonomous pose tracking
@@ -217,7 +213,7 @@ class SwerveDrive:  # (Sendable):
     ]:
         return self.swerve_module_states
 
-    @fms_feedback
+    # @feedback
     def get_distance_from_desired_pose(self) -> units.meters:
         return self.desired_pose.translation().distance(
             self.get_estimated_pose().translation()
@@ -463,7 +459,7 @@ class SwerveDrive:  # (Sendable):
 
     def execute(self) -> None:
         if self.stopped:
-            self.drivetrain.set_control(self.x_brake_req)
+            self.drivetrain.set_control(self.idle_req)
             return
 
         # Refresh cached state — single get_state() per cycle.

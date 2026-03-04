@@ -41,7 +41,7 @@ from lemonlib.util import (
 
 
 class MyRobot(LemonRobot):
-    led_strip: LEDStrip
+    # led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -68,7 +68,7 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        self.tuning_enabled = False
+        self.tuning_enabled = True
 
         self.rio_canbus = CANBus.roborio()
 
@@ -261,7 +261,7 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        self.shooter_controller.engage()
+        # self.shooter_controller.engage()
 
     def autonomousInit(self):
         # globalProfiler.enable()
@@ -285,9 +285,6 @@ class MyRobot(LemonRobot):
         self.omega_filter = SlewRateLimiter(
             self.rasing_slew_rate  # , self.falling_slew_rate
         )
-        self.profiler = cProfile.Profile()
-        self.profiler_start = wpilib.Timer.getFPGATimestamp()
-        self.profiler.enable()
         # Cache inputs called multiple times
 
     def teleopPeriodic(self):
@@ -326,7 +323,7 @@ class MyRobot(LemonRobot):
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
 
-            if self.primary.getLeftBumper():
+            if self.primary.getLeftBumper() or True:
                 if abs(primary_rx) <= 0.0:
                     omega = 0.0
                 else:
@@ -352,7 +349,9 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getLeftBumper():
-                self.intake.set_voltage(6.0)
+                self.intake.set_voltage(8.0)
+            elif self.secondary.getRightBumper():
+                self.intake.set_voltage(-8.0)
 
             if self.secondary.getBButton():
                 self.intake.set_arm_voltage(-8.0)
@@ -373,6 +372,7 @@ class MyRobot(LemonRobot):
         with self.consumeExceptions():
             if self.secondary.getRightTriggerAxis() >= 0.8:
                 # self.shooter_controller.request_shoot()
+                # print("[DEBUG-Chase] settining kicker")
                 self.shooter.set_kicker(8)
 
             if self.secondary.getAButton():
@@ -382,8 +382,10 @@ class MyRobot(LemonRobot):
                 self.shooter.set_velocity(15.0)
 
             if self.secondary.getStartButton():
+                # print("[DEBUG-Chase] settinging kicker")
                 self.shooter.set_voltage(-6)
                 self.shooter.set_kicker(-10)
+
 
     def disabledPeriodic(self):
         # self.odometry.execute()
@@ -394,11 +396,9 @@ class MyRobot(LemonRobot):
         #     try:
         #         globalProfiler.dump_stats("/home/lvuser/teleop.prof")
         #         globalProfiler.disable()
-        #         print("[DEBUG] Profile files written")
         #     except FileNotFoundError:
         #         globalProfiler.dump_stats("./temp.prof")
         #     except Exception as e:
-        #         print(f"[DEBUG] Profile dump failed: {e}")
         # else:
         #     self.firstRun = False
         pass
@@ -408,11 +408,11 @@ class MyRobot(LemonRobot):
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
 
-    @feedback
+    # @feedback
     def hub_status(self) -> bool:
         return is_alliance_hub_active()
 
-    @fms_feedback
+    # @feedback
     def display_auto_state(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):

@@ -8,6 +8,7 @@ from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
 from lemonlib import fms_feedback
+from magicbot import feedback
 
 
 class ShooterController(StateMachine):
@@ -21,13 +22,13 @@ class ShooterController(StateMachine):
     def setup(self):
 
         # Meters
-        self.distance_lookup = [1.597, 4.597]  # TODO Tune these values
+        self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
         # RPS
-        self.speed_lookup = [43.0, 53.0]  # TODO Tune these values
+        self.speed_lookup = [41.95, 45.8, 48.9, 53.0]  # TODO Tune these values
 
         # Seconds — measured flight times at each distance
-        self.time_lookup = [1, 1]  # TODO Tune these values
+        self.time_lookup = [0.97, 1.21, 1.2, 1.2]  # TODO Tune these values
 
         self.target_rps = 0.0
         self.target_angle = 0.0
@@ -140,15 +141,15 @@ class ShooterController(StateMachine):
     INFORMATIONAL METHODS
     """
 
-    @fms_feedback
+    # @feedback
     def get_target_rps(self):
         return self.target_rps
 
-    @fms_feedback
+    # @feedback
     def get_distance(self):
         return self.distance
 
-    @fms_feedback
+    # @feedback
     def is_at_speed(self):
         return self.at_speed
 

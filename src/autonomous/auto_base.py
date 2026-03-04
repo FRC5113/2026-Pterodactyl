@@ -136,6 +136,8 @@ class AutoBase(AutonomousStateMachine):
         final_pose = self.current_trajectory.get_final_pose(
             is_red()
         )  # Get final pose of trajectory
+        if final_pose is None:
+            final_pose = Pose2d()
         distance = current_pose.translation().distance(
             final_pose.translation()
         )  # Calculate distance to final pose
@@ -185,13 +187,13 @@ class AutoBase(AutonomousStateMachine):
     @timed_state(duration=5.0)
     def go_foward_and_intake_lt(self):
         self.drive_control.drive_auto_manual(0.0, 1, 0.0, False)
-        self.intake.set_arm_angle(IntakeAngle.INTAKING)
+        self.intake.set_arm_angle(IntakeAngle.INTAKING.value)
         self.intake.set_voltage(8)
         
     @timed_state(duration=5.0)
     def go_foward_and_intake_rt(self):
         self.drive_control.drive_auto_manual(0.0, -1, 0.0, False)
-        self.intake.set_arm_angle(IntakeAngle.INTAKING)
+        self.intake.set_arm_angle(IntakeAngle.INTAKING.value)
         self.intake.set_voltage(8)
     @timed_state(duration=5.0, next_state="next_step")
     def outpost_wait(self):
