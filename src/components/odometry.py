@@ -1,6 +1,6 @@
 from photonlibpy.photonPoseEstimator import PhotonPoseEstimator
 from robotpy_apriltag import AprilTagFieldLayout
-from wpilib import Field2d, SmartDashboard
+from wpilib import Field2d
 
 from components.swerve_drive import SwerveDrive
 from lemonlib.vision import LemonCamera
@@ -34,7 +34,7 @@ class Odometry:
             self.camera_back_right.camera_to_bot,
         )
 
-        SmartDashboard.putData("Estimated Field", self.estimated_field)
+        # SmartDashboard.putData("Estimated Field", self.estimated_field)
 
     def execute(self):
         # self._process_latest_result(
