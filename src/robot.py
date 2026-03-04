@@ -26,6 +26,7 @@ from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
+from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
@@ -35,8 +36,6 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
-
-from .game import is_alliance_hub_active
 
 # globalProfiler = cProfile.Profile()
 
@@ -407,7 +406,7 @@ class MyRobot(LemonRobot):
             selected_auto.display_trajectory()
 
     @feedback
-    def hub_status(self) -> str:
+    def hub_status(self) -> bool:
         return is_alliance_hub_active()
 
     @fms_feedback
