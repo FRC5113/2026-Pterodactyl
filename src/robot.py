@@ -4,6 +4,7 @@
 import math
 
 import wpilib
+from magicbot import feedback
 from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
 from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
@@ -12,7 +13,6 @@ from wpilib import (
     DriverStation,
     DutyCycleEncoder,
     Field2d,
-    RobotController,
 )
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
@@ -35,6 +35,8 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
+
+from .game import is_alliance_hub_active
 
 # globalProfiler = cProfile.Profile()
 
@@ -67,7 +69,7 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        self.tuning_enabled = True
+        self.tuning_enabled = False
 
         self.rio_canbus = CANBus.roborio()
 
@@ -399,14 +401,14 @@ class MyRobot(LemonRobot):
         #     self.firstRun = False
         pass
 
-    @fms_feedback
-    def get_voltage(self) -> units.volts:
-        return RobotController.getBatteryVoltage()
-
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
+
+    @feedback
+    def hub_status(self) -> str:
+        return is_alliance_hub_active()
 
     @fms_feedback
     def display_auto_state(self) -> None:
