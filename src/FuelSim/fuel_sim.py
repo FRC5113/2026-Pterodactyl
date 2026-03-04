@@ -34,7 +34,6 @@ class FuelSim:
             self.pos = self.pos + self.vel * (const.PERIOD / subticks)
             
             if self.pos.Z() > const.FUEL_RADIUS:
-                Fg = const.GRAVITY * const.FUEL_MASS
                 Fd = Translation3d()
 
                 if simulate_air_resistance:
@@ -42,7 +41,7 @@ class FuelSim:
                     if speed > 1e-6:
                         Fd = self.vel * (-const.DRAG_FORCE_FACTOR * speed)
 
-                accel = Fg + (Fd) / (const.FUEL_MASS)
+                accel = const.GRAVITY + (Fd / const.FUEL_MASS)
                 self.vel = self.vel + (accel * (const.PERIOD / subticks))
             
             if abs(self.vel.Z()) < 0.05 and self.pos.Z() <= const.FUEL_RADIUS + 0.03:

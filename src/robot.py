@@ -16,7 +16,7 @@ from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Rotation3d, Transform3d
+from wpimath.geometry import Rotation3d, Transform3d, Translation3d
 
 from autonomous.auto_base import AutoBase
 
@@ -253,7 +253,9 @@ class MyRobot(LemonRobot):
             self.alliance = False  # Blue alliance
 
         self.fuel_sim = FuelSim()
-        self.fuel_sim.spawn_starting_fuel()
+
+        self.fuel_sim.spawn_fuel(Translation3d(8.0, 4.0, 0.05), Translation3d(0, 0, 0))
+        self.fuel_sim.spawn_fuel(Translation3d(8.2, 4.0, 0.05), Translation3d(0, 0, 0))
 
         self.fuel_sim.register_robot(
             self.robot_width,
@@ -264,16 +266,13 @@ class MyRobot(LemonRobot):
         )
 
         self.fuel_sim.register_intake(
-            0, 12, 0, 12
+            0, 0.3, 0, 0.3
         )
 
         self.fuel_sim.set_subticks(1)
 
         self.fuel_sim.start()
         self.fuel_sim.log_fuels()
-
-        print(f"First fuel at: {self.fuel_sim.fuels[0].pos}")
-        print(f"Total fuel count: {len(self.fuel_sim.fuels)}")
     
     def enabledperiodic(self) -> None:
         self.drive_control.engage()
@@ -396,7 +395,7 @@ class MyRobot(LemonRobot):
         """
         Method called in robotPeriodic on simulation.
         """
-        self.fuel_sim.step_sim()
+        self.fuel_sim.update_sim()
 
     @fms_feedback
     def get_battery_voltage(self) -> units.volts:
