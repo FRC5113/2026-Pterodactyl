@@ -12,15 +12,14 @@ from phoenix6.signals import (
     MotorArrangementValue,
     NeutralModeValue,
 )
+from wpilib import RobotBase
 from wpimath import units
 
-from lemonlib import fms_feedback
+from lemonlib import fms_feedback # type: ignore Lemon
 from lemonlib.smart import SmartProfile
 
 
 class Shooter:
-    """low level component that directly manages the shooter motors and their configuration. controlled by the shooter controller component, but can also be directly controlled for testing purposes"""
-
     right_motor: TalonFX
     left_motor: TalonFX
     left_kicker_motor: TalonFXS
@@ -38,22 +37,26 @@ class Shooter:
     manual_control = will_reset_to(False)
 
     def setup(self):
+        """Initialize shooter hardware and configuration."""
         self._cached_velocity = 0.0
+        
+        # Use short timeout in simulation to avoid blocking
+        timeout = 0.05 if RobotBase.isSimulation() else 0.5
+
         self.shooter_motors_config = TalonFXConfiguration()
         self.shooter_motors_config.motor_output.neutral_mode = NeutralModeValue.COAST
+
         self.shooter_motors_config.feedback = (
             FeedbackConfigs()
             .with_feedback_sensor_source(FeedbackSensorSourceValue.ROTOR_SENSOR)
             .with_sensor_to_mechanism_ratio(self.shooter_gear_ratio)
         )
 
-        self.shooter_motors_config.current_limits.stator_current_limit = (
-            self.shooter_amps
-        )
+        self.shooter_motors_config.current_limits.stator_current_limit = self.shooter_amps
         self.shooter_motors_config.current_limits.stator_current_limit_enable = True
 
-        self.left_motor.configurator.apply(self.shooter_motors_config)
-        self.right_motor.configurator.apply(self.shooter_motors_config)
+        self.left_motor.configurator.apply(self.shooter_motors_config, timeout)
+        self.right_motor.configurator.apply(self.shooter_motors_config, timeout)
 
         self.shooter_control = (
             controls.VelocityVoltage(0).with_enable_foc(True).with_slot(0)
@@ -68,8 +71,8 @@ class Shooter:
             MotorArrangementValue.NEO550_JST
         )
 
-        self.left_kicker_motor.configurator.apply(self.kicker_motor_configs)
-        self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
+        self.left_kicker_motor.configurator.apply(self.kicker_motor_configs, timeout)
+        self.right_kicker_motor.configurator.apply(self.kicker_motor_configs, timeout)
 
         self.conveyor_motor_configs = TalonFXSConfiguration()
         self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.COAST
@@ -77,7 +80,7 @@ class Shooter:
             MotorArrangementValue.NEO550_JST
         )
 
-        self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
+        self.conveyor_motor.configurator.apply(self.conveyor_motor_configs, timeout)
 
         self.voltage_control = controls.VoltageOut(0).with_enable_foc(True)
         self.duty_control = controls.DutyCycleOut(0).with_enable_foc(True)
@@ -86,46 +89,44 @@ class Shooter:
         )
 
     def on_enable(self):
+        """Apply tuned PID/feedforward gains when robot is enabled."""
+        timeout = 0.05 if RobotBase.isSimulation() else 0.5
         if self.tuning_enabled:
             self.shooter_controller = (
                 self.shooter_profile.create_ctre_flywheel_controller()
             )
             self.left_motor.configurator.apply(
-                self.shooter_motors_config.with_slot0(self.shooter_controller)
+                self.shooter_motors_config.with_slot0(self.shooter_controller), timeout
             )
             self.right_motor.configurator.apply(
-                self.shooter_motors_config.with_slot0(self.shooter_controller)
+                self.shooter_motors_config.with_slot0(self.shooter_controller), timeout
             )
 
-    """
-    CONTROL METHODS
-    """
-
     def set_velocity(self, speed: float):
+        """Set target flywheel velocity with closed-loop control."""
         self.manual_control = False
         self.shooter_velocity = speed
 
     def set_voltage(self, volts: units.volts):
+        """Set flywheel voltage directly for open-loop control."""
         self.manual_control = True
         self.shooter_voltage = volts
 
     def set_kicker(self, value: float):
-        self.kicker_duty = value  # ha duty thats funny right there
+        """Set kicker/indexer motor voltage."""
+        self.kicker_duty = value
 
-    """
-    INFORMATIONAL METHODS
-    """
-
-    @fms_feedback
     def get_velocity(self) -> float:
+        """Get current flywheel velocity."""
         return self._cached_velocity
 
     @fms_feedback
     def get_target_velocity(self) -> float:
+        """Get target flywheel velocity."""
         return self.shooter_velocity
 
     def execute(self):
-        # Cache velocity once per cycle for feedback and shooter_controller use
+        """Execute shooter control loop."""
         self._cached_velocity = self.left_motor.get_velocity().value
 
         self.right_kicker_motor.set_control(

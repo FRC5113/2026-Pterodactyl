@@ -1,3 +1,5 @@
+"""Module for talonfx."""
+
 import phoenix6
 from wpilib.interfaces import MotorController
 
@@ -10,6 +12,7 @@ class LemonTalonFX(phoenix6.hardware.TalonFX, MotorController):
     """
 
     def __init__(self, device_id: int, canbus: str = "", enable_foc: bool = False):
+        """Execute __init__."""
         phoenix6.hardware.TalonFX.__init__(self, device_id, canbus=canbus)
         MotorController.__init__(self)
         self.config = phoenix6.configs.TalonFXConfiguration()
@@ -18,19 +21,23 @@ class LemonTalonFX(phoenix6.hardware.TalonFX, MotorController):
         self.is_disabled = False
 
     def disable(self):
+        """Execute disable."""
         self.stopMotor()
         self.is_disabled = True
 
     def get(self) -> float:
+        """Execute get."""
         return self.duty_cycle_out.output
 
     def getInverted(self) -> bool:
+        """Execute getInverted."""
         return (
             self.config.motor_output.inverted
             == phoenix6.signals.InvertedValue.COUNTER_CLOCKWISE_POSITIVE
         )
 
     def set(self, speed: float):
+        """Execute set."""
         if not self.is_disabled:
             self.duty_cycle_out.output = speed
             self.set_control(self.duty_cycle_out)
@@ -45,6 +52,7 @@ class LemonTalonFX(phoenix6.hardware.TalonFX, MotorController):
         self.configurator.apply(self.config)
 
     def setInverted(self, isInverted: bool):
+        """Execute setInverted."""
         if isInverted:
             self.config.motor_output.inverted = (
                 phoenix6.signals.InvertedValue.CLOCKWISE_POSITIVE
@@ -56,9 +64,11 @@ class LemonTalonFX(phoenix6.hardware.TalonFX, MotorController):
         self.configurator.apply(self.config)
 
     def setVoltage(self, volts: float):
+        """Execute setVoltage."""
         if not self.is_disabled:
             self.voltage_out.output = volts
             self.set_control(self.voltage_out)
 
     def stopMotor(self):
+        """Execute stopMotor."""
         self.set(0)

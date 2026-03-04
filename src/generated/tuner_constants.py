@@ -1,3 +1,5 @@
+"""Module for tuner constants."""
+
 from typing import TYPE_CHECKING, overload
 
 from phoenix6 import CANBus, configs, hardware, signals, swerve, units

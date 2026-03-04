@@ -1,3 +1,5 @@
+"""Module for control."""
+
 import math
 from enum import IntEnum
 
@@ -16,6 +18,7 @@ class LemonInput(GenericHID):
     """
 
     class xbox_buttons(IntEnum):
+        """xbox_buttons class."""
         kLeftTrigger = 2
         kLeftX = 0
         kLeftY = 1
@@ -34,6 +37,7 @@ class LemonInput(GenericHID):
         kY = 4
 
     class ps5_buttons(IntEnum):
+        """ps5_buttons class."""
         kLeftTrigger = 3
         kLeftX = 0
         kLeftY = 1
@@ -52,6 +56,7 @@ class LemonInput(GenericHID):
         kY = 4
 
     class legion_buttons(IntEnum):
+        """legion_buttons class."""
         kLeftTrigger = 2
         kLeftX = 0
         kLeftY = 1

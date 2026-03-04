@@ -1,3 +1,5 @@
+"""Module for slew."""
+
 from wpilib import RobotController
 
 

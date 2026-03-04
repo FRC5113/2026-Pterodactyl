@@ -1,3 +1,5 @@
+"""Module for tuner constants old."""
+
 from phoenix6 import CANBus, configs, signals, swerve, units
 
 

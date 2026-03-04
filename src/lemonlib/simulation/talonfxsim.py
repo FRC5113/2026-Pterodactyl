@@ -1,10 +1,14 @@
+"""Module for talonfxsim."""
+
 from phoenix6.hardware.talon_fx import TalonFX
 from wpilib.simulation import DCMotorSim
 from wpimath.system.plant import DCMotor, LinearSystemId
 
 
 class FalconSim:
+    """FalconSim class."""
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
+        """Execute __init__."""
         self.gearbox = DCMotor.falcon500(1)
         self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
         self.gearing = gearing
@@ -13,9 +17,11 @@ class FalconSim:
         self.motor_sim = DCMotorSim(self.plant, self.gearbox)
 
     def getSetpoint(self) -> float:
+        """Execute getSetpoint."""
         return self.sim_state.motor_voltage
 
     def update(self, dt: float):
+        """Execute update."""
         voltage = self.sim_state.motor_voltage
         self.motor_sim.setInputVoltage(voltage)
         self.motor_sim.update(dt)
@@ -28,7 +34,9 @@ class FalconSim:
 
 
 class FalconSimFOC:
+    """FalconSimFOC class."""
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
+        """Execute __init__."""
         self.gearbox = DCMotor.falcon500FOC(1)
         self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
         self.gearing = gearing
@@ -37,9 +45,11 @@ class FalconSimFOC:
         self.motor_sim = DCMotorSim(self.plant, self.gearbox)
 
     def getSetpoint(self) -> float:
+        """Execute getSetpoint."""
         return self.sim_state.motor_voltage
 
     def update(self, dt: float):
+        """Execute update."""
         voltage = self.sim_state.motor_voltage
         self.motor_sim.setInputVoltage(voltage)
         self.motor_sim.update(dt)
@@ -52,7 +62,9 @@ class FalconSimFOC:
 
 
 class KrakenSim:
+    """KrakenSim class."""
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
+        """Execute __init__."""
         self.gearbox = DCMotor.krakenX60(1)
         self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
         self.gearing = gearing
@@ -61,9 +73,11 @@ class KrakenSim:
         self.motor_sim = DCMotorSim(self.plant, self.gearbox)
 
     def getSetpoint(self) -> float:
+        """Execute getSetpoint."""
         return self.sim_state.motor_voltage
 
     def update(self, dt: float):
+        """Execute update."""
         voltage = self.sim_state.motor_voltage
         self.motor_sim.setInputVoltage(voltage)
         self.motor_sim.update(dt)
@@ -76,7 +90,9 @@ class KrakenSim:
 
 
 class KrakenSimFOC:
+    """KrakenSimFOC class."""
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
+        """Execute __init__."""
         self.gearbox = DCMotor.krakenX60FOC(1)
         self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
         self.gearing = gearing
@@ -85,9 +101,11 @@ class KrakenSimFOC:
         self.motor_sim = DCMotorSim(self.plant, self.gearbox)
 
     def getSetpoint(self) -> float:
+        """Execute getSetpoint."""
         return self.sim_state.motor_voltage
 
     def update(self, dt: float):
+        """Execute update."""
         voltage = self.sim_state.motor_voltage
         self.motor_sim.setInputVoltage(voltage)
         self.motor_sim.update(dt)

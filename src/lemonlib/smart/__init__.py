@@ -1,3 +1,5 @@
+"""Module for   init  ."""
+
 from .controller import SmartController
 from .nettables import SmartNT
 from .preference import SmartPreference

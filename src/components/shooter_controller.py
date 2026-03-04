@@ -7,7 +7,7 @@ from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
-from lemonlib import fms_feedback
+from lemonlib import fms_feedback # type: ignore Lemon
 
 
 class ShooterController(StateMachine):
@@ -19,15 +19,12 @@ class ShooterController(StateMachine):
     shooting = will_reset_to(False)
 
     def setup(self):
+        """Initialize shooter controller parameters and lookup tables."""
+        self.distance_lookup = [1.597, 4.597]
 
-        # Meters
-        self.distance_lookup = [1.597, 4.597]  # TODO Tune these values
+        self.speed_lookup = [43.0, 53.0]
 
-        # RPS
-        self.speed_lookup = [43.0, 53.0]  # TODO Tune these values
-
-        # Seconds — measured flight times at each distance
-        self.time_lookup = [1, 1]  # TODO Tune these values
+        self.time_lookup = [1, 1]
 
         self.target_rps = 0.0
         self.target_angle = 0.0
@@ -37,25 +34,23 @@ class ShooterController(StateMachine):
         self.phase_delay = 0.03
         self.lead_iterations = 15
 
-        self.shooter_offsetX = 0.25  # meters forward of robot center
-        self.shooter_offsetY = 0.0  # meters left (+) / right (-)
+        self.shooter_offsetX = 0.25
+        self.shooter_offsetY = 0.0
 
         self.min_distance = 1.0
         self.max_distance = 6.0
 
         self.idle_speed_scalar = 0.8
-        self.kicker_duty = 8  # Volts
-        self.angle_tolerance = 0.035  # radians (~2 deg)
-        self.speed_tolerance = 0.05  # 5%
-
-    """
-    CONTROL METHODS
-    """
+        self.kicker_duty = 8
+        self.angle_tolerance = 0.035
+        self.speed_tolerance = 0.05
 
     def request_shoot(self):
+        """Request a shot to be taken."""
         self.shooting = True
 
     def _update_target(self):
+        """Calculate target shooting parameters with moving target compensation."""
         pose = self.swerve_drive.get_estimated_pose()
         chassis = self.swerve_drive.get_velocity()
 
@@ -123,7 +118,8 @@ class ShooterController(StateMachine):
 
         self.valid_shot = self.min_distance <= self.distance <= self.max_distance
 
-    def _linear_interp(self, x, xp, fp):
+    def _linear_interp(self, x: float, xp: list[float], fp: list[float] | list[int]) -> float:
+        """Perform linear interpolation on lookup tables."""
         if x <= xp[0]:
             return fp[0]
         if x >= xp[-1]:
@@ -136,28 +132,24 @@ class ShooterController(StateMachine):
 
         return fp[-1]
 
-    """
-    INFORMATIONAL METHODS
-    """
-
     @fms_feedback
     def get_target_rps(self):
+        """Get calculated target flywheel speed."""
         return self.target_rps
 
     @fms_feedback
     def get_distance(self):
+        """Get calculated distance to target."""
         return self.distance
 
     @fms_feedback
-    def is_at_speed(self):
-        return self.at_speed
-
-    """
-    STATES
-    """
+    def is_at_speed(self) -> bool:
+        """Check if shooter is ready to fire."""
+        return self.at_speed # type: ignore
 
     @state(first=True)
     def idle(self):
+        """Idle state - monitor target and spin flywheel at reduced speed."""
         self._update_target()
 
         if self.valid_shot:
@@ -169,6 +161,7 @@ class ShooterController(StateMachine):
             self.next_state("spin_up")
 
     def _is_aimed(self):
+        """Check if robot is aimed at target within tolerance."""
         heading = self.swerve_drive.get_estimated_pose().rotation().radians()
         error = math.atan2(
             math.sin(self.target_angle - heading),
@@ -178,6 +171,7 @@ class ShooterController(StateMachine):
 
     @state
     def spin_up(self):
+        """Spin-up state - accelerate flywheel to full speed while aiming."""
         self._update_target()
 
         if not self.valid_shot:
@@ -200,6 +194,7 @@ class ShooterController(StateMachine):
 
     @state
     def shoot(self):
+        """Shoot state - feed game piece into flywheel."""
         self._update_target()
 
         if not self.valid_shot:

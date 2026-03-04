@@ -1,3 +1,5 @@
+"""Module for killoughdrive."""
+
 import math
 
 from wpilib.interfaces import MotorController

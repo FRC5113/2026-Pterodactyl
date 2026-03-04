@@ -1,3 +1,5 @@
+"""Module for vision."""
+
 from photonlibpy.photonCamera import PhotonCamera
 from robotpy_apriltag import AprilTagFieldLayout
 from wpimath.geometry import Transform3d
@@ -22,12 +24,15 @@ class LemonCamera(PhotonCamera):
         self.april_tag_field = april_tag_field
 
     def update(self):
+        """Execute update."""
         self.results = self.getAllUnreadResults()
 
     def has_target(self):
+        """Execute has_target."""
         return len(self.results) > 0 and self.results[-1].hasTargets()
 
     def get_best_tag(self) -> int:
+        """Execute get_best_tag."""
         if self.results:
             result = self.results[-1]
             best_target = result.getBestTarget()
@@ -37,12 +42,14 @@ class LemonCamera(PhotonCamera):
         return getattr(self, "_last_valid_tag", None)
 
     def get_tag_pose(self, ID: int, twod: bool):
+        """Execute get_tag_pose."""
         if twod:
             return self.april_tag_field.getTagPose(ID).toPose2d()
         else:
             return self.april_tag_field.getTagPose(ID)
 
     def get_best_pose(self, twod: bool = True):
+        """Execute get_best_pose."""
         best_tag = self.get_best_tag()
         if best_tag is None:
             return None

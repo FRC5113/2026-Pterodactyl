@@ -1,3 +1,5 @@
+"""Module for sysid."""
+
 from commands2.sysid import SysIdRoutine
 from magicbot import will_reset_to
 from wpilib import Timer
@@ -48,6 +50,7 @@ class MagicSysIdRoutine:
     output_volts = will_reset_to(0)
 
     def __init__(self):
+        """Execute __init__."""
         self.timer = Timer()
         self.timed_out = False
         self.was_enabled = False
@@ -56,46 +59,55 @@ class MagicSysIdRoutine:
     def setup_sysid(
         self, config: SysIdRoutine.Config, mechanism: SysIdRoutine.Mechanism
     ):
+        """Execute setup_sysid."""
         self.log = SysIdRoutineLog(mechanism.name)
         self.config = config
         self.mechanism = mechanism
         self.record_state = config.recordState or self.log.recordState
 
     def quasistatic_forward(self):
+        """Execute quasistatic_forward."""
         self.enabled = True
         self.state = State.kQuasistaticForward
         self.outputVolts = self.timer.get() * self.config.rampRate
 
     def quasistatic_reverse(self):
+        """Execute quasistatic_reverse."""
         self.enabled = True
         self.state = State.kQuasistaticReverse
         self.outputVolts = -self.timer.get() * self.config.rampRate
 
     def dynamic_forward(self):
+        """Execute dynamic_forward."""
         self.enabled = True
         self.state = State.kDynamicForward
         self.outputVolts = self.config.stepVoltage
 
     def dynamic_reverse(self):
+        """Execute dynamic_reverse."""
         self.enabled = True
         self.state = State.kDynamicReverse
         self.outputVolts = -self.config.stepVoltage
 
     def on_start(self):
+        """Execute on_start."""
         self.timer.restart()
         self.timed_out = False
         self.was_enabled = True
 
     def on_end(self):
+        """Execute on_end."""
         self.was_enabled = False
         self.mechanism.drive(0.0)
         self.record_state(State.kNone)
         self.timer.stop()
 
     def getName(self) -> str:
+        """Execute getName."""
         return __name__
 
     def execute(self):
+        """Execute execute."""
         if self.was_enabled:
             if self.timed_out:
                 return

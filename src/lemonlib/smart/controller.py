@@ -1,3 +1,5 @@
+"""Module for controller."""
+
 from wpiutil import Sendable, SendableBuilder
 
 
@@ -8,6 +10,7 @@ class SmartController(Sendable):
     """
 
     def __init__(self, key: str, calculate_method, feedback_enabled):
+        """Execute __init__."""
         Sendable.__init__(self)
         self._calculate_method = calculate_method
         self.reference = 0
@@ -44,6 +47,7 @@ class SmartController(Sendable):
         return self.measurement
 
     def initSendable(self, builder: SendableBuilder):
+        """Execute initSendable."""
         builder.setSmartDashboardType("SmartController")
         builder.addDoubleProperty("Reference", lambda: self.reference, lambda _: None)
         builder.addDoubleProperty(
@@ -53,6 +57,7 @@ class SmartController(Sendable):
         builder.addDoubleProperty("Output", lambda: self.output, lambda _: None)
 
     def calculate(self, measurement: float, reference: float):
+        """Execute calculate."""
         self.reference = reference
         self.measurement = measurement
         self.error = reference - measurement

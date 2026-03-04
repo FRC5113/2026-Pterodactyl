@@ -61,6 +61,7 @@ APRILTAGS = apriltag_layout.getTags()
 
 @dataclasses.dataclass(slots=True)
 class Tag2d:
+    """Tag2d class."""
     id: TagId
     pose: Pose2d
 
@@ -84,6 +85,7 @@ BLUE_HUB_POS = (
 
 
 def get_hub_pos(is_red: bool):
+    """Execute get_hub_pos."""
     if is_red:
         return RED_HUB_POS
     else:
@@ -91,6 +93,7 @@ def get_hub_pos(is_red: bool):
 
 
 def field_flip_pose2d(p: Pose2d):
+    """Execute field_flip_pose2d."""
     return Pose2d(
         field_flip_translation2d(p.translation()),
         field_flip_rotation2d(p.rotation()),
@@ -98,13 +101,16 @@ def field_flip_pose2d(p: Pose2d):
 
 
 def field_flip_rotation2d(r: Rotation2d):
+    """Execute field_flip_rotation2d."""
     return Rotation2d(-r.cos(), r.sin())
 
 
 def field_flip_translation2d(t: Translation2d):
+    """Execute field_flip_translation2d."""
     return Translation2d(FIELD_LENGTH - t.x, t.y)
 
 
 # This will default to the blue alliance if a proper link to the driver station has not yet been established
 def is_red() -> bool:
+    """Execute is_red."""
     return wpilib.DriverStation.getAlliance() == wpilib.DriverStation.Alliance.kRed

@@ -1,3 +1,5 @@
+"""Module for alert."""
+
 from enum import Enum
 from logging import Logger
 from typing import List

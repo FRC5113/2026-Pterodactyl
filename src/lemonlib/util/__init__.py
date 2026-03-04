@@ -1,3 +1,5 @@
+"""Module for   init  ."""
+
 from .alert import Alert, AlertManager, AlertType
 from .elastic import (
     Notification,
@@ -46,6 +48,7 @@ def clamp(value: float, min_value: float, max_value: float) -> float:
 
 
 def is_red() -> bool:
+    """Execute is_red."""
     return DriverStation.getAlliance() == DriverStation.Alliance.kRed
 
 
@@ -98,6 +101,7 @@ def linear_curve(
     max_mag: float = 0.0,
     absolute_offset: bool = True,
 ) -> Callable[[float], float]:
+    """Execute linear_curve."""
     return curve(lambda x: scalar * x, offset, deadband, max_mag, absolute_offset)
 
 
@@ -108,6 +112,7 @@ def ollie_curve(
     max_mag: float = 0.0,
     absolute_offset: bool = True,
 ) -> Callable[[float], float]:
+    """Execute ollie_curve."""
     return curve(
         lambda x: scalar * x * abs(x), offset, deadband, max_mag, absolute_offset
     )
@@ -120,16 +125,19 @@ def cubic_curve(
     max_mag: float = 0.0,
     absolute_offset: bool = True,
 ) -> Callable[[float], float]:
+    """Execute cubic_curve."""
     return curve(lambda x: scalar * x**3, offset, deadband, max_mag, absolute_offset)
 
 
 def SnapX(x, y) -> float:
+    """Execute SnapX."""
     if abs(x) > abs(y):
         return x
     return 0.0
 
 
 def SnapY(x, y) -> float:
+    """Execute SnapY."""
     if abs(y) > abs(x):
         return y
     return 0.0

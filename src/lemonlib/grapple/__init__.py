@@ -1,3 +1,5 @@
+"""Module for   init  ."""
+
 from libgrapplefrc import (
     LaserCAN as _LaserCAN,
 )

@@ -1,3 +1,5 @@
+"""Module for elastic."""
+
 import json
 from enum import Enum
 
@@ -7,6 +9,7 @@ from wpinet import WebServer
 
 
 class NotificationLevel(Enum):
+    """NotificationLevel class."""
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"

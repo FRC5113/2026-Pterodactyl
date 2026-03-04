@@ -1,3 +1,5 @@
+"""Module for swagdrive."""
+
 from wpilib.drive import DifferentialDrive
 from wpiutil import Sendable
 
@@ -5,6 +7,7 @@ from lemonlib.smart.preference import SmartPreference
 
 
 class SwagDrive(Sendable):
+    """SwagDrive class."""
     maxspeed = SmartPreference(0.8)
     defspeed = SmartPreference(0.5)
     swagadd = SmartPreference(1)
@@ -13,6 +16,7 @@ class SwagDrive(Sendable):
     swagmulti = SmartPreference(10)
 
     def __init__(self, leftMotor, rightMotor):
+        """Execute __init__."""
         Sendable.__init__(self)
         self.leftMotor = leftMotor
         self.rightMotor = rightMotor
@@ -68,6 +72,7 @@ class SwagDrive(Sendable):
         self.oldRotate = rotateValue
 
     def initSendable(self, builder):
+        """Execute initSendable."""
         builder.setSmartDashboardType("SwagDrive")
         builder.addDoubleProperty("Swag Level", lambda: self.swagLevel, lambda _: None)
         builder.addDoubleProperty(

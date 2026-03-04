@@ -1,3 +1,5 @@
+"""Module for ledcontroller."""
+
 from typing import Tuple
 
 import wpimath.units
@@ -30,6 +32,7 @@ def _hsv_to_rgb255(h: float, s: float, v: float) -> tuple[int, int, int]:
 
 
 class LEDController:
+    """LEDController class."""
     def __init__(self, pwm_port: int, length: int, start_index: int = 0):
         """
         Initializes the LED controller.
@@ -56,6 +59,7 @@ class LEDController:
         self._set_data(self.buffer)
 
     def _write_data(self, index: int, color: Color):
+        """Execute _write_data."""
         self.buffer[index].setLED(color)
 
     def set_solid_color(self, color: Tuple[int, int, int]):

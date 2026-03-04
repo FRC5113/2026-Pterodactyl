@@ -1,3 +1,5 @@
+"""Module for preference."""
+
 from wpilib import Preferences, RobotController
 
 
@@ -35,6 +37,7 @@ class SmartPreference(object):
     _CACHE_PERIOD = 250_000  # microseconds between NT reads
 
     def __init__(self, value) -> None:
+        """Execute __init__."""
         self._value = value
         self._type = type(value)
         self._last_nt_read = 0.0
@@ -44,6 +47,7 @@ class SmartPreference(object):
             )
 
     def __set_name__(self, obj, name):
+        """Execute __set_name__."""
         try:
             self._low_bandwidth = obj.low_bandwidth
         except:
@@ -59,6 +63,7 @@ class SmartPreference(object):
             Preferences.initBoolean(self._key, self._value)
 
     def __get__(self, obj, objtype=None):
+        """Execute __get__."""
         if self._low_bandwidth:
             return self._value
         # Only re-read from NT periodically to avoid per-cycle overhead
@@ -79,6 +84,7 @@ class SmartPreference(object):
         return self._value
 
     def __set__(self, obj, value):
+        """Execute __set__."""
         if type(value) is not self._type:
             raise TypeError(
                 f"Set value type ({type(value)} does not match original ({self._type}))"

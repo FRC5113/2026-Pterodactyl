@@ -1,3 +1,5 @@
+"""Module for profile."""
+
 from phoenix6 import signals
 from phoenix6.configs import MotionMagicConfigs, Slot0Configs
 from wpilib import Preferences, SmartDashboard
@@ -66,6 +68,7 @@ class SmartProfile(Sendable):
             SmartDashboard.putData(f"SmartProfile/{profile_key}", self)
 
     def initSendable(self, builder: SendableBuilder):
+        """Execute initSendable."""
         builder.setSmartDashboardType("SmartController")
         for gain_key in self.gains:
             builder.addDoubleProperty(
@@ -76,13 +79,17 @@ class SmartProfile(Sendable):
             )
 
     def _set_gain(self, key: str, value: float):
+        """Execute _set_gain."""
         self.gains[key] = value
         if self.tuning_enabled:
             Preferences.setDouble(f"{self.profile_key}_{key}", value)
 
     def _requires(requirements: set[str]):
+        """Execute _requires."""
         def inner(func):
+            """Execute inner."""
             def wrapper(self, key, feedback_enabled=None):
+                """Execute wrapper."""
                 missing_reqs = requirements - set(self.gains.keys())
                 assert len(missing_reqs) == 0, (
                     f"Requires gains: {', '.join(missing_reqs)}"
@@ -290,6 +297,7 @@ class SmartProfile(Sendable):
         )
 
         def calculate(y, r):
+            """Execute calculate."""
             pid_output = pid.calculate(y, r)
             setpoint = pid.getSetpoint()
             # add acceleration eventually
@@ -323,6 +331,7 @@ class SmartProfile(Sendable):
         )
 
         def calculate(y, r):
+            """Execute calculate."""
             pid_output = pid.calculate(y, r)
             setpoint = pid.getSetpoint()
             # add acceleration eventually
@@ -359,6 +368,7 @@ class SmartProfile(Sendable):
             y,
             r,
         ):
+            """Execute calculate."""
             pid_output = pid.calculate(y, r)
             setpoint = pid.getSetpoint()
             # add acceleration eventually

@@ -1,3 +1,5 @@
+"""Module for auto base."""
+
 import math
 from typing import List
 
@@ -16,6 +18,7 @@ from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
+    """AutoBase class."""
     swerve_drive: SwerveDrive
     drive_control: DriveControl
     # odometry: Odometry
@@ -27,6 +30,7 @@ class AutoBase(AutonomousStateMachine):
     ROTATIONAL_SPEED_TOLERANCE = 0.1  # rad/s
 
     def __init__(self, sequence: List[str]) -> None:
+        """Execute __init__."""
         super().__init__()
 
         self.sequence = sequence  # List of trajectories and states
@@ -59,6 +63,7 @@ class AutoBase(AutonomousStateMachine):
                     )
 
     def on_enable(self) -> None:
+        """Execute on_enable."""
         starting_pose = self.get_starting_pose()
         if starting_pose is not None and RobotBase.isSimulation():
             self.swerve_drive.set_starting_pose(starting_pose)

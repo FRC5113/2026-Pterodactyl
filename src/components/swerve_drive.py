@@ -5,7 +5,8 @@ from magicbot import will_reset_to
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
-from wpilib import DriverStation, SmartDashboard, Timer
+from wpilib import DriverStation, RobotBase, SmartDashboard, Timer
+from phoenix6.swerve.swerve_drivetrain import SwerveDrivetrain as PhoenixSwerveDrivetrain
 from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
@@ -13,12 +14,12 @@ from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import (
     ChassisSpeeds,
     SwerveDrive4Kinematics,
-    SwerveModuleState,
+    SwerveModuleState
 )
 from wpiutil import SendableBuilder
 
 from generated.tuner_constants import TunerConstants
-from lemonlib import fms_feedback
+from lemonlib import fms_feedback # type: ignore
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
@@ -51,12 +52,14 @@ class SwerveDrive:  # (Sendable):
         # Avoids repeated get_state() calls (each copies C++ > Python objects).
         self.cached_pose = Pose2d()
         self.chassis_speeds = ChassisSpeeds()
-        self.swerve_module_states = (
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
-        )
+        self.swerve_module_states: tuple[
+            SwerveModuleState, SwerveModuleState, SwerveModuleState, SwerveModuleState
+        ] = (
+                SwerveModuleState(),
+                SwerveModuleState(),
+                SwerveModuleState(),
+                SwerveModuleState(),
+            )
 
     @staticmethod
     def shouldFlipPath():
@@ -79,7 +82,7 @@ class SwerveDrive:  # (Sendable):
             [tc.front_left, tc.front_right, tc.back_left, tc.back_right],
         )
 
-        self.kinematics: SwerveDrive4Kinematics = self.drivetrain.kinematics
+        self.kinematics: SwerveDrive4Kinematics = self.drivetrain.kinematics # type: ignore
 
         # Pre-built SwerveRequest objects (mutated in-place each cycle)
         self.field_centric_req = (
@@ -191,10 +194,10 @@ class SwerveDrive:  # (Sendable):
         ):
             _i = i  # capture for closures
 
-            def _vel(idx=_i):
+            def _vel(idx = _i) -> float: # type: ignore
                 return self.swerve_module_states[idx].speed * 5
 
-            def _ang(idx=_i):
+            def _ang(idx = _i) -> float: # type: ignore
                 return self.swerve_module_states[idx].angle.degrees()
 
             builder.addDoubleProperty(f"{label} Velocity", _vel, lambda _: None)
@@ -216,6 +219,23 @@ class SwerveDrive:  # (Sendable):
         SwerveModuleState, SwerveModuleState, SwerveModuleState, SwerveModuleState
     ]:
         return self.swerve_module_states
+    
+    def get_field_speeds(self) -> ChassisSpeeds:
+        """Get the current field-relative chassis speeds.
+        
+        Returns:
+            ChassisSpeeds in field-relative coordinates
+        """
+        pose = self.get_estimated_pose()
+        angle = pose.rotation().radians()
+        cos_angle = math.cos(angle)
+        sin_angle = math.sin(angle)
+        
+        # Convert robot-relative speeds to field-relative by rotating velocity vector
+        vx_field = self.chassis_speeds.vx * cos_angle - self.chassis_speeds.vy * sin_angle
+        vy_field = self.chassis_speeds.vx * sin_angle + self.chassis_speeds.vy * cos_angle
+        
+        return ChassisSpeeds(vx_field, vy_field, self.chassis_speeds.omega)
 
     @fms_feedback
     def get_distance_from_desired_pose(self) -> units.meters:
@@ -265,8 +285,10 @@ class SwerveDrive:  # (Sendable):
 
         for i in range(4):
             mod = self.drivetrain.get_module(i)
-            mod.steer_motor.configurator.apply(steer_slot0)
-            mod.drive_motor.configurator.apply(drive_slot0)
+            # Use short timeout in simulation to avoid blocking
+            timeout = 0.05 if RobotBase.isSimulation() else 0.5
+            mod.steer_motor.configurator.apply(steer_slot0, timeout)
+            mod.drive_motor.configurator.apply(drive_slot0, timeout)
 
     """
     CONTROL METHODS
@@ -414,7 +436,7 @@ class SwerveDrive:  # (Sendable):
         self.stopped = False
         return self.drive(speeds.vx, speeds.vy, speeds.omega, False)
 
-    def set_starting_pose(self, pose: Pose2d):
+    def set_starting_pose(self, pose: Pose2d | None):
         """ONLY USE IN SIM!"""
         self.starting_pose = pose
         if pose is not None:
@@ -427,24 +449,24 @@ class SwerveDrive:  # (Sendable):
     TELEMETRY
     """
 
-    def sendAdvantageScopeData(self, drive_state=None):
-        if not self.adv_scope_enabled:
+    def sendAdvantageScopeData(self, drive_state: PhoenixSwerveDrivetrain.SwerveDriveState | None = None):
+        if not self.adv_scope_enabled: # type: ignore
             return
         now = Timer.getFPGATimestamp()
-        if now - self.last_adv_scope_time < self.adv_scope_period:
+        if now - self.last_adv_scope_time < self.adv_scope_period: # type: ignore
             return
         self.last_adv_scope_time = now
 
-        swerve_setpoints = []
+        swerve_setpoints: list[float] = []
         for state in self.swerve_module_states:
             swerve_setpoints += [state.angle.degrees(), state.speed]
-        SmartDashboard.putNumberArray("Swerve Setpoints", swerve_setpoints)
+        SmartDashboard.putNumberArray("Swerve Setpoints", swerve_setpoints) # type: ignore
 
         if drive_state and drive_state.module_states:
-            swerve_measurements = []
+            swerve_measurements: list[float] = []
             for ms in drive_state.module_states:
                 swerve_measurements += [ms.angle.degrees(), ms.speed]
-            SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements)
+            SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements) # type: ignore
 
     def log(self, sys_id_routine: SysIdRoutineLog) -> None:
         """SysId logging: record voltage, position, and velocity for each drive motor."""
@@ -476,7 +498,7 @@ class SwerveDrive:  # (Sendable):
                 drive_state.speeds if drive_state.speeds else ChassisSpeeds()
             )
             if drive_state.module_states:
-                self.swerve_module_states = tuple(drive_state.module_states)
+                self.swerve_module_states = tuple(drive_state.module_states) # type: ignore
 
         self.sendAdvantageScopeData(drive_state)
 

@@ -1,3 +1,5 @@
+"""Module for lemon robot."""
+
 from typing import Callable, Dict, List
 
 import magicbot
@@ -22,6 +24,7 @@ class LemonRobot(magicbot.MagicRobot):
     watchdog_ema_alpha = SmartPreference(0.25)
 
     def __init__(self):
+        """Execute __init__."""
         super().__init__()
 
         self._periodic_callbacks: List[List] = []
@@ -39,10 +42,12 @@ class LemonRobot(magicbot.MagicRobot):
         self._smart_nt = SmartNT("LemonRobot")
 
     def add_periodic(self, callback: Callable[[], None], period: float):
+        """Execute add_periodic."""
         now = Timer.getFPGATimestamp()
         self._periodic_callbacks.append([callback, period, now])
 
     def _run_periodics(self):
+        """Execute _run_periodics."""
         now = Timer.getFPGATimestamp()
         for entry in self._periodic_callbacks:
             callback, period, last = entry
@@ -51,23 +56,29 @@ class LemonRobot(magicbot.MagicRobot):
                 callback()
 
     def autonomousPeriodic(self):
+        """Execute autonomousPeriodic."""
         pass
 
     def autonomous(self):
+        """Execute autonomous."""
         super().autonomous()
         self.autonomousPeriodic()
 
     def enabledperiodic(self) -> None:
+        """Execute enabledperiodic."""
         pass
 
     def _on_mode_enable_components(self):
+        """Execute _on_mode_enable_components."""
         super()._on_mode_enable_components()
         self.on_enable()
 
     def on_enable(self):
+        """Execute on_enable."""
         pass
 
     def _enabled_periodic(self) -> None:
+        """Execute _enabled_periodic."""
         watchdog = self.watchdog
 
         for name, component in self._components:
@@ -84,6 +95,7 @@ class LemonRobot(magicbot.MagicRobot):
         watchdog.addEpoch("periodics")
 
     def _do_periodics(self):
+        """Execute _do_periodics."""
         super()._do_periodics()
 
         if not self.watchdog_profile:
