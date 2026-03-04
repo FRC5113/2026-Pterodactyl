@@ -270,6 +270,10 @@ class MyRobot(LemonRobot):
         self.fuel_sim.set_subticks(1)
 
         self.fuel_sim.start()
+        self.fuel_sim.log_fuels()
+
+        print(f"First fuel at: {self.fuel_sim.fuels[0].pos}")
+        print(f"Total fuel count: {len(self.fuel_sim.fuels)}")
     
     def enabledperiodic(self) -> None:
         self.drive_control.engage()

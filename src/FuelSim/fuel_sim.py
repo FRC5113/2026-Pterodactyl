@@ -29,19 +29,7 @@ class FuelSim:
             self.pos = pos
             self.vel = vel if vel is not None else Translation3d()
 
-            self.blue_hub = FuelSim.Hub(
-                Translation2d(4.61, const.FIELD_WIDTH / 2),
-                Translation3d(5.3, const.FIELD_WIDTH / 2, 0.89),
-                1
-            )
-
-            self.red_hub = FuelSim.Hub(
-                Translation2d(const.FIELD_LENGTH - 4.61, const.FIELD_WIDTH / 2),
-                Translation3d(const.FIELD_LENGTH - 5.3, const.FIELD_WIDTH / 2, 0.89),
-                -1
-            )
-
-        def update(self, simulate_air_resistance: bool, subticks: int):
+        def update(self, simulate_air_resistance: bool, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub'):
             """Update fuel position and velocity."""
             self.pos = self.pos + self.vel * (const.PERIOD / subticks)
             
@@ -61,7 +49,7 @@ class FuelSim:
                 self.vel = Translation3d(self.vel.X(), self.vel.Y(), 0)
                 self.vel = self.vel * (1 - const.FRICTION * const.PERIOD / subticks)
 
-            self._handle_field_collisions(subticks)
+            self._handle_field_collisions(subticks, blue_hub, red_hub)
 
         def _handle_xz_line_collision(self, line_start: Translation3d, line_end: Translation3d):
             """Handle collision with a line in the XZ plane."""
@@ -96,7 +84,7 @@ class FuelSim:
             
             self.vel = self.vel - (normal * ((1 + const.FIELD_COR) * self.vel.dot(normal)))
 
-        def _handle_field_collisions(self, subticks: int):
+        def _handle_field_collisions(self, subticks: int, blue_hub: 'FuelSim.Hub', red_hub: 'FuelSim.Hub'):
             """Handle all field collisions."""
             # floor and bumps
             for i in range(len(const.FIELD_XZ_LINE_STARTS)):
@@ -122,8 +110,8 @@ class FuelSim:
                 self.vel = self.vel + Translation3d(0, -(1 + const.FIELD_COR) * self.vel.Y(), 0)
 
             # hubs
-            self.blue_hub.handle_hub_interaction(self, subticks)
-            self.red_hub.handle_hub_interaction(self, subticks)
+            blue_hub.handle_hub_interaction(self, subticks)
+            red_hub.handle_hub_interaction(self, subticks)
 
             self._handle_trench_collisions()
 
@@ -276,6 +264,18 @@ class FuelSim:
         self.logging_freq_hz = 10
         self.logging_timer = Timer()
 
+        # Create hubs once for the entire simulation
+        self.blue_hub = FuelSim.Hub(
+            Translation2d(4.61, const.FIELD_WIDTH / 2),
+            Translation3d(5.3, const.FIELD_WIDTH / 2, 0.89),
+            1
+        )
+        self.red_hub = FuelSim.Hub(
+            Translation2d(const.FIELD_LENGTH - 4.61, const.FIELD_WIDTH / 2),
+            Translation3d(const.FIELD_LENGTH - 5.3, const.FIELD_WIDTH / 2, 0.89),
+            -1
+        )
+
         self.fuel_publisher = NetworkTableInstance.getDefault() \
             .getStructArrayTopic(table_key + "/Fuels", Translation3d) \
             .publish()
@@ -370,7 +370,7 @@ class FuelSim:
         """Run the simulation forward 1 time step (0.02s)."""
         for _ in range(self.subticks):
             for fuel in self.fuels:
-                fuel.update(self.simulate_air_resistance, self.subticks)
+                fuel.update(self.simulate_air_resistance, self.subticks, self.blue_hub, self.red_hub)
 
             self._handle_fuel_collisions(self.fuels)
 
@@ -549,6 +549,19 @@ class FuelSim:
         if intake_callback is None:
             intake_callback = lambda: None
         self.intakes.append(FuelSim.SimIntake(x_min, x_max, y_min, y_max, able_to_intake, intake_callback))
+
+    def get_blue_score(self) -> int:
+        """Get the current blue alliance score."""
+        return self.blue_hub.get_score()
+
+    def get_red_score(self) -> int:
+        """Get the current red alliance score."""
+        return self.red_hub.get_score()
+
+    def reset_scores(self):
+        """Reset both hub scores to 0."""
+        self.blue_hub.reset_score()
+        self.red_hub.reset_score()
 
     class Hub:
         """Represents a hub on the field."""
