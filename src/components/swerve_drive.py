@@ -114,8 +114,11 @@ class SwerveDrive(Sendable):
         )
         self.x_brake_req = requests.SwerveDriveBrake()
         self.idle_req = requests.Idle()
-        self.sysid_translation_req = requests.SysIdSwerveTranslation()
-        self.sysid_rotation_req = requests.SysIdSwerveRotation()
+        # self.sysid_translation_req = requests.SysIdSwerveTranslation()
+        # self.sysid_rotation_req = requests.SysIdSwerveRotation()
+        from components.sysid_drive import SysIdDriveLinear, SysIdDriveRotation
+        self.sysid_drive_linear = SysIdDriveLinear()
+        self.sysid_drive_rotational = SysIdDriveRotation()
         self.apply_speeds_req = (
             requests.ApplyRobotSpeeds()
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
@@ -330,11 +333,11 @@ class SwerveDrive(Sendable):
 
     def sysid_drive(self, volts: float, rot: float = 0.0) -> None:
         self.stopped = False
-        self.pending_request = self.sysid_translation_req.with_volts(volts)
+        self.pending_request = self.sysid_drive_linear.drive_sysid(volts)
 
     def sysid_rot(self, volts: float, rot: float = 0.0) -> None:
         self.stopped = False
-        self.pending_request = self.sysid_rotation_req.with_rotational_rate(volts)
+        self.pending_request = self.sysid_drive_rotational.drive_sysid(volts)
 
     def set_desired_pose(self, pose: Pose2d):
         self.stopped = False
