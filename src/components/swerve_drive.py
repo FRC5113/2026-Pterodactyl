@@ -1,7 +1,7 @@
 import math
 
 from choreo.trajectory import SwerveSample
-from magicbot import will_reset_to, feedback
+from magicbot import will_reset_to
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
@@ -15,15 +15,14 @@ from wpimath.kinematics import (
     SwerveDrive4Kinematics,
     SwerveModuleState,
 )
-from wpiutil import SendableBuilder
+from wpiutil import Sendable, SendableBuilder
 
 from generated.tuner_constants import TunerConstants
-from lemonlib import fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
 
-class SwerveDrive:  # (Sendable):
+class SwerveDrive(Sendable):
     """Swerve drive using the Phoenix 6 Swerve API (SwerveDrivetrain).
 
     The underlying ``phoenix6.swerve.SwerveDrivetrain`` owns the hardware,
@@ -46,7 +45,7 @@ class SwerveDrive:  # (Sendable):
     stopped = will_reset_to(True)
 
     def __init__(self) -> None:
-        # Sendable.__init__(self)
+        Sendable.__init__(self)
         # Cached drivetrain state — updated once per execute() cycle.
         # Avoids repeated get_state() calls (each copies C++ > Python objects).
         self.cached_pose = Pose2d()
@@ -124,7 +123,7 @@ class SwerveDrive:  # (Sendable):
         )
 
         self.still_states = self.swerve_module_states
-        # SmartDashboard.putData("Swerve Drive", self)
+        SmartDashboard.putData("Swerve Drive", self)
 
         self.period = 0.02
         self.desired_pose = Pose2d()
@@ -139,7 +138,6 @@ class SwerveDrive:  # (Sendable):
 
         # Register telemetry callback (called from the odometry thread)
         # self.drivetrain.register_telemetry(self._telemetry_callback)
-
 
     def on_enable(self):
         # PID controllers for autonomous pose tracking
@@ -321,6 +319,14 @@ class SwerveDrive:  # (Sendable):
             .with_velocity_y(vy)
             .with_target_direction(Rotation2d(angle))
         )
+
+    def XBrake(self):
+        """
+        Sets the swerve drive module states to point inward on the robot in an "X"
+        fashion, creating a natural brake which will oppose any motion.
+        """
+        self.stopped = False
+        self.pending_request = self.x_brake_req
 
     def sysid_drive(self, volts: float, rot: float = 0.0) -> None:
         self.stopped = False

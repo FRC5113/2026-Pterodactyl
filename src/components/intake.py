@@ -12,7 +12,6 @@ from phoenix6.signals import (
 from wpilib import DutyCycleEncoder
 from wpimath import units
 
-from lemonlib import fms_feedback
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
@@ -40,6 +39,8 @@ class Intake:
     arm_voltage = will_reset_to(0.0)
     arm_manual_control = will_reset_to(False)
     arm_angle = will_reset_to(IntakeAngle.UP.value)
+
+    bypass_limits = will_reset_to(False)
 
     INTAKEUP = IntakeAngle.UP.value
     INTAKING = IntakeAngle.INTAKING.value
@@ -70,13 +71,21 @@ class Intake:
         self.right_encoder.setInverted(True)
 
         self.hinge_alert = Alert(
-            "intake hinge has rotated too far!", type=AlertType.ERROR
+            "intake hinge has rotated too far!", type=AlertType.WARNING
         )
 
         self.break_alert = Alert(
             "intake arm may be breaking! Check for mechanical issues.",
             type=AlertType.ERROR,
         )
+
+        self.bypass_alert = Alert(
+            "Bypassing intake limits!",
+            type=AlertType.WARNING,
+        )
+
+        self.prev_arm_voltage = 0.0
+        self.prev_spin_voltage = 0.0
 
     def on_enable(self):
         self.controller = self.profile.create_arm_controller("intake_arm")
@@ -123,6 +132,9 @@ class Intake:
     def set_arm_angle(self, angle: units.degrees):
         self.arm_angle = angle
 
+    def set_bypass_limits(self):
+        self.bypass_limits = True
+
     def execute(self):
         # Cache angle once per cycle for feedback and control use
         pos = self.get_position()
@@ -132,24 +144,33 @@ class Intake:
 
         # making sure we don't try to move the arm past its limits or break
         if abs(self.get_right_angle() - self.get_left_angle()) > 0.2:
-            self.arm_voltage = 0.0
+            if not self.bypass_limits:
+                self.arm_voltage = 0.0
             self.break_alert.enable()
             self.break_alert.set_text(
                 f"Intake arm may be breaking! Left: {self.get_left_angle():.2f}, Right: {self.get_right_angle():.2f}"
             )
         if pos > self.INTAKEUP:
-            self.arm_voltage = max(self.arm_voltage, 0)
+            if not self.bypass_limits:
+                self.arm_voltage = max(self.arm_voltage, 0)
             self.hinge_alert.enable()
             self.hinge_alert.set_text(
                 f"Intake hinge has rotated too far! Position: {pos:.2f}"
             )
         elif pos < self.INTAKING:
-            self.arm_voltage = min(self.arm_voltage, 0)
+            if not self.bypass_limits:
+                self.arm_voltage = min(self.arm_voltage, 0)
             self.hinge_alert.enable()
             self.hinge_alert.set_text(
                 f"Intake hinge has rotated too far! Position: {pos:.2f}"
             )
 
-        self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
-        self.left_motor.set_control(self.arm_follower)
-        self.spin_motor.set_control(self.spin_control.with_output(self.spin_voltage))
+        if self.arm_voltage != self.prev_arm_voltage:
+            self.prev_arm_voltage = self.arm_voltage
+            self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
+            self.left_motor.set_control(self.arm_follower)
+        if self.spin_voltage != self.prev_spin_voltage:
+            self.prev_spin_voltage = self.spin_voltage
+            self.spin_motor.set_control(
+                self.spin_control.with_output(self.spin_voltage)
+            )

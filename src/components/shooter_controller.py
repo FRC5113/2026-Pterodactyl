@@ -7,8 +7,6 @@ from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
-from lemonlib import fms_feedback
-from magicbot import feedback
 
 
 class ShooterController(StateMachine):
@@ -18,6 +16,9 @@ class ShooterController(StateMachine):
 
     at_speed = will_reset_to(False)
     shooting = will_reset_to(False)
+    unjamming = will_reset_to(False)
+    force_shoot_req = will_reset_to(False)
+    force_shoot_rps = will_reset_to(0.0)
 
     def setup(self):
 
@@ -55,6 +56,13 @@ class ShooterController(StateMachine):
 
     def request_shoot(self):
         self.shooting = True
+
+    def request_unjam(self):
+        self.unjamming = True
+
+    def request_force_shoot(self, rps: float):
+        self.force_shoot_req = True
+        self.force_shoot_rps = rps
 
     def _update_target(self):
         pose = self.swerve_drive.get_estimated_pose()
@@ -166,6 +174,11 @@ class ShooterController(StateMachine):
         else:
             self.shooter.set_velocity(0)
 
+        if self.unjamming:
+            self.next_state("unjam")
+        if self.force_shoot_req:
+            self.next_state("force_shoot")
+
         if self.shooting:
             self.next_state("spin_up")
 
@@ -176,6 +189,23 @@ class ShooterController(StateMachine):
             math.cos(self.target_angle - heading),
         )
         return abs(error) <= self.angle_tolerance
+
+    @state
+    def unjam(self):
+        self.shooter.set_kicker(-self.kicker_duty)
+        self.shooter.set_voltage(-self.kicker_duty)
+        if not self.unjamming:
+            self.next_state("idle")
+
+    @state
+    def force_shoot(self):
+        self.shooter.set_velocity(self.force_shoot_rps)
+        if abs(self.shooter.get_velocity() - self.target_rps) <= (
+            self.speed_tolerance * self.force_shoot_rps
+        ):
+            self.shooter.set_kicker(self.kicker_duty)
+        if not self.force_shoot_req:
+            self.next_state("idle")
 
     @state
     def spin_up(self):

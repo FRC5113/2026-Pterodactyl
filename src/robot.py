@@ -28,7 +28,7 @@ from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
-from lemonlib import LemonCamera, LemonInput, LemonRobot, fms_feedback
+from lemonlib import LemonCamera, LemonInput, LemonRobot
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import (
     AlertManager,
@@ -37,11 +37,9 @@ from lemonlib.util import (
     curve,
 )
 
-# globalProfiler = cProfile.Profile()
-
 
 class MyRobot(LemonRobot):
-    # led_strip: LEDStrip
+    led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -217,18 +215,18 @@ class MyRobot(LemonRobot):
             ox, -oy, 0.21, Rotation3d(0, 1.0472, (7 * math.pi) / 4)
         )
 
-        # self.camera_front_left = LemonCamera(
-        #     "Front_Left", self.temp_cam, self.field_layout
-        # )
-        # self.camera_front_right = LemonCamera(
-        #     "Front_Right", self.rtc_front_right, self.field_layout
-        # )
+        self.camera_front_left = LemonCamera(
+            "Front_Left", self.rtc_front_left, self.field_layout
+        )
+        self.camera_front_right = LemonCamera(
+            "Front_Right", self.rtc_front_right, self.field_layout
+        )
 
         self.camera_back_left = LemonCamera(
-            "Arducam OV9281 USB Camera", self.rtc_back_left, self.field_layout
+            "Back_Left", self.rtc_back_left, self.field_layout
         )
         self.camera_back_right = LemonCamera(
-            "PC_Camera", self.rtc_back_right, self.field_layout
+            "Back_Right", self.rtc_back_right, self.field_layout
         )
 
         """
@@ -242,7 +240,7 @@ class MyRobot(LemonRobot):
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
 
-        self.led_length = 112
+        self.led_length = 150
         self.leds = LEDController(2, self.led_length)
 
         # alerts
@@ -295,6 +293,12 @@ class MyRobot(LemonRobot):
         primary_rx = self.primary.getRightX()
         primary_ry = self.primary.getRightY()
 
+        secondary_left_bumper = self.secondary.getLeftBumper()
+        secondary_right_bumper = self.secondary.getRightBumper()
+
+        if self.secondary.getRightStickButton():
+            self.intake.set_bypass_limits()
+
         """
         SWERVE
         """
@@ -323,7 +327,7 @@ class MyRobot(LemonRobot):
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
 
-            if self.primary.getLeftBumper() or True:
+            if self.primary.getLeftBumper():
                 if abs(primary_rx) <= 0.0:
                     omega = 0.0
                 else:
@@ -341,6 +345,9 @@ class MyRobot(LemonRobot):
                     vx, vy, primary_rx, primary_ry
                 )
 
+            if self.primary.getCrossButton():
+                self.drive_control.Xbrake()
+
             if self.primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
 
@@ -348,9 +355,15 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-            if self.secondary.getLeftBumper():
+            if (
+                secondary_right_bumper
+                and secondary_left_bumper
+                and self.secondary.getAButton()
+            ):
+                self.intake.zero_encoders()
+            elif self.secondary.getLeftTriggerAxis() >= 0.8:
                 self.intake.set_voltage(8.0)
-            elif self.secondary.getRightBumper():
+            elif secondary_left_bumper:
                 self.intake.set_voltage(-8.0)
 
             if self.secondary.getBButton():
@@ -360,8 +373,8 @@ class MyRobot(LemonRobot):
                 self.intake.set_arm_voltage(8.0)
 
             if (
-                self.secondary.getRightBumper()
-                and self.secondary.getLeftBumper()
+                secondary_right_bumper
+                and secondary_left_bumper
                 and self.secondary.getAButton()
             ):
                 self.intake.zero_encoders()
@@ -371,21 +384,16 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if self.secondary.getRightTriggerAxis() >= 0.8:
-                # self.shooter_controller.request_shoot()
-                # print("[DEBUG-Chase] settining kicker")
-                self.shooter.set_kicker(8)
-
-            if self.secondary.getAButton():
-                self.shooter.set_velocity(self.flywheel_speed)
-
-            if self.secondary.getYButton():
-                self.shooter.set_velocity(15.0)
+                self.shooter_controller.request_shoot()
 
             if self.secondary.getStartButton():
-                # print("[DEBUG-Chase] settinging kicker")
-                self.shooter.set_voltage(-6)
-                self.shooter.set_kicker(-10)
+                self.shooter.set_velocity(15.0)
 
+            if self.secondary.getYButton():
+                self.shooter_controller.request_unjam()
+
+            if self.secondary.getAButton():
+                self.shooter_controller.request_force_shoot(47.5)
 
     def disabledPeriodic(self):
         # self.odometry.execute()
@@ -408,11 +416,11 @@ class MyRobot(LemonRobot):
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
 
-    # @feedback
+    @feedback
     def hub_status(self) -> bool:
         return is_alliance_hub_active()
 
-    # @feedback
+    @feedback
     def display_auto_state(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):
