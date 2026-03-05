@@ -1,7 +1,8 @@
-from magicbot import feedback, will_reset_to
+from magicbot import will_reset_to
 from wpilib import Color, DriverStation
 
 from components.swerve_drive import SwerveDrive
+from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
 
 
@@ -31,7 +32,7 @@ class LEDStrip:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_colors(self) -> list[str]:
         """Returns LED colors in list of hex strings"""
         return [Color(led.r, led.g, led.b).hexString() for led in self.leds.buffer]
@@ -47,6 +48,7 @@ class LEDStrip:
     """
 
     def justin_fun(self):
+        # I miss you justin
         self.justin_bool = True
 
     """
@@ -60,5 +62,7 @@ class LEDStrip:
             self.leds.set_solid_color(self.warning_color)
         elif DriverStation.isAutonomousEnabled():
             self.leds.move_across(self.auton_color, 20, 50)
+        elif is_alliance_hub_active():
+            self.leds.blink((255, 0, 0), (0, 0, 255), 1.0)
         else:
-            self.leds.scolling_rainbow()
+            self.leds.move_across((self.idle))

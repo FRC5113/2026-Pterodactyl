@@ -3,9 +3,10 @@ This test module imports tests that come with pyfrc, and can be used
 to test basic functionality of just about any robot.
 """
 
-from pyfrc.tests.basic import test_disabled, test_operator_control
+from pyfrc.tests.basic import test_disabled, test_operator_control, test_practice
 
 __all__ = (
     "test_disabled",
     "test_operator_control",
+    "test_practice",
 )

@@ -1,4 +1,4 @@
-from magicbot import will_reset_to
+from magicbot import feedback, will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
@@ -14,7 +14,6 @@ from phoenix6.signals import (
 )
 from wpimath import units
 
-from lemonlib import fms_feedback
 from lemonlib.smart import SmartProfile
 
 
@@ -52,6 +51,10 @@ class Shooter:
         )
         self.shooter_motors_config.current_limits.stator_current_limit_enable = True
 
+        self.shooter_motors_config.slot0 = (
+            self.shooter_profile.create_ctre_flywheel_controller()
+        )
+
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
@@ -85,6 +88,9 @@ class Shooter:
             self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
         )
 
+        self.prev_kicker_control = 0.0
+        self.prev_shooter_control = 0.0
+
     def on_enable(self):
         if self.tuning_enabled:
             self.shooter_controller = (
@@ -116,11 +122,11 @@ class Shooter:
     INFORMATIONAL METHODS
     """
 
-    @fms_feedback
+    @feedback
     def get_velocity(self) -> float:
         return self._cached_velocity
 
-    @fms_feedback
+    @feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 
@@ -128,18 +134,25 @@ class Shooter:
         # Cache velocity once per cycle for feedback and shooter_controller use
         self._cached_velocity = self.left_motor.get_velocity().value
 
-        self.right_kicker_motor.set_control(
-            self.voltage_control.with_output(self.kicker_duty)
-        )
-        self.left_kicker_motor.set_control(self.kicker_follower)
-        self.conveyor_motor.set_control(self.kicker_follower)
+        if self.kicker_duty != self.prev_kicker_control:
+            self.prev_kicker_control = self.kicker_duty
+            self.right_kicker_motor.set_control(
+                self.voltage_control.with_output(self.kicker_duty)
+            )
+            self.left_kicker_motor.set_control(self.kicker_follower)
+            self.conveyor_motor.set_control(self.kicker_follower)
 
         if self.manual_control:
-            self.right_motor.set_control(
-                self.voltage_control.with_output(self.shooter_voltage)
-            )
+            if self.shooter_voltage != self.prev_shooter_control:
+                self.prev_shooter_control = self.shooter_voltage
+                self.right_motor.set_control(
+                    self.voltage_control.with_output(self.shooter_voltage)
+                )
+                self.left_motor.set_control(self.shooter_follower)
         else:
-            self.right_motor.set_control(
-                self.shooter_control.with_velocity(self.shooter_velocity)
-            )
-        self.left_motor.set_control(self.shooter_follower)
+            if self.shooter_velocity != self.prev_shooter_control:
+                self.prev_shooter_control = self.shooter_velocity
+                self.right_motor.set_control(
+                    self.shooter_control.with_velocity(self.shooter_velocity)
+                )
+                self.left_motor.set_control(self.shooter_follower)

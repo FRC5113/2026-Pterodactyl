@@ -9,6 +9,8 @@ from wpilib import Field2d, RobotBase, SmartDashboard
 from wpimath.geometry import Pose2d
 
 from components.drive_control import DriveControl
+from components.intake import Intake, IntakeAngle
+from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 
 # from components.odometry import Odometry
@@ -16,8 +18,10 @@ from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
-    swerve_drive: SwerveDrive
+    shooter_controller: ShooterController
     drive_control: DriveControl
+    swerve_drive: SwerveDrive
+    intake: Intake
     # odometry: Odometry
     estimated_field: Field2d
 
@@ -33,7 +37,6 @@ class AutoBase(AutonomousStateMachine):
         self.current_step = -1
         self.trajectory_index = -1
         self.trajectories: list[SwerveTrajectory] = []
-        self.starting_pose = None
         SmartDashboard.putNumber("Distance", 0)
         SmartDashboard.putString("Final Pose", "none")
 
@@ -47,10 +50,6 @@ class AutoBase(AutonomousStateMachine):
                 case "trajectory":
                     try:
                         self.trajectories.append(choreo.load_swerve_trajectory(x[1]))
-                        if self.starting_pose is None and RobotBase.isSimulation():
-                            self.starting_pose = (
-                                self.get_starting_pose()
-                            )  # Get starting pose if in simulation
                     except ValueError:
                         print(f"WARNING: TRAJECTORY {x[1]} NOT FOUND")
                 case _:
@@ -78,10 +77,9 @@ class AutoBase(AutonomousStateMachine):
 
     def get_starting_pose(self) -> Pose2d | None:
         """Get the initial pose of the first trajectory."""
-        if self.trajectories[0].get_initial_pose(is_red()) is not None:
-            return self.trajectories[0].get_initial_pose(is_red())
-        else:
-            return Pose2d()  # Return default pose if not found
+        if not self.trajectories:
+            return None
+        return self.trajectories[0].get_initial_pose(is_red())
 
     def display_trajectory(self) -> None:
         """Display the trajectory on the estimated field."""
@@ -134,6 +132,8 @@ class AutoBase(AutonomousStateMachine):
         final_pose = self.current_trajectory.get_final_pose(
             is_red()
         )  # Get final pose of trajectory
+        if final_pose is None:
+            final_pose = Pose2d()
         distance = current_pose.translation().distance(
             final_pose.translation()
         )  # Calculate distance to final pose
@@ -146,17 +146,23 @@ class AutoBase(AutonomousStateMachine):
         )  # Calculate speed
         SmartDashboard.putString("Final Pose", f"{final_pose}")
 
+        in_distance_tolerance = distance < self.DISTANCE_TOLERANCE
+        in_angle_tolerance = abs(angle_error) < self.ANGLE_TOLERANCE
+        in_translational_speed_tolerance = speed < self.TRANSLATIONAL_SPEED_TOLERANCE
+        in_rotational_speed_tolerance = (
+            abs(velocity.omega) < self.ROTATIONAL_SPEED_TOLERANCE
+        )
+        is_in_second_half_of_trajectory = (
+            state_tm > self.current_trajectory.get_total_time() / 2.0
+        )
         if (
-            distance < self.DISTANCE_TOLERANCE
-            and math.isclose(angle_error, 0.0, abs_tol=self.ANGLE_TOLERANCE)
-            and math.isclose(speed, 0.0, abs_tol=self.TRANSLATIONAL_SPEED_TOLERANCE)
-            and math.isclose(
-                velocity.omega, 0.0, abs_tol=self.ROTATIONAL_SPEED_TOLERANCE
-            )
-            and state_tm > self.current_trajectory.get_total_time() / 2.0
+            in_distance_tolerance
+            and in_angle_tolerance
+            and in_translational_speed_tolerance
+            and in_rotational_speed_tolerance
+            and is_in_second_half_of_trajectory
         ):
             self.next_state("next_step")  # Move to next step if trajectory is complete
-            return
         sample = self.current_trajectory.sample_at(
             state_tm, is_red()
         )  # Sample trajectory at current time
@@ -169,17 +175,22 @@ class AutoBase(AutonomousStateMachine):
     STATES
     """
 
-    @state
+    @timed_state(duration=5.0, next_state="next_step")
     def shoot(self):
         """Placeholder for shooting state."""
-        print("Shooting State Placeholder")
-        self.next_state("next_step")
+        self.shooter_controller.request_shoot()
 
     @state
     def climb(self):
         """Placeholder for climbing state."""
         print("Climbing State Placeholder")
         self.next_state("next_step")
+
+    @timed_state(duration=3.0, next_state="next_step")
+    def go_forward_and_intake(self):
+        self.drive_control.drive_auto_manual(1, 0.0, 0.0, False)
+        self.intake.set_arm_angle(IntakeAngle.INTAKING.value)
+        self.intake.set_voltage(8)
 
     @timed_state(duration=5.0, next_state="next_step")
     def outpost_wait(self):

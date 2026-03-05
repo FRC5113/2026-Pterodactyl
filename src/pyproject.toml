@@ -24,6 +24,7 @@ components = [
 
 # Other pip packages to install
 requires = [
+    "robotpy-wpilib-utilities==2026.1.1",
     "phoenix6",
     "robotpy-rev",
     "sleipnirgroup-choreolib",

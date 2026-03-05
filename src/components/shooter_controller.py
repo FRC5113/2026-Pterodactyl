@@ -7,7 +7,6 @@ from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
-from lemonlib import fms_feedback
 
 
 class ShooterController(StateMachine):
@@ -17,17 +16,20 @@ class ShooterController(StateMachine):
 
     at_speed = will_reset_to(False)
     shooting = will_reset_to(False)
+    unjamming = will_reset_to(False)
+    force_shoot_req = will_reset_to(False)
+    force_shoot_rps = will_reset_to(0.0)
 
     def setup(self):
 
         # Meters
-        self.distance_lookup = [1.597, 4.597]  # TODO Tune these values
+        self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
         # RPS
-        self.speed_lookup = [43.0, 53.0]  # TODO Tune these values
+        self.speed_lookup = [41.95, 45.8, 48.9, 53.0]  # TODO Tune these values
 
         # Seconds — measured flight times at each distance
-        self.time_lookup = [1, 1]  # TODO Tune these values
+        self.time_lookup = [0.97, 1.21, 1.2, 1.2]  # TODO Tune these values
 
         self.target_rps = 0.0
         self.target_angle = 0.0
@@ -54,6 +56,13 @@ class ShooterController(StateMachine):
 
     def request_shoot(self):
         self.shooting = True
+
+    def request_unjam(self):
+        self.unjamming = True
+
+    def request_force_shoot(self, rps: float):
+        self.force_shoot_req = True
+        self.force_shoot_rps = rps
 
     def _update_target(self):
         pose = self.swerve_drive.get_estimated_pose()
@@ -140,15 +149,15 @@ class ShooterController(StateMachine):
     INFORMATIONAL METHODS
     """
 
-    @fms_feedback
+    # @feedback
     def get_target_rps(self):
         return self.target_rps
 
-    @fms_feedback
+    # @feedback
     def get_distance(self):
         return self.distance
 
-    @fms_feedback
+    # @feedback
     def is_at_speed(self):
         return self.at_speed
 
@@ -165,6 +174,11 @@ class ShooterController(StateMachine):
         else:
             self.shooter.set_velocity(0)
 
+        if self.unjamming:
+            self.next_state("unjam")
+        if self.force_shoot_req:
+            self.next_state("force_shoot")
+
         if self.shooting:
             self.next_state("spin_up")
 
@@ -175,6 +189,23 @@ class ShooterController(StateMachine):
             math.cos(self.target_angle - heading),
         )
         return abs(error) <= self.angle_tolerance
+
+    @state
+    def unjam(self):
+        self.shooter.set_kicker(-self.kicker_duty)
+        self.shooter.set_voltage(-self.kicker_duty)
+        if not self.unjamming:
+            self.next_state("idle")
+
+    @state
+    def force_shoot(self):
+        self.shooter.set_velocity(self.force_shoot_rps)
+        if abs(self.shooter.get_velocity() - self.target_rps) <= (
+            self.speed_tolerance * self.force_shoot_rps
+        ):
+            self.shooter.set_kicker(self.kicker_duty)
+        if not self.force_shoot_req:
+            self.next_state("idle")
 
     @state
     def spin_up(self):

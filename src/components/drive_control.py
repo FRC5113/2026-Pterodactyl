@@ -33,6 +33,7 @@ class DriveControl(StateMachine):
     point_joy_x = will_reset_to(0.0)
     point_joy_y = will_reset_to(0.0)
     sample = will_reset_to(None)  # Trajectory sample for autonomous path following
+    xbrake_req = will_reset_to(False)  # Request to engage X-brake mode
 
     def setup(self):
         pass
@@ -126,6 +127,10 @@ class DriveControl(StateMachine):
         self.field_relative = field_relative
         self.drive_auto_man = True
 
+    def Xbrake(self):
+        """Engage X-brake mode for maximum resistance to movement."""
+        self.xbrake_req = True
+
     @state(first=True)
     def initialise(self):
         """
@@ -160,12 +165,24 @@ class DriveControl(StateMachine):
             self.next_state("run_auton_routine")
         elif self.go_to_pose:
             self.next_state("going_to_pose")
+        elif self.xbrake_req:
+            self.next_state("x_brake_state")
         elif self.point_to_target:
             self.next_state("point_towards_target")
         elif self.point_joy_target:
             self.next_state("point_towards_joy")
         elif self.drive_sysid:
             self.next_state("drive_sysid_state")
+
+    @state
+    def x_brake_state(self):
+        """
+        State to engage X-brake mode, which points swerve modules inward to resist movement.
+        Exits when X-brake request is cleared.
+        """
+        self.swerve_drive.XBrake()
+        if not self.xbrake_req:
+            self.next_state("free")
 
     @state
     def point_towards_target(self):
@@ -197,7 +214,9 @@ class DriveControl(StateMachine):
             self.point_joy_x,
             self.point_joy_y,
         )
-        if not self.point_joy_target:
+        if self.xbrake_req:
+            self.next_state("x_brake_state")
+        elif not self.point_joy_target:
             self.next_state("free")
 
     @state
