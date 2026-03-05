@@ -201,7 +201,7 @@ class ShooterController(StateMachine):
     def force_shoot(self):
         self.shooter.set_velocity(self.force_shoot_rps)
         if abs(self.shooter.get_velocity() - self.target_rps) <= (
-            self.speed_tolerance * self.force_shoot_rps
+            10.0
         ):
             self.shooter.set_kicker(self.kicker_duty)
         if not self.force_shoot_req:

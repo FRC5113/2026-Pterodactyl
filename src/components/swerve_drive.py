@@ -22,7 +22,7 @@ from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
 
-class SwerveDrive(Sendable):
+class SwerveDrive: #(Sendable):
     """Swerve drive using the Phoenix 6 Swerve API (SwerveDrivetrain).
 
     The underlying ``phoenix6.swerve.SwerveDrivetrain`` owns the hardware,
@@ -45,7 +45,7 @@ class SwerveDrive(Sendable):
     stopped = will_reset_to(True)
 
     def __init__(self) -> None:
-        Sendable.__init__(self)
+        # Sendable.__init__(self)
         # Cached drivetrain state — updated once per execute() cycle.
         # Avoids repeated get_state() calls (each copies C++ > Python objects).
         self.cached_pose = Pose2d()
@@ -123,7 +123,7 @@ class SwerveDrive(Sendable):
         )
 
         self.still_states = self.swerve_module_states
-        SmartDashboard.putData("Swerve Drive", self)
+        # SmartDashboard.putData("Swerve Drive", self)
 
         self.period = 0.02
         self.desired_pose = Pose2d()
@@ -440,13 +440,13 @@ class SwerveDrive(Sendable):
         swerve_setpoints = []
         for state in self.swerve_module_states:
             swerve_setpoints += [state.angle.degrees(), state.speed]
-        SmartDashboard.putNumberArray("Swerve Setpoints", swerve_setpoints)
+        # SmartDashboard.putNumberArray("Swerve Setpoints", swerve_setpoints)
 
         if drive_state and drive_state.module_states:
             swerve_measurements = []
             for ms in drive_state.module_states:
                 swerve_measurements += [ms.angle.degrees(), ms.speed]
-            SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements)
+            # SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements)
 
     def log(self, sys_id_routine: SysIdRoutineLog) -> None:
         """SysId logging: record voltage, position, and velocity for each drive motor."""
@@ -480,6 +480,6 @@ class SwerveDrive(Sendable):
             if drive_state.module_states:
                 self.swerve_module_states = tuple(drive_state.module_states)
 
-        self.sendAdvantageScopeData(drive_state)
+        # self.sendAdvantageScopeData(drive_state)
 
         self.drivetrain.set_control(self.pending_request)

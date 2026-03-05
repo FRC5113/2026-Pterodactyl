@@ -39,7 +39,7 @@ from lemonlib.util import (
 
 
 class MyRobot(LemonRobot):
-    led_strip: LEDStrip
+    # led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -53,11 +53,11 @@ class MyRobot(LemonRobot):
     top_speed = SmartPreference(4.7)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate: SmartPreference = SmartPreference(8.0)
-    falling_slew_rate: SmartPreference = SmartPreference(20.0)
+    rasing_slew_rate= SmartPreference(8.0)
+    # falling_slew_rate = SmartPreference(20.0)
     firstRun = True
 
-    flywheel_speed = SmartPreference(30.0)
+    # flywheel_speed = SmartPreference(30.0)
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -66,7 +66,7 @@ class MyRobot(LemonRobot):
         can be found in one place. Also, attributes shared by multiple
         components, such as the NavX, need only be created once.
         """
-        self.tuning_enabled = True
+        self.tuning_enabled = False
 
         self.rio_canbus = CANBus.roborio()
 
@@ -259,11 +259,19 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        # self.shooter_controller.engage()
+        self.shooter_controller.engage()
 
     def autonomousInit(self):
         # globalProfiler.enable()
         pass
+
+    def robotPeriodic(self) -> None:
+        if self.tuning_enabled:
+            watchdog = self.watchdog
+            self.__sd_update()
+            watchdog.addEpoch("SmartDashboard")
+            self.__lv_update()
+            watchdog.addEpoch("LiveWindow")
 
     def autonomousPeriodic(self):
         self._display_auto_trajectory()
@@ -327,23 +335,23 @@ class MyRobot(LemonRobot):
                     self.sammi_curve(primary_lx) * mult * self.top_speed
                 )
 
-            if self.primary.getLeftBumper():
-                if abs(primary_rx) <= 0.0:
-                    omega = 0.0
-                else:
-                    omega = self.y_filter.calculate(
-                        self.sammi_curve(primary_rx) * self.top_omega
-                    )
-                self.drive_control.drive_manual(
-                    vx,
-                    vy,
-                    omega,
-                    not self.primary.getCreateButton(),  # temporary
-                )
-            else:
-                self.drive_control.drive_point_joy(  # Keaton mode
-                    vx, vy, primary_rx, primary_ry
-                )
+            # if self.primary.getLeftBumper():
+            # if abs(primary_rx) <= 0.0:
+            #     omega = 0.0
+            # else:
+            omega = self.y_filter.calculate(
+                self.sammi_curve(primary_rx) * self.top_omega
+            )
+            self.drive_control.drive_manual(
+                vx,
+                vy,
+                omega,
+                not self.primary.getCreateButton(),  # temporary
+            )
+            # else:
+            #     self.drive_control.drive_point_joy(  # Keaton mode
+            #         vx, vy, primary_rx, primary_ry
+            #     )
 
             if self.primary.getCrossButton():
                 self.drive_control.Xbrake()
@@ -367,17 +375,10 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(-8.0)
 
             if self.secondary.getBButton():
-                self.intake.set_arm_voltage(-8.0)
+                self.intake.set_arm_voltage(-4.0)
 
             if self.secondary.getXButton():
-                self.intake.set_arm_voltage(8.0)
-
-            if (
-                secondary_right_bumper
-                and secondary_left_bumper
-                and self.secondary.getAButton()
-            ):
-                self.intake.zero_encoders()
+                self.intake.set_arm_voltage(4.0)
 
         """
         SHOOTER
@@ -416,11 +417,11 @@ class MyRobot(LemonRobot):
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
 
-    @feedback
+    # @feedback
     def hub_status(self) -> bool:
         return is_alliance_hub_active()
 
-    @feedback
+    # @feedback
     def display_auto_state(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):

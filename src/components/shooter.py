@@ -75,15 +75,15 @@ class Shooter:
         self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
 
         self.conveyor_motor_configs = TalonFXSConfiguration()
-        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.COAST
+        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.conveyor_motor_configs.commutation.motor_arrangement = (
             MotorArrangementValue.NEO550_JST
         )
 
         self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
 
-        self.voltage_control = controls.VoltageOut(0).with_enable_foc(True)
-        self.duty_control = controls.DutyCycleOut(0).with_enable_foc(True)
+        self.voltage_control = controls.VoltageOut(0)
+        self.duty_control = controls.DutyCycleOut(0)
         self.kicker_follower = controls.Follower(
             self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
         )
@@ -122,11 +122,11 @@ class Shooter:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_velocity(self) -> float:
         return self._cached_velocity
 
-    @feedback
+    # @feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 
@@ -140,7 +140,7 @@ class Shooter:
                 self.voltage_control.with_output(self.kicker_duty)
             )
             self.left_kicker_motor.set_control(self.kicker_follower)
-            self.conveyor_motor.set_control(self.kicker_follower)
+            self.conveyor_motor.set_control(self.voltage_control.with_output(self.kicker_duty-2))
 
         if self.manual_control:
             if self.shooter_voltage != self.prev_shooter_control:

@@ -15,6 +15,8 @@ from wpimath import units
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
 
+from magicbot import feedback
+
 
 class IntakeAngle(enum.Enum):
     UP = 0.8
@@ -56,7 +58,7 @@ class Intake:
         self.spin_motor.configurator.apply(spin_config)
 
         arm_config = TalonFXConfiguration()
-        arm_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        arm_config.motor_output.neutral_mode = NeutralModeValue.COAST
         arm_config.current_limits.supply_current_limit = self.arm_amps
         self.left_motor.configurator.apply(arm_config)
         self.right_motor.configurator.apply(arm_config)
@@ -93,7 +95,7 @@ class Intake:
     """
     INFORMATIONAL METHODS
     """
-
+    @feedback
     def get_left_angle(self) -> units.degrees:
         pos = self.left_encoder.get() - self.left_offset
         if pos < 0.0:
@@ -101,7 +103,7 @@ class Intake:
         elif pos >= 1.0:
             pos -= 1.0
         return pos
-
+    @feedback
     def get_right_angle(self) -> units.degrees:
         pos = self.right_encoder.get() - self.right_offset
         if pos < 0.0:
@@ -110,7 +112,7 @@ class Intake:
             pos -= 1.0
         return pos
 
-    # @fms_feedback
+    @feedback
     def get_position(self) -> float:
         return (self.get_left_angle() + self.get_right_angle()) / 2
 
@@ -150,14 +152,14 @@ class Intake:
             self.break_alert.set_text(
                 f"Intake arm may be breaking! Left: {self.get_left_angle():.2f}, Right: {self.get_right_angle():.2f}"
             )
-        if pos > self.INTAKEUP:
+        if pos > (self.INTAKEUP + 0.1):
             if not self.bypass_limits:
                 self.arm_voltage = max(self.arm_voltage, 0)
             self.hinge_alert.enable()
             self.hinge_alert.set_text(
                 f"Intake hinge has rotated too far! Position: {pos:.2f}"
             )
-        elif pos < self.INTAKING:
+        elif pos < (self.INTAKING - 0.05) :
             if not self.bypass_limits:
                 self.arm_voltage = min(self.arm_voltage, 0)
             self.hinge_alert.enable()
