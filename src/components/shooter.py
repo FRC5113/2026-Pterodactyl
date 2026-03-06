@@ -79,7 +79,7 @@ class Shooter:
         self.conveyor_motor_configs = TalonFXSConfiguration()
         self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.conveyor_motor_configs.commutation.motor_arrangement = (
-            MotorArrangementValue.NEO550_JST
+            MotorArrangementValue.BRUSHED_DC
         )
 
         self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
@@ -144,7 +144,7 @@ class Shooter:
                 self.voltage_control.with_output(kicker_duty)
             )
             self.conveyor_motor.set_control(
-                self.voltage_control.with_output(kicker_duty - 2)
+                self.voltage_control.with_output(kicker_duty - 6)
             )
         if not self._kicker_follower_set:
             self._kicker_follower_set = True

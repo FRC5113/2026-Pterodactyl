@@ -1,6 +1,6 @@
 import math
 
-from magicbot import StateMachine, state, will_reset_to
+from magicbot import StateMachine, state, will_reset_to, feedback
 from wpilib import DriverStation
 
 from components.drive_control import DriveControl
@@ -44,8 +44,8 @@ class ShooterController(StateMachine):
         self.shooter_offsetX = 0.25  # meters forward of robot center
         self.shooter_offsetY = 0.0  # meters left (+) / right (-)
 
-        self.min_distance = 1.0
-        self.max_distance = 6.0
+        self.min_distance = 1.5
+        self.max_distance = 4.6
 
         self.idle_speed_scalar = 0.8
         self.kicker_duty = 8  # Volts
@@ -165,6 +165,10 @@ class ShooterController(StateMachine):
     # @feedback
     def is_at_speed(self):
         return self.at_speed
+    
+    @feedback
+    def is_valid_shot(self) -> bool:
+        return self.valid_shot
 
     """
     STATES

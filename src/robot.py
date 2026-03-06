@@ -69,8 +69,6 @@ class MyRobot(LemonRobot):
         """
         self.tuning_enabled = False
 
-        self.rio_canbus = CANBus.roborio()
-
         """
         SWERVE
         Swerve hardware (TalonFX drive/steer motors, CANcoders, Pigeon2)
@@ -143,7 +141,7 @@ class MyRobot(LemonRobot):
         self.intake_right_encoder = DutyCycleEncoder(DigitalInput(1))
 
         self.intake_spin_amps: units.amperes = 40.0
-        self.intake_arm_amps: units.amperes = 20.0
+        self.intake_arm_amps: units.amperes = 40.0
 
         self.intake_profile = SmartProfile(
             "intake",
@@ -163,8 +161,8 @@ class MyRobot(LemonRobot):
         """
         SHOOTER
         """
-        self.shooter_left_motor = TalonFX(2, self.rio_canbus)
-        self.shooter_right_motor = TalonFX(3, self.rio_canbus)
+        self.shooter_left_motor = TalonFX(2)
+        self.shooter_right_motor = TalonFX(3)
 
         self.shooter_gear_ratio = 1.0
         self.shooter_amps: units.amperes = 60.0
@@ -187,11 +185,11 @@ class MyRobot(LemonRobot):
         """
         INDEXER
         """
-        self.shooter_left_kicker_motor = TalonFXS(4, self.rio_canbus)
-        self.shooter_right_kicker_motor = TalonFXS(5, self.rio_canbus)
-        self.shooter_conveyor_motor = TalonFXS(6, self.rio_canbus)
-        self.shooter_kicker_amps: units.amperes = 20.0
-        self.shooter_conveyor_amps: units.amperes = 10.0
+        self.shooter_left_kicker_motor = TalonFXS(4)
+        self.shooter_right_kicker_motor = TalonFXS(5)
+        self.shooter_conveyor_motor = TalonFXS(6)
+        self.shooter_kicker_amps: units.amperes = 30.0
+        self.shooter_conveyor_amps: units.amperes = 30.0
         """
         ODOMETRY
         """
@@ -207,15 +205,15 @@ class MyRobot(LemonRobot):
         ox = 0.298
         oy = 0.298
         self.rtc_front_left = Transform3d(
-            0.0,
-            0.0,
-            0.0,
+            -0.279,
+            0.222,
+            0.229,
             Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(45)),
         )
         self.rtc_front_right = Transform3d(
-            0.0,
-            0.0,
-            0.0,
+            -0.279,
+            -0.222,
+            0.229,
             Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(-45)),
         )
         self.rtc_back_left = Transform3d(
@@ -256,8 +254,8 @@ class MyRobot(LemonRobot):
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
 
-        self.led_length = 150
-        self.leds = LEDController(2, self.led_length)
+        # self.led_length = 150
+        # self.leds = LEDController(2, self.led_length)
 
         # alerts
         AlertManager(self.logger)
@@ -311,12 +309,12 @@ class MyRobot(LemonRobot):
         primary_ly = primary.getLeftY()
         primary_lx = primary.getLeftX()
         primary_rx = primary.getRightX()
+        primary_ry = primary.getRightX()
 
         secondary_left_bumper = secondary.getLeftBumper()
         secondary_right_bumper = secondary.getRightBumper()
-
-        if secondary.getRightStickButton():
-            self.intake.set_bypass_limits()
+        secondary_right_stick_button = secondary.getRightStickButton()
+        secondary_left_stick_button = secondary.getLeftStickButton()
 
         """
         SWERVE
@@ -344,21 +342,24 @@ class MyRobot(LemonRobot):
             else:
                 vy = self.omega_filter.calculate(sammi(primary_lx) * mult * top_speed)
 
-            # if self.primary.getLeftBumper():
-            # if abs(primary_rx) <= 0.0:
-            #     omega = 0.0
-            # else:
-            omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
-            self.drive_control.drive_manual(
-                vx,
-                vy,
-                omega,
-                not primary.getCreateButton(),  # temporary
-            )
-            # else:
-            #     self.drive_control.drive_point_joy(  # Keaton mode
-            #         vx, vy, primary_rx, primary_ry
-            #     )
+            if self.primary.getLeftBumper():
+                if abs(primary_rx) <= 0.0:
+                    omega = 0.0
+                else:
+                    omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
+                    self.drive_control.drive_manual(
+                        vx,
+                        vy,
+                        omega,
+                        not primary.getCreateButton(),  # temporary
+                    )
+            else:
+                if primary.getCircleButton():
+                    self.drive_control.drive_point(vx,vy,self.shooter_controller.target_angle)
+                else:
+                    self.drive_control.drive_point_joy(  # Keaton mode
+                        vx, vy, primary_rx, primary_ry
+                    )
 
             if primary.getCrossButton():
                 self.drive_control.Xbrake()
@@ -370,13 +371,12 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-            if (
-                secondary_right_bumper
-                and secondary_left_bumper
-                and secondary.getAButton()
-            ):
+            if secondary_right_stick_button and secondary_left_stick_button:
                 self.intake.zero_encoders()
-            elif secondary.getLeftTriggerAxis() >= 0.8:
+            elif secondary_right_stick_button:
+                self.intake.set_bypass_limits()
+
+            if secondary.getLeftTriggerAxis() >= 0.8:
                 self.intake.set_voltage(8.0)
             elif secondary_left_bumper:
                 self.intake.set_voltage(-8.0)
@@ -387,6 +387,10 @@ class MyRobot(LemonRobot):
             if secondary.getXButton():
                 self.intake.set_arm_voltage(4.0)
 
+            if secondary_right_bumper:
+                self.shooter_controller.request_unjam()
+                self.intake.set_voltage(-8.0)
+
         """
         SHOOTER
         """
@@ -395,7 +399,7 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_shoot()
 
             if secondary.getStartButton():
-                self.shooter.set_velocity(15.0)
+                self.shooter_controller.request_force_shoot(15.0)
 
             if secondary.getYButton():
                 self.shooter_controller.request_unjam()
@@ -434,7 +438,3 @@ class MyRobot(LemonRobot):
         if isinstance(selected_auto, AutoBase):
             return selected_auto.current_state
         return "No Auto Selected"
-
-
-if __name__ == "__main__":
-    wpilib.run(MyRobot)

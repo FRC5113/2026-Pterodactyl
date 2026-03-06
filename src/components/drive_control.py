@@ -41,6 +41,9 @@ class DriveControl(StateMachine):
     def setup(self):
         pass
 
+    def on_enable(self):
+        self.point_target = self.swerve_drive.cached_pose.rotation().radians()
+
     def drive_manual(
         self,
         translationX: units.meters_per_second,
@@ -222,16 +225,6 @@ class DriveControl(StateMachine):
         elif not self.point_joy_target:
             self.next_state("free")
 
-    @state
-    def drive_sysid_state(self):
-        """
-        System identification state - applies constant voltage for characterization.
-        Exits when drive_sysid is no longer requested (resets each cycle via will_reset_to).
-        """
-        if not self.drive_sysid:
-            self.next_state("free")
-            return
-        self.swerve_drive.sysid_drive(self.sysid_volts)
 
     @state
     def going_to_pose(self):
