@@ -5,7 +5,7 @@ import choreo
 import choreo.util
 from choreo.trajectory import SwerveTrajectory
 from magicbot import AutonomousStateMachine, state, timed_state
-from wpilib import Field2d, RobotBase, SmartDashboard
+from wpilib import DriverStation, Field2d, RobotBase, SmartDashboard
 from wpimath.geometry import Pose2d
 
 from components.drive_control import DriveControl
@@ -37,21 +37,27 @@ class AutoBase(AutonomousStateMachine):
         self.current_step = -1
         self.trajectory_index = -1
         self.trajectories: list[SwerveTrajectory] = []
-        SmartDashboard.putNumber("Distance", 0)
-        SmartDashboard.putString("Final Pose", "none")
+        # Pre-parsed steps: list of (kind, name) tuples to avoid string splitting at runtime
+        self._parsed_steps: list[tuple[str, str]] = []
+        self._fms = DriverStation.isFMSAttached()
+        if not self._fms:
+            SmartDashboard.putNumber("Distance", 0)
+            SmartDashboard.putString("Final Pose", "none")
 
         # separates sequence in states and trajectories (which are tagged accordingly. if not tagged, will throw error)
         for item in self.sequence:
             x = item.split(":")  # divides into tag and name
             assert len(x) == 2  # asserts there were not multiple :'s in item
-            match x[0]:
+            kind, name = x
+            self._parsed_steps.append((kind, name))
+            match kind:
                 case "state":
                     pass
                 case "trajectory":
                     try:
-                        self.trajectories.append(choreo.load_swerve_trajectory(x[1]))
+                        self.trajectories.append(choreo.load_swerve_trajectory(name))
                     except ValueError:
-                        print(f"WARNING: TRAJECTORY {x[1]} NOT FOUND")
+                        print(f"WARNING: TRAJECTORY {name} NOT FOUND")
                 case _:
                     print(
                         'WARNING:Elements in sequence must be tagged with either "state:" or "trajectory"'
@@ -83,35 +89,34 @@ class AutoBase(AutonomousStateMachine):
 
     def display_trajectory(self) -> None:
         """Display the trajectory on the estimated field."""
-        self.estimated_field.getObject("trajectory").setPoses(
-            self._get_full_path_poses()
-        )
+        if not self._fms:
+            self.estimated_field.getObject("trajectory").setPoses(
+                self._get_full_path_poses()
+            )
 
     def on_disable(self) -> None:
         """Clear the trajectory display when disabled."""
         super().on_disable()
-        self.estimated_field.getObject("trajectory").setPoses(
-            []
-        )  # Clear trajectory display
+        if not self._fms:
+            self.estimated_field.getObject("trajectory").setPoses(
+                []
+            )  # Clear trajectory display
 
     @state(first=True)
     def next_step(self):
         """Moves to the next step in the sequence, determining if it's a trajectory or a state."""
         self.current_step += 1
-        if self.current_step >= len(self.sequence):
+        if self.current_step >= len(self._parsed_steps):
             self.done()
             return
 
-        step = self.sequence[self.current_step]  # Get the current step
-        if step.startswith("state:"):
-            state = step.split("state:")[1]  # Extract state name
-            if state not in self.state_names:
-                print(f"WARNING: STATE {state} NOT DEFINED")
-                # raise ReferenceError("State {state} not defined")
+        kind, name = self._parsed_steps[self.current_step]
+        if kind == "state":
+            if name not in self.state_names:
+                print(f"WARNING: STATE {name} NOT DEFINED")
                 self.next_state("next_step")
                 return
-
-            self.next_state(step.split("state:")[1])  # Go to the specified state
+            self.next_state(name)
         else:
             self.trajectory_index += 1
             self.current_trajectory = self.trajectories[
@@ -141,10 +146,9 @@ class AutoBase(AutonomousStateMachine):
             final_pose.rotation() - current_pose.rotation()
         ).radians()  # Calculate angle error
         velocity = self.swerve_drive.get_velocity()
-        speed = math.sqrt(
-            math.pow(velocity.vx, 2.0) + math.pow(velocity.vy, 2.0)
-        )  # Calculate speed
-        SmartDashboard.putString("Final Pose", f"{final_pose}")
+        speed = math.hypot(velocity.vx, velocity.vy)  # Calculate speed
+        if not self._fms:
+            SmartDashboard.putString("Final Pose", f"{final_pose}")
 
         in_distance_tolerance = distance < self.DISTANCE_TOLERANCE
         in_angle_tolerance = abs(angle_error) < self.ANGLE_TOLERANCE
@@ -169,7 +173,8 @@ class AutoBase(AutonomousStateMachine):
         if sample is not None:
             self.drive_control.drive_auto(sample)  # Drive using the sampled trajectory
 
-            SmartDashboard.putNumber("Distance", distance)
+            if not self._fms:
+                SmartDashboard.putNumber("Distance", distance)
 
     """
     STATES

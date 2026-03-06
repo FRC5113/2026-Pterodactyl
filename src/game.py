@@ -12,6 +12,10 @@ from wpimath.geometry import (
     Translation2d,
 )
 
+# Cache frequently used enum values
+_Alliance = wpilib.DriverStation.Alliance
+_RED = _Alliance.kRed
+
 apriltag_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
     robotpy_apriltag.AprilTagField.k2026RebuiltWelded
 )
@@ -107,7 +111,7 @@ def field_flip_translation2d(t: Translation2d):
 
 # This will default to the blue alliance if a proper link to the driver station has not yet been established
 def is_red() -> bool:
-    return wpilib.DriverStation.getAlliance() == wpilib.DriverStation.Alliance.kRed
+    return wpilib.DriverStation.getAlliance() == _RED
 
 
 def is_alliance_hub_active() -> bool:
@@ -139,11 +143,7 @@ def is_alliance_hub_active() -> bool:
             return True
 
     # Shift 1 is active for blue if red won auto, or red if blue won auto.
-    shift1_active = (
-        not red_inactive_first
-        if alliance == wpilib.DriverStation.Alliance.kRed
-        else red_inactive_first
-    )
+    shift1_active = not red_inactive_first if alliance == _RED else red_inactive_first
 
     if match_time > 130:
         return True  # Transition shift, hub is active

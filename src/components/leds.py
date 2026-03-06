@@ -65,4 +65,4 @@ class LEDStrip:
         elif is_alliance_hub_active():
             self.leds.blink((255, 0, 0), (0, 0, 255), 1.0)
         else:
-            self.leds.move_across((self.idle))
+            self.leds.move_across(self.idle)

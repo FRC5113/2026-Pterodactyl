@@ -1,6 +1,6 @@
 import enum
 
-from magicbot import will_reset_to
+from magicbot import feedback, will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import TalonFXConfiguration
 from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
@@ -14,8 +14,6 @@ from wpimath import units
 
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
-
-from magicbot import feedback
 
 
 class IntakeAngle(enum.Enum):
@@ -95,6 +93,7 @@ class Intake:
     """
     INFORMATIONAL METHODS
     """
+
     @feedback
     def get_left_angle(self) -> units.degrees:
         pos = self.left_encoder.get() - self.left_offset
@@ -103,6 +102,7 @@ class Intake:
         elif pos >= 1.0:
             pos -= 1.0
         return pos
+
     @feedback
     def get_right_angle(self) -> units.degrees:
         pos = self.right_encoder.get() - self.right_offset
@@ -138,19 +138,22 @@ class Intake:
         self.bypass_limits = True
 
     def execute(self):
-        # Cache angle once per cycle for feedback and control use
-        pos = self.get_position()
+        # Cache angles once per cycle — avoids re-reading encoders multiple times
+        left_angle = self.get_left_angle()
+        right_angle = self.get_right_angle()
+        pos = (left_angle + right_angle) * 0.5
 
         if not self.arm_manual_control:
             self.arm_voltage = self.controller.calculate(pos, self.arm_angle)
 
         # making sure we don't try to move the arm past its limits or break
-        if abs(self.get_right_angle() - self.get_left_angle()) > 0.2:
+        angle_diff = abs(right_angle - left_angle)
+        if angle_diff > 0.2:
             if not self.bypass_limits:
                 self.arm_voltage = 0.0
             self.break_alert.enable()
             self.break_alert.set_text(
-                f"Intake arm may be breaking! Left: {self.get_left_angle():.2f}, Right: {self.get_right_angle():.2f}"
+                f"Intake arm may be breaking! Left: {left_angle:.2f}, Right: {right_angle:.2f}"
             )
         if pos > (self.INTAKEUP + 0.1):
             if not self.bypass_limits:
@@ -159,7 +162,7 @@ class Intake:
             self.hinge_alert.set_text(
                 f"Intake hinge has rotated too far! Position: {pos:.2f}"
             )
-        elif pos < (self.INTAKING - 0.05) :
+        elif pos < (self.INTAKING - 0.05):
             if not self.bypass_limits:
                 self.arm_voltage = min(self.arm_voltage, 0)
             self.hinge_alert.enable()

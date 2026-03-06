@@ -7,6 +7,9 @@ from wpimath.geometry import Pose2d
 
 from components.swerve_drive import SwerveDrive
 
+_isAutonomousEnabled = DriverStation.isAutonomousEnabled
+_isTeleop = DriverStation.isTeleop
+
 
 class DriveControl(StateMachine):
     """
@@ -143,7 +146,7 @@ class DriveControl(StateMachine):
         self.field_relative = False
         if self.go_to_pose:
             self.next_state("going_to_pose")
-        elif DriverStation.isAutonomousEnabled():
+        elif _isAutonomousEnabled():
             self.next_state("run_auton_routine")
         else:
             self.next_state("free")
@@ -161,7 +164,7 @@ class DriveControl(StateMachine):
             self.field_relative,
         )
         # Check for state transitions in priority order
-        if DriverStation.isAutonomousEnabled():
+        if _isAutonomousEnabled():
             self.next_state("run_auton_routine")
         elif self.go_to_pose:
             self.next_state("going_to_pose")
@@ -248,7 +251,7 @@ class DriveControl(StateMachine):
         Drive commands come from auto_base.py which calls drive_auto() with samples.
         Returns to free state when teleop begins.
         """
-        if DriverStation.isTeleop():
+        if _isTeleop():
             self.next_state("free")
             return
         if self.drive_auto_man:
