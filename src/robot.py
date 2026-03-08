@@ -23,7 +23,7 @@ from components.drive_control import DriveControl
 from components.intake import Intake
 from components.leds import LEDStrip
 from components.odometry import Odometry
-from components.shooter import Shooter, ShooterSettings
+from components.shooter import Shooter, ShootSettings
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
@@ -39,7 +39,6 @@ from lemonlib.util import (
 
 class MyRobot(LemonRobot):
     # led_strip: LEDStrip
-    shooter_controller: ShooterController
 
     drive_control: DriveControl
     odometry: Odometry
@@ -258,7 +257,6 @@ class MyRobot(LemonRobot):
 
     def enabledperiodic(self):
         self.drive_control.engage()
-        self.shooter_controller.engage()
 
     def autonomousInit(self):
         # globalProfiler.enable()
@@ -388,13 +386,13 @@ class MyRobot(LemonRobot):
             "B - HIGH"
             "Y - Vibrate and Index"
             if self.secondary.getAButton():
-                self.shooter.set_shooter(ShooterSettings.LOW)
+                self.shooter.set_shooter(ShootSettings.LOW)
             elif self.secondary.getXButton():
-                self.shooter.set_shooter(ShooterSettings.MIDDLE)
+                self.shooter.set_shooter(ShootSettings.MIDDLE)
             elif self.secondary.getBButton():
-                self.shooter.set_shooter(ShooterSettings.HIGH)
+                self.shooter.set_shooter(ShootSettings.HIGH)
             else:
-                self.shooter.set_shooter(ShooterSettings.OFF)
+                self.shooter.set_shooter(ShootSettings.OFF)
 
             if self.secondary.getYButton():
                 self.shooter.vibrator_on()

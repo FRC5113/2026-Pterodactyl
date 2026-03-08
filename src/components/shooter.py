@@ -16,7 +16,7 @@ from wpimath import units
 import enum
 from lemonlib.smart import SmartProfile
 
-class ShooterSettings(enum.IntEnum):
+class ShootSettings(enum.IntEnum):
     HIGH = 1
     MIDDLE = 2
     LOW = 3
@@ -33,11 +33,11 @@ class Shooter:
     shooter_profile: SmartProfile
     shooter_gear_ratio: float
     shooter_amps: units.amperes
-    shooter_setting: ShooterSettings
+    _shoot_setting: ShootSettings
     setting_to_volt = {
-        ShooterSettings.LOW: 42,
-        ShooterSettings.MIDDLE: 46,
-        ShooterSettings.HIGH: 50
+        ShootSettings.LOW: 42,
+        ShootSettings.MIDDLE: 46,
+        ShootSettings.HIGH: 50
     }
     kicker_volts = 0
     def setup(self):
@@ -88,8 +88,8 @@ class Shooter:
 
 
 
-    def set_shooter(self, setting: ShooterSettings):
-        self.shooter_setting = setting
+    def set_shooter(self, setting: ShootSettings):
+        self._shoot_setting = setting
     def kicker_on(self):
         self.kicker_volts = 8
     def kicker_off(self):
@@ -100,10 +100,10 @@ class Shooter:
         self.vibrator_volts = 0
     def execute(self):
         self.right_motor.set_control(
-            self.shooter_control.with_velocity(self.setting_to_volt[self.shooter_setting])
+            self.shooter_control.with_velocity(self.setting_to_volt[self._shoot_setting])
         )
         self.left_motor.set_control(
-            self.shooter_control.with_velocity(-self.setting_to_volt[self.shooter_setting])
+            self.shooter_control.with_velocity(-self.setting_to_volt[self._shoot_setting])
         )
         self.right_kicker_motor.set_control(
             controls.VoltageOut(self.kicker_volts)

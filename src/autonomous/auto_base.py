@@ -10,7 +10,6 @@ from wpimath.geometry import Pose2d
 
 from components.drive_control import DriveControl
 from components.intake import Intake, IntakeAngle
-from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 
 # from components.odometry import Odometry
@@ -18,7 +17,6 @@ from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
-    shooter_controller: ShooterController
     drive_control: DriveControl
     swerve_drive: SwerveDrive
     intake: Intake
@@ -178,7 +176,7 @@ class AutoBase(AutonomousStateMachine):
     @timed_state(duration=5.0, next_state="next_step")
     def shoot(self):
         """Placeholder for shooting state."""
-        self.shooter_controller.request_shoot()
+        #self.shooter_controller.request_shoot()
 
     @state
     def climb(self):
