@@ -13,10 +13,14 @@ from phoenix6.signals import (
     NeutralModeValue,
 )
 from wpimath import units
-
+import enum
 from lemonlib.smart import SmartProfile
 
-
+class ShooterSettings(enum.IntEnum):
+    HIGH = 1
+    MIDDLE = 2
+    LOW = 3
+    OFF = 4
 class Shooter:
     """low level component that directly manages the shooter motors and their configuration. controlled by the shooter controller component, but can also be directly controlled for testing purposes"""
 
@@ -24,18 +28,18 @@ class Shooter:
     left_motor: TalonFX
     left_kicker_motor: TalonFXS
     right_kicker_motor: TalonFXS
-    conveyor_motor: TalonFXS
-
+    vibrator_motor: TalonFXS
+    vibrator_volts = 0
     shooter_profile: SmartProfile
     shooter_gear_ratio: float
     shooter_amps: units.amperes
-    tuning_enabled: bool
-
-    shooter_velocity = will_reset_to(0.0)
-    shooter_voltage = will_reset_to(0.0)
-    kicker_duty = will_reset_to(0.0)
-    manual_control = will_reset_to(False)
-
+    shooter_setting: ShooterSettings
+    setting_to_volt = {
+        ShooterSettings.LOW: 42,
+        ShooterSettings.MIDDLE: 46,
+        ShooterSettings.HIGH: 50
+    }
+    kicker_volts = 0
     def setup(self):
         self._cached_velocity = 0.0
         self.shooter_motors_config = TalonFXConfiguration()
@@ -80,79 +84,33 @@ class Shooter:
             MotorArrangementValue.NEO550_JST
         )
 
-        self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
+        self.vibrator_motor.configurator.apply(self.conveyor_motor_configs)
 
-        self.voltage_control = controls.VoltageOut(0)
-        self.duty_control = controls.DutyCycleOut(0)
-        self.kicker_follower = controls.Follower(
-            self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
-        )
 
-        self.prev_kicker_control = 0.0
-        self.prev_shooter_control = 0.0
 
-    def on_enable(self):
-        if self.tuning_enabled:
-            self.shooter_controller = (
-                self.shooter_profile.create_ctre_flywheel_controller()
-            )
-            self.left_motor.configurator.apply(
-                self.shooter_motors_config.with_slot0(self.shooter_controller)
-            )
-            self.right_motor.configurator.apply(
-                self.shooter_motors_config.with_slot0(self.shooter_controller)
-            )
-
-    """
-    CONTROL METHODS
-    """
-
-    def set_velocity(self, speed: float):
-        self.manual_control = False
-        self.shooter_velocity = speed
-
-    def set_voltage(self, volts: units.volts):
-        self.manual_control = True
-        self.shooter_voltage = volts
-
-    def set_kicker(self, value: float):
-        self.kicker_duty = value  # ha duty thats funny right there
-
-    """
-    INFORMATIONAL METHODS
-    """
-
-    # @feedback
-    def get_velocity(self) -> float:
-        return self._cached_velocity
-
-    # @feedback
-    def get_target_velocity(self) -> float:
-        return self.shooter_velocity
-
+    def set_shooter(self, setting: ShooterSettings):
+        self.shooter_setting = setting
+    def kicker_on(self):
+        self.kicker_volts = 8
+    def kicker_off(self):
+        self.kicker_volts = 0
+    def vibrator_on(self):
+        self.vibrator_volts = 8
+    def vibrator_off(self):
+        self.vibrator_volts = 0
     def execute(self):
-        # Cache velocity once per cycle for feedback and shooter_controller use
-        self._cached_velocity = self.left_motor.get_velocity().value
-
-        if self.kicker_duty != self.prev_kicker_control:
-            self.prev_kicker_control = self.kicker_duty
-            self.right_kicker_motor.set_control(
-                self.voltage_control.with_output(self.kicker_duty)
-            )
-            self.left_kicker_motor.set_control(self.kicker_follower)
-            self.conveyor_motor.set_control(self.voltage_control.with_output(self.kicker_duty-2))
-
-        if self.manual_control:
-            if self.shooter_voltage != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_voltage
-                self.right_motor.set_control(
-                    self.voltage_control.with_output(self.shooter_voltage)
-                )
-                self.left_motor.set_control(self.shooter_follower)
-        else:
-            if self.shooter_velocity != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_velocity
-                self.right_motor.set_control(
-                    self.shooter_control.with_velocity(self.shooter_velocity)
-                )
-                self.left_motor.set_control(self.shooter_follower)
+        self.right_motor.set_control(
+            self.shooter_control.with_velocity(self.setting_to_volt[self.shooter_setting])
+        )
+        self.left_motor.set_control(
+            self.shooter_control.with_velocity(-self.setting_to_volt[self.shooter_setting])
+        )
+        self.right_kicker_motor.set_control(
+            controls.VoltageOut(self.kicker_volts)
+        )
+        self.left_kicker_motor.set_control(
+            controls.VoltageOut(-self.kicker_volts)
+        )
+        self.vibrator_motor.set_control(
+            controls.VoltageOut(self.vibrator_volts)
+        )

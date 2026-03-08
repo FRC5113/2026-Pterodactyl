@@ -23,8 +23,7 @@ from components.drive_control import DriveControl
 from components.intake import Intake
 from components.leds import LEDStrip
 from components.odometry import Odometry
-from components.shooter import Shooter
-from components.shooter_controller import ShooterController
+from components.shooter import Shooter, ShooterSettings
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
@@ -188,7 +187,7 @@ class MyRobot(LemonRobot):
         """
         self.shooter_left_kicker_motor = TalonFXS(4, self.rio_canbus)
         self.shooter_right_kicker_motor = TalonFXS(5, self.rio_canbus)
-        self.shooter_conveyor_motor = TalonFXS(6, self.rio_canbus)
+        self.shooter_vibrator_motor = TalonFXS(6, self.rio_canbus)
         self.shooter_kicker_amps: units.amperes = 20.0
         self.shooter_conveyor_amps: units.amperes = 10.0
         """
@@ -384,17 +383,25 @@ class MyRobot(LemonRobot):
         SHOOTER
         """
         with self.consumeExceptions():
-            if self.secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter_controller.request_shoot()
-
-            if self.secondary.getStartButton():
-                self.shooter.set_velocity(15.0)
+            "A - LOW"
+            "X - MIDDLE"
+            "B - HIGH"
+            "Y - Vibrate and Index"
+            if self.secondary.getAButton():
+                self.shooter.set_shooter(ShooterSettings.LOW)
+            elif self.secondary.getXButton():
+                self.shooter.set_shooter(ShooterSettings.MIDDLE)
+            elif self.secondary.getBButton():
+                self.shooter.set_shooter(ShooterSettings.HIGH)
+            else:
+                self.shooter.set_shooter(ShooterSettings.OFF)
 
             if self.secondary.getYButton():
-                self.shooter_controller.request_unjam()
-
-            if self.secondary.getAButton():
-                self.shooter_controller.request_force_shoot(47.5)
+                self.shooter.vibrator_on()
+                self.shooter.kicker_on
+            else:
+                self.shooter.vibrator_off()
+                self.shooter.kicker_off() 
 
     def disabledPeriodic(self):
         # self.odometry.execute()
