@@ -1,6 +1,8 @@
-from magicbot import timed_state
+from magicbot import timed_state,AutonomousStateMachine
 
 from autonomous.auto_base import AutoBase
+from components.drive_control import DriveControl
+from components.shooter_controller import ShooterController 
 
 """
 Trajectories: (start with trajectory:)
@@ -23,6 +25,9 @@ class hard_code_shoot(AutoBase):
     MODE_NAME = "Hard Code Shoot"
     DEFAULT = True
 
+    drive_control: DriveControl
+    shooter_controller: ShooterController
+
     def __init__(self):
         super().__init__(
             [
@@ -31,7 +36,7 @@ class hard_code_shoot(AutoBase):
             ]
         )
 
-    @timed_state(duration=1.5, next_state="shoot")
+    @timed_state(duration=1.5, next_state="next_step")
     def move_back(self):
         self.drive_control.drive_auto_manual(
             translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
@@ -41,6 +46,36 @@ class hard_code_shoot(AutoBase):
     def shoot(self):
         self.shooter_controller.request_shoot()
 
+class hard_code_spin_shoot(AutoBase):
+    MODE_NAME = "Hard Code Spin Shoot"
+    
+    drive_control: DriveControl
+    shooter_controller: ShooterController
+
+    def __init__(self):
+        super().__init__(
+            [
+                "state:move_back",
+                "state:spin",
+                "state:shoot",
+            ]
+        )
+
+    @timed_state(duration=1.5, next_state="next_step")
+    def move_back(self):
+        self.drive_control.drive_auto_manual(
+            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
+        )
+        
+    @timed_state(duration=5, next_state="next_step")
+    def spin(self):
+        self.drive_control.drive_auto_manual(
+            translationX=0.0, translationY=0.0, rotationX=12.0, field_relative=False
+        )
+
+    @timed_state(duration=5.0, next_state="next_step")
+    def shoot(self):
+        self.shooter_controller.request_shoot()
 
 class hub_outpost_shoot(AutoBase):
     MODE_NAME = "H-Outpost>Shoot"

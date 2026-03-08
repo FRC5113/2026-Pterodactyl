@@ -159,7 +159,7 @@ class SwerveDrive(Sendable):
         heading_kd = rp.get("kD", 0.0)
         max_rot = rp.get("kMaxV", 0)
         for req in (self.facing_angle_req, self.facing_angle_field_req):
-            req.with_heading_pid(heading_kp, heading_ki, heading_kd)
+            req.with_heading_pid(7, 0, 0)
             if max_rot > 0:
                 req.with_max_abs_rotational_rate(max_rot)
 
@@ -347,7 +347,7 @@ class SwerveDrive(Sendable):
             self.pending_request = self.apply_speeds_req.with_speeds(speeds)
 
     def reset_gyro(self) -> None:
-        self.drivetrain.seed_field_centric(Rotation2d().fromDegrees(180))
+        self.drivetrain.seed_field_centric()
         self.pigeon_alert.enable()
 
     def addVisionPoseEstimate(self, pose: Pose2d, timestamp: units.seconds):

@@ -23,7 +23,6 @@ class ShooterController(StateMachine):
     force_shoot_rps = will_reset_to(0.0)
 
     def setup(self):
-
         # Meters
         self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
@@ -44,8 +43,8 @@ class ShooterController(StateMachine):
         self.shooter_offsetX = 0.25  # meters forward of robot center
         self.shooter_offsetY = 0.0  # meters left (+) / right (-)
 
-        self.min_distance = 1.5
-        self.max_distance = 4.6
+        self.min_distance = 1
+        self.max_distance = 6
 
         self.idle_speed_scalar = 0.8
         self.kicker_duty = 8  # Volts
@@ -178,10 +177,7 @@ class ShooterController(StateMachine):
     def idle(self):
         self._update_target()
 
-        if self.valid_shot:
-            self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
-        else:
-            self.shooter.set_velocity(0)
+        self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
 
         if self.unjamming:
             self.next_state("unjam")
@@ -216,18 +212,18 @@ class ShooterController(StateMachine):
     def spin_up(self):
         self._update_target()
 
-        if not self.valid_shot:
-            self.next_state("idle")
-            return
+        # if not self.valid_shot:
+        #     self.next_state("idle")
+        #     return
 
         self.shooter.set_velocity(self.target_rps)
-        self.drive_control.point_to(self.target_angle)
+        # self.drive_control.point_to(self.target_angle)
 
         tolerance = self.speed_tolerance * self.target_rps
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
-        aim_ready = self._is_aimed()
+        # aim_ready = self._is_aimed()
 
-        self.at_speed = speed_ready and aim_ready
+        self.at_speed = speed_ready #and aim_ready
 
         if not self.shooting:
             self.next_state("idle")
@@ -238,18 +234,18 @@ class ShooterController(StateMachine):
     def shoot(self):
         self._update_target()
 
-        if not self.valid_shot:
-            self.next_state("idle")
-            return
+        # if not self.valid_shot:
+        #     self.next_state("idle")
+        #     return
 
-        self.drive_control.point_to(self.target_angle)
+        # self.drive_control.point_to(self.target_angle)
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
-        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
-        aim_ready = self._is_aimed()
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= (10.0)
+        # aim_ready = self._is_aimed()
 
-        self.at_speed = speed_ready and aim_ready
+        self.at_speed = speed_ready# and aim_ready
 
         if not self.shooting:
             self.next_state("idle")
