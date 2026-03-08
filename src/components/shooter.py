@@ -127,11 +127,11 @@ class Shooter:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_velocity(self) -> float:
         return self._cached_velocity
 
-    @feedback
+    # @feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 
