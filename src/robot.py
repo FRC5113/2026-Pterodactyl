@@ -18,7 +18,9 @@ from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
-from autonomous.auto_base import AutoBase
+from autonomous import auto
+from components.swerve_drive import SwerveDrive
+from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
 from components.intake import Intake
 from components.leds import LEDStrip
@@ -53,11 +55,10 @@ class MyRobot(LemonRobot):
     top_speed = SmartPreference(4.7)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate= SmartPreference(8.0)
-    # falling_slew_rate = SmartPreference(20.0)
-    firstRun = True
-
-    # flywheel_speed = SmartPreference(30.0)
+    rasing_slew_rate: SmartPreference = SmartPreference(5.0)
+    falling_slew_rate: SmartPreference = SmartPreference(5.0)
+    intake: Intake
+    auto_context: auto.AutoContext
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -262,19 +263,16 @@ class MyRobot(LemonRobot):
         self.shooter_controller.engage()
 
     def autonomousInit(self):
-        # globalProfiler.enable()
-        pass
-
-    def robotPeriodic(self) -> None:
-        if self.tuning_enabled:
-            watchdog = self.watchdog
-            self.__sd_update()
-            watchdog.addEpoch("SmartDashboard")
-            self.__lv_update()
-            watchdog.addEpoch("LiveWindow")
+        self.auto_context = auto.AutoContext(
+            sd=self.swerve_drive,
+            sh=self.shooter,
+            it=self.intake,
+            sc=self.shooter_controller,
+        )
+        auto.tempAutoRoutine.reset()
 
     def autonomousPeriodic(self):
-        self._display_auto_trajectory()
+        auto.tempAutoRoutine.run(self.auto_context)
 
     def teleopInit(self):
         # globalProfiler.enable()
@@ -412,21 +410,7 @@ class MyRobot(LemonRobot):
         #     self.firstRun = False
         pass
 
-    def _display_auto_trajectory(self) -> None:
-        selected_auto = self._automodes.chooser.getSelected()
-        if isinstance(selected_auto, AutoBase):
-            selected_auto.display_trajectory()
 
-    # @feedback
-    def hub_status(self) -> bool:
-        return is_alliance_hub_active()
-
-    # @feedback
-    def display_auto_state(self) -> None:
-        selected_auto = self._automodes.chooser.getSelected()
-        if isinstance(selected_auto, AutoBase):
-            return selected_auto.current_state
-        return "No Auto Selected"
 
 
 if __name__ == "__main__":
