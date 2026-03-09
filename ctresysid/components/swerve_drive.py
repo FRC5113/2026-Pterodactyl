@@ -103,7 +103,6 @@ class SwerveDrive(Sendable):
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0,0.0,0.0)
         )
         # Field-absolute version (no operator-perspective rotation) — used by
         # the shooter controller whose target_angle is already in field coords.
@@ -114,7 +113,6 @@ class SwerveDrive(Sendable):
             .with_forward_perspective(requests.ForwardPerspectiveValue.BLUE_ALLIANCE)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0,0.0,0.0)
         )
         self.x_brake_req = requests.SwerveDriveBrake()
         self.idle_req = requests.Idle()
@@ -153,6 +151,17 @@ class SwerveDrive(Sendable):
         self.holonomic_controller = HolonomicDriveController(
             self.x_controller, self.y_controller, self.theta_controller
         )
+
+        # Sync facing-angle request PID from the rotation profile
+        rp = self.rotation_profile.gains
+        heading_kp = rp.get("kP", 7.0)
+        heading_ki = rp.get("kI", 0.0)
+        heading_kd = rp.get("kD", 0.0)
+        max_rot = rp.get("kMaxV", 0)
+        for req in (self.facing_angle_req, self.facing_angle_field_req):
+            req.with_heading_pid(heading_kp, heading_ki, heading_kd)
+            if max_rot > 0:
+                req.with_max_abs_rotational_rate(max_rot)
 
         # Apply steer & drive gains from SmartProfiles to all modules
         if self.tuning_enabled:
@@ -321,6 +330,18 @@ class SwerveDrive(Sendable):
         self.stopped = False
         self.pending_request = self.x_brake_req
 
+    def sysid_drive(self, volts: units.volts) -> None:
+        self.stopped = False
+        self.pending_request = self.sysid_translation_req.with_volts(volts)
+
+    def sysid_rot(self, volts: units.volts) -> None:
+        self.stopped = False
+        self.pending_request = self.sysid_rotation_req.with_rotational_rate(volts)
+
+    def sysid_steer(self, volts: units.volts) -> None:
+        self.stopped = False
+        self.pending_request = self.sysid_steer_req.with_volts(volts)
+
     def apply_control(self, control: requests.SwerveRequest) -> None:
         self.stopped = False
         self.pending_request = control
@@ -338,7 +359,7 @@ class SwerveDrive(Sendable):
             self.pending_request = self.apply_speeds_req.with_speeds(speeds)
 
     def reset_gyro(self) -> None:
-        self.drivetrain.seed_field_centric()
+        self.drivetrain.seed_field_centric(Rotation2d().fromDegrees(180))
         self.pigeon_alert.enable()
 
     def addVisionPoseEstimate(self, pose: Pose2d, timestamp: units.seconds):
@@ -364,6 +385,43 @@ class SwerveDrive(Sendable):
             field_speeds.vx, field_speeds.vy, field_speeds.omega, rot
         )
         self.pending_request = self.apply_speeds_req.with_speeds(robot_speeds)
+
+    def point_towards_joy(
+        self,
+        rightX: float,
+        rightY: float,
+        translationX: units.meters_per_second = 0.0,
+        translationY: units.meters_per_second = 0.0,
+        field_relative: bool = True,
+    ):
+        """Point the robot in the direction the right joystick is pushed.
+        Uses operator-perspective so "push forward" = face away from driver."""
+        self.stopped = False
+        moved = abs(rightX) > 0.707 or abs(rightY) > 0.707
+        if not moved:
+            self.drive(translationX, translationY, 0.0, field_relative)
+            return
+        angle = math.atan2(rightY, rightX)
+        self.pending_request = (
+            self.facing_angle_req.with_velocity_x(translationX)
+            .with_velocity_y(translationY)
+            .with_target_direction(Rotation2d(angle))
+        )
+
+    def point_towards(
+        self,
+        angle: units.radians,
+        translationX: units.meters_per_second = 0.0,
+        translationY: units.meters_per_second = 0.0,
+    ):
+        """Point the robot at a field-absolute angle while translating.
+        Used by the shooter controller."""
+        self.stopped = False
+        self.pending_request = (
+            self.facing_angle_field_req.with_velocity_x(translationX)
+            .with_velocity_y(translationY)
+            .with_target_direction(Rotation2d(angle))
+        )
 
     def driveRobotRelative(self, speeds: ChassisSpeeds):
         self.stopped = False
@@ -400,6 +458,18 @@ class SwerveDrive(Sendable):
             for ms in drive_state.module_states:
                 swerve_measurements += [ms.angle.degrees(), ms.speed]
             # SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements)
+
+    def log(self, sys_id_routine: SysIdRoutineLog) -> None:
+        """SysId logging: record voltage, position, and velocity for each drive motor."""
+        for i, name in enumerate(("fl", "fr", "rl", "rr")):
+            mod = self.drivetrain.get_module(i)
+            drive_motor = mod.drive_motor
+            sys_id_routine.motor(f"swerve/drive/{name}").voltage(
+                drive_motor.get_motor_voltage().value
+            ).position(drive_motor.get_position().value).velocity(
+                drive_motor.get_velocity().value
+            )
+
     """
     EXECUTE
     """

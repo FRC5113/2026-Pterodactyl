@@ -1,12 +1,14 @@
 import math
 
-from magicbot import StateMachine, state, will_reset_to
+from magicbot import StateMachine, state, will_reset_to, feedback
 from wpilib import DriverStation
 
 from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
+
+_RED = DriverStation.Alliance.kRed
 
 
 class ShooterController(StateMachine):
@@ -20,8 +22,9 @@ class ShooterController(StateMachine):
     force_shoot_req = will_reset_to(False)
     force_shoot_rps = will_reset_to(0.0)
 
-    def setup(self):
+    forceshoottolgood = will_reset_to(False)
 
+    def setup(self):
         # Meters
         self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
@@ -42,8 +45,8 @@ class ShooterController(StateMachine):
         self.shooter_offsetX = 0.25  # meters forward of robot center
         self.shooter_offsetY = 0.0  # meters left (+) / right (-)
 
-        self.min_distance = 1.0
-        self.max_distance = 6.0
+        self.min_distance = 1.597
+        self.max_distance = 4.597
 
         self.idle_speed_scalar = 0.8
         self.kicker_duty = 8  # Volts
@@ -66,71 +69,18 @@ class ShooterController(StateMachine):
 
     def _update_target(self):
         pose = self.swerve_drive.get_estimated_pose()
-        chassis = self.swerve_drive.get_velocity()
-
-        is_red = DriverStation.getAlliance() == DriverStation.Alliance.kRed
+        is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)
 
-        future_x = pose.x + chassis.vx * self.phase_delay
-        future_y = pose.y + chassis.vy * self.phase_delay
-        future_heading = pose.rotation().radians() + chassis.omega * self.phase_delay
+        distance = math.hypot((hub_pos.y - pose.y),(hub_pos.x - pose.x))
+        self.distance = distance
 
-        cos_h = math.cos(future_heading)
-        sin_h = math.sin(future_heading)
-
-        launcher_x = (
-            future_x + self.shooter_offsetX * cos_h - self.shooter_offsetY * sin_h
+        self.target_angle = math.atan2(
+            hub_pos.y - pose.y, hub_pos.x - pose.x
         )
 
-        launcher_y = (
-            future_y + self.shooter_offsetX * sin_h + self.shooter_offsetY * cos_h
-        )
-
-        rot_vx = -chassis.omega * self.shooter_offsetY
-        rot_vy = chassis.omega * self.shooter_offsetX
-
-        launcher_vx = chassis.vx + rot_vx
-        launcher_vy = chassis.vy + rot_vy
-
-        predicted_x = hub_pos.x
-        predicted_y = hub_pos.y
-
-        lookahead_distance = math.hypot(
-            predicted_x - launcher_x,
-            predicted_y - launcher_y,
-        )
-
-        for _ in range(self.lead_iterations):
-            time_of_flight = self._linear_interp(
-                lookahead_distance,
-                self.distance_lookup,
-                self.time_lookup,
-            )
-
-            offset_x = launcher_vx * time_of_flight
-            offset_y = launcher_vy * time_of_flight
-
-            predicted_x = hub_pos.x - offset_x
-            predicted_y = hub_pos.y - offset_y
-
-            lookahead_distance = math.hypot(
-                predicted_x - launcher_x,
-                predicted_y - launcher_y,
-            )
-
-        dx = predicted_x - launcher_x
-        dy = predicted_y - launcher_y
-
-        self.distance = lookahead_distance
-        self.target_angle = math.atan2(dy, dx)
-
-        self.target_rps = self._linear_interp(
-            self.distance,
-            self.distance_lookup,
-            self.speed_lookup,
-        )
-
-        self.valid_shot = self.min_distance <= self.distance <= self.max_distance
+        self.target_rps = self._linear_interp(distance,self.distance_lookup,self.speed_lookup)
+        self.valid_shot = self.min_distance <= distance <= self.max_distance
 
     def _linear_interp(self, x, xp, fp):
         if x <= xp[0]:
@@ -160,6 +110,14 @@ class ShooterController(StateMachine):
     # @feedback
     def is_at_speed(self):
         return self.at_speed
+    
+    @feedback
+    def is_valid_shot(self) -> bool:
+        return self.valid_shot
+    
+
+    def get_force_good(self):
+        return self.forceshoottolgood
 
     """
     STATES
@@ -168,11 +126,10 @@ class ShooterController(StateMachine):
     @state(first=True)
     def idle(self):
         self._update_target()
-
         if self.valid_shot:
             self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
         else:
-            self.shooter.set_velocity(0)
+            self.shooter.set_velocity(0.0)
 
         if self.unjamming:
             self.next_state("unjam")
@@ -184,10 +141,8 @@ class ShooterController(StateMachine):
 
     def _is_aimed(self):
         heading = self.swerve_drive.get_estimated_pose().rotation().radians()
-        error = math.atan2(
-            math.sin(self.target_angle - heading),
-            math.cos(self.target_angle - heading),
-        )
+        diff = self.target_angle - heading
+        error = math.atan2(math.sin(diff), math.cos(diff))
         return abs(error) <= self.angle_tolerance
 
     @state
@@ -200,9 +155,8 @@ class ShooterController(StateMachine):
     @state
     def force_shoot(self):
         self.shooter.set_velocity(self.force_shoot_rps)
-        if abs(self.shooter.get_velocity() - self.target_rps) <= (
-            10.0
-        ):
+        if abs(self.shooter.get_velocity() - self.target_rps) <= (10.0):
+            self.forceshoottolgood = True
             self.shooter.set_kicker(self.kicker_duty)
         if not self.force_shoot_req:
             self.next_state("idle")
@@ -241,7 +195,7 @@ class ShooterController(StateMachine):
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
-        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= (10.0)
         aim_ready = self._is_aimed()
 
         self.at_speed = speed_ready and aim_ready

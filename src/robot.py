@@ -4,10 +4,8 @@
 import math
 
 import wpilib
-from magicbot import feedback
 from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
-from robotpy_apriltag import AprilTagField, AprilTagFieldLayout
 from wpilib import (
     DigitalInput,
     DriverStation,
@@ -17,16 +15,17 @@ from wpilib import (
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
+import robotpy_apriltag
+from magicbot import feedback
 
 from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
 from components.intake import Intake
-from components.leds import LEDStrip
 from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
-from game import is_alliance_hub_active
+from game import apriltag_layout, is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot
 from lemonlib.smart import SmartPreference, SmartProfile
@@ -53,7 +52,7 @@ class MyRobot(LemonRobot):
     top_speed = SmartPreference(4.7)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate= SmartPreference(8.0)
+    rasing_slew_rate = SmartPreference(8.0)
     # falling_slew_rate = SmartPreference(20.0)
     firstRun = True
 
@@ -67,8 +66,6 @@ class MyRobot(LemonRobot):
         components, such as the NavX, need only be created once.
         """
         self.tuning_enabled = False
-
-        self.rio_canbus = CANBus.roborio()
 
         """
         SWERVE
@@ -141,7 +138,7 @@ class MyRobot(LemonRobot):
         self.intake_left_encoder = DutyCycleEncoder(DigitalInput(0))
         self.intake_right_encoder = DutyCycleEncoder(DigitalInput(1))
 
-        self.intake_spin_amps: units.amperes = 40.0
+        self.intake_spin_amps: units.amperes = 20.0
         self.intake_arm_amps: units.amperes = 20.0
 
         self.intake_profile = SmartProfile(
@@ -162,11 +159,11 @@ class MyRobot(LemonRobot):
         """
         SHOOTER
         """
-        self.shooter_left_motor = TalonFX(2, self.rio_canbus)
-        self.shooter_right_motor = TalonFX(3, self.rio_canbus)
+        self.shooter_left_motor = TalonFX(2)
+        self.shooter_right_motor = TalonFX(3)
 
         self.shooter_gear_ratio = 1.0
-        self.shooter_amps: units.amperes = 60.0
+        self.shooter_amps: units.amperes = 40.0
 
         self.shooter_angle = 23  # degrees
 
@@ -186,9 +183,9 @@ class MyRobot(LemonRobot):
         """
         INDEXER
         """
-        self.shooter_left_kicker_motor = TalonFXS(4, self.rio_canbus)
-        self.shooter_right_kicker_motor = TalonFXS(5, self.rio_canbus)
-        self.shooter_conveyor_motor = TalonFXS(6, self.rio_canbus)
+        self.shooter_left_kicker_motor = TalonFXS(4)
+        self.shooter_right_kicker_motor = TalonFXS(5)
+        self.shooter_conveyor_motor = TalonFXS(6)
         self.shooter_kicker_amps: units.amperes = 20.0
         self.shooter_conveyor_amps: units.amperes = 10.0
         """
@@ -199,20 +196,37 @@ class MyRobot(LemonRobot):
         #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
         # )
 
-        self.field_layout = AprilTagFieldLayout.loadField(
-            AprilTagField.k2026RebuiltWelded
+        # Reuse the field layout already loaded in game.py
+        self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
+            robotpy_apriltag.AprilTagField.k2026RebuiltWelded
         )
 
         # Robot to Camera Transforms
         ox = 0.298
         oy = 0.298
-        self.rtc_front_left = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, 45))
-        self.rtc_front_right = Transform3d(0.0, 0.0, 0.0, Rotation3d(0, 30, -45))
+        self.rtc_front_left = Transform3d(
+            -0.279,
+            0.222,
+            0.229,
+            Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(45)),
+        )
+        self.rtc_front_right = Transform3d(
+            -0.279,
+            -0.222,
+            0.229,
+            Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(-45)),
+        )
         self.rtc_back_left = Transform3d(
-            -ox, -oy, 0.21, Rotation3d(0, 1.0472, (5 * math.pi) / 4)
+            -ox,
+            -oy,
+            0.21,
+            Rotation3d(0, units.degreesToRadians(10), units.degreesToRadians(135)),
         )
         self.rtc_back_right = Transform3d(
-            ox, -oy, 0.21, Rotation3d(0, 1.0472, (7 * math.pi) / 4)
+            ox,
+            -oy,
+            0.21,
+            Rotation3d(0, units.degreesToRadians(10), units.degreesToRadians(-135)),
         )
 
         self.camera_front_left = LemonCamera(
@@ -240,8 +254,8 @@ class MyRobot(LemonRobot):
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
 
-        self.led_length = 150
-        self.leds = LEDController(2, self.led_length)
+        # self.led_length = 150
+        # self.leds = LEDController(2, self.led_length)
 
         # alerts
         AlertManager(self.logger)
@@ -265,16 +279,9 @@ class MyRobot(LemonRobot):
         # globalProfiler.enable()
         pass
 
-    def robotPeriodic(self) -> None:
-        if self.tuning_enabled:
-            watchdog = self.watchdog
-            self.__sd_update()
-            watchdog.addEpoch("SmartDashboard")
-            self.__lv_update()
-            watchdog.addEpoch("LiveWindow")
-
     def autonomousPeriodic(self):
-        self._display_auto_trajectory()
+        if not self.fms:
+            self._display_auto_trajectory()
 
     def teleopInit(self):
         # globalProfiler.enable()
@@ -294,18 +301,20 @@ class MyRobot(LemonRobot):
         # Cache inputs called multiple times
 
     def teleopPeriodic(self):
-        primary_r2 = self.primary.getR2Axis()
-        primary_l2 = self.primary.getL2Axis()
-        primary_ly = self.primary.getLeftY()
-        primary_lx = self.primary.getLeftX()
-        primary_rx = self.primary.getRightX()
-        primary_ry = self.primary.getRightY()
+        primary = self.primary
+        secondary = self.secondary
 
-        secondary_left_bumper = self.secondary.getLeftBumper()
-        secondary_right_bumper = self.secondary.getRightBumper()
+        primary_r2 = primary.getR2Axis()
+        primary_l2 = primary.getL2Axis()
+        primary_ly = primary.getLeftY()
+        primary_lx = primary.getLeftX()
+        primary_rx = primary.getRightX()
+        primary_ry = primary.getRightX()
 
-        if self.secondary.getRightStickButton():
-            self.intake.set_bypass_limits()
+        secondary_left_bumper = secondary.getLeftBumper()
+        secondary_right_bumper = secondary.getRightBumper()
+        secondary_right_stick_button = secondary.getRightStickButton()
+        secondary_left_stick_button = secondary.getLeftStickButton()
 
         """
         SWERVE
@@ -322,79 +331,82 @@ class MyRobot(LemonRobot):
                 mult = 1.0
 
             # only apply the curve and slew rate if the input is above the deadband, otherwise set to 0 to avoid useless math
-            if abs(primary_ly) <= 0.0:
+            sammi = self.sammi_curve
+            top_speed = self.top_speed
+            if abs(primary_ly) < 0.1:
                 vx = 0.0
             else:
-                vx = self.x_filter.calculate(
-                    self.sammi_curve(primary_ly) * mult * self.top_speed
-                )
-            if abs(primary_lx) <= 0.0:
+                vx = self.x_filter.calculate(sammi(primary_ly) * mult * top_speed)
+            if abs(primary_lx) < 0.1:
                 vy = 0.0
             else:
-                vy = self.omega_filter.calculate(
-                    self.sammi_curve(primary_lx) * mult * self.top_speed
-                )
+                vy = self.omega_filter.calculate(sammi(primary_lx) * mult * top_speed)
 
             # if self.primary.getLeftBumper():
-            # if abs(primary_rx) <= 0.0:
-            #     omega = 0.0
-            # else:
-            omega = self.y_filter.calculate(
-                self.sammi_curve(primary_rx) * self.top_omega
-            )
-            self.drive_control.drive_manual(
-                vx,
-                vy,
-                omega,
-                not self.primary.getCreateButton(),  # temporary
-            )
-            # else:
-            #     self.drive_control.drive_point_joy(  # Keaton mode
-            #         vx, vy, primary_rx, primary_ry
-            #     )
+            if abs(primary_rx) <= 0.0:
+                omega = 0.0
+            else:
+                omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
 
-            if self.primary.getCrossButton():
+            if primary.getTriangleButton():
+                self.drive_control.drive_point(vx,vy,0.0)
+            elif primary.getCircleButton():
+                self.drive_control.drive_point(vx,vy,self.shooter_controller.target_angle)
+            else:
+                self.drive_control.drive_manual(
+                    vx,
+                    vy,
+                    omega,
+                    not primary.getCreateButton(),  # temporary
+                )
+                
+            if primary.getCrossButton():
                 self.drive_control.Xbrake()
 
-            if self.primary.getSquareButton():
+            if primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
 
         """
         INTAKE
         """
         with self.consumeExceptions():
-            if (
-                secondary_right_bumper
-                and secondary_left_bumper
-                and self.secondary.getAButton()
-            ):
+            if secondary_right_stick_button and secondary_left_stick_button:
                 self.intake.zero_encoders()
-            elif self.secondary.getLeftTriggerAxis() >= 0.8:
+            elif secondary_right_stick_button:
+                self.intake.set_bypass_limits()
+
+            if secondary.getLeftTriggerAxis() >= 0.8:
                 self.intake.set_voltage(8.0)
             elif secondary_left_bumper:
                 self.intake.set_voltage(-8.0)
 
-            if self.secondary.getBButton():
-                self.intake.set_arm_voltage(-4.0)
+            if secondary.getRightTriggerAxis() >= 0.8:
+                self.intake.set_arm_voltage(0.25)
 
-            if self.secondary.getXButton():
-                self.intake.set_arm_voltage(4.0)
+            if secondary.getRightBumper():
+                self.intake.set_arm_voltage(-0.25)
 
         """
         SHOOTER
         """
         with self.consumeExceptions():
-            if self.secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter_controller.request_shoot()
+            # if secondary.getRightTriggerAxis() >= 0.8:
+            #     self.shooter_controller.request_shoot()
 
-            if self.secondary.getStartButton():
-                self.shooter.set_velocity(15.0)
+            if secondary.getStartButton():
+                self.shooter_controller.request_force_shoot(15.0)
 
-            if self.secondary.getYButton():
+            if secondary.getYButton():
                 self.shooter_controller.request_unjam()
 
-            if self.secondary.getAButton():
+            if secondary.getAButton():
                 self.shooter_controller.request_force_shoot(47.5)
+
+            if secondary.getBButton():
+                self.shooter_controller.request_force_shoot(30)
+
+            if secondary.getXButton():
+                self.shooter_controller.request_force_shoot(50.0)
 
     def disabledPeriodic(self):
         # self.odometry.execute()
@@ -421,13 +433,9 @@ class MyRobot(LemonRobot):
     def hub_status(self) -> bool:
         return is_alliance_hub_active()
 
-    # @feedback
+    @feedback
     def display_auto_state(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):
             return selected_auto.current_state
         return "No Auto Selected"
-
-
-if __name__ == "__main__":
-    wpilib.run(MyRobot)

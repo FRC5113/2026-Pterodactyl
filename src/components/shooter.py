@@ -1,4 +1,4 @@
-from magicbot import feedback, will_reset_to
+from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
@@ -13,6 +13,7 @@ from phoenix6.signals import (
     NeutralModeValue,
 )
 from wpimath import units
+from magicbot import feedback
 
 from lemonlib.smart import SmartProfile
 
@@ -34,10 +35,13 @@ class Shooter:
     shooter_velocity = will_reset_to(0.0)
     shooter_voltage = will_reset_to(0.0)
     kicker_duty = will_reset_to(0.0)
+    conveyor_volt = will_reset_to(0.0)
     manual_control = will_reset_to(False)
 
     def setup(self):
         self._cached_velocity = 0.0
+        self._kicker_follower_set = False
+        self._shooter_follower_set = False
         self.shooter_motors_config = TalonFXConfiguration()
         self.shooter_motors_config.motor_output.neutral_mode = NeutralModeValue.COAST
         self.shooter_motors_config.feedback = (
@@ -59,7 +63,7 @@ class Shooter:
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
         self.shooter_control = (
-            controls.VelocityVoltage(0).with_enable_foc(True).with_slot(0)
+            controls.VelocityVoltage(0).with_slot(0)
         )
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
@@ -77,7 +81,7 @@ class Shooter:
         self.conveyor_motor_configs = TalonFXSConfiguration()
         self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.conveyor_motor_configs.commutation.motor_arrangement = (
-            MotorArrangementValue.NEO550_JST
+            MotorArrangementValue.BRUSHED_DC
         )
 
         self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
@@ -117,6 +121,7 @@ class Shooter:
 
     def set_kicker(self, value: float):
         self.kicker_duty = value  # ha duty thats funny right there
+        self.conveyor_volt = 4.5
 
     """
     INFORMATIONAL METHODS
@@ -134,25 +139,31 @@ class Shooter:
         # Cache velocity once per cycle for feedback and shooter_controller use
         self._cached_velocity = self.left_motor.get_velocity().value
 
-        if self.kicker_duty != self.prev_kicker_control:
-            self.prev_kicker_control = self.kicker_duty
+        kicker_duty = self.kicker_duty
+        if kicker_duty != self.prev_kicker_control:
+            self.prev_kicker_control = kicker_duty
+            self._kicker_follower_set = False
             self.right_kicker_motor.set_control(
-                self.voltage_control.with_output(self.kicker_duty)
+                self.voltage_control.with_output(kicker_duty)
             )
             self.left_kicker_motor.set_control(self.kicker_follower)
-            self.conveyor_motor.set_control(self.voltage_control.with_output(self.kicker_duty-2))
+            self.conveyor_motor.set_control(
+                self.voltage_control.with_output(self.conveyor_volt)
+            )
+
 
         if self.manual_control:
-            if self.shooter_voltage != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_voltage
+            shooter_voltage = self.shooter_voltage
+            if shooter_voltage != self.prev_shooter_control:
+                self.prev_shooter_control = shooter_voltage
                 self.right_motor.set_control(
-                    self.voltage_control.with_output(self.shooter_voltage)
+                    self.voltage_control.with_output(shooter_voltage)
                 )
-                self.left_motor.set_control(self.shooter_follower)
         else:
-            if self.shooter_velocity != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_velocity
+            shooter_velocity = self.shooter_velocity
+            if shooter_velocity != self.prev_shooter_control:
+                self.prev_shooter_control = shooter_velocity
                 self.right_motor.set_control(
-                    self.shooter_control.with_velocity(self.shooter_velocity)
+                    self.shooter_control.with_velocity(shooter_velocity)
                 )
                 self.left_motor.set_control(self.shooter_follower)
