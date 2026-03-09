@@ -56,17 +56,17 @@ class Intake:
         self.spin_motor.configurator.apply(spin_config)
 
         arm_config = TalonFXConfiguration()
-        arm_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        arm_config.motor_output.neutral_mode = NeutralModeValue.COAST
         arm_config.current_limits.supply_current_limit = self.arm_amps
         self.left_motor.configurator.apply(arm_config)
         self.right_motor.configurator.apply(arm_config)
 
-        self.arm_control = controls.DutyCycleOut(0).with_enable_foc(True)
+        self.arm_control = controls.DutyCycleOut(0)
         self.arm_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
         )
 
-        self.spin_control = controls.VoltageOut(0).with_enable_foc(True)
+        self.spin_control = controls.VoltageOut(0)
 
         self.right_encoder.setInverted(True)
 
@@ -167,7 +167,7 @@ class Intake:
         # if self.arm_voltage != self.prev_arm_voltage:
         self.prev_arm_voltage = self.arm_voltage
         self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
-        self.left_motor.set_control(self.arm_control.with_output(-self.arm_voltage))
+        self.left_motor.set_control(self.arm_follower)
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage
             self.spin_motor.set_control(

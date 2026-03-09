@@ -63,7 +63,7 @@ class Shooter:
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
         self.shooter_control = (
-            controls.VelocityVoltage(0).with_enable_foc(True).with_slot(0)
+            controls.VelocityVoltage(0).with_slot(0)
         )
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
@@ -121,7 +121,7 @@ class Shooter:
 
     def set_kicker(self, value: float):
         self.kicker_duty = value  # ha duty thats funny right there
-        self.conveyor_volt = 2.0
+        self.conveyor_volt = 4.5
 
     """
     INFORMATIONAL METHODS

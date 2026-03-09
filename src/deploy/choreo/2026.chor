@@ -69,6 +69,20 @@
      "val":0.0
     }
    },
+   "hubfront_faceaway":{
+    "x":{
+     "exp":"3.5 m",
+     "val":3.5
+    },
+    "y":{
+     "exp":"4.04 m",
+     "val":4.04
+    },
+    "heading":{
+     "exp":"3.1415 rad",
+     "val":3.1415
+    }
+   },
    "left_ball_enter":{
     "x":{
      "exp":"7.021 m",

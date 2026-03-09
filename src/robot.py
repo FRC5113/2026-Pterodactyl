@@ -349,7 +349,7 @@ class MyRobot(LemonRobot):
                 omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
 
             if primary.getTriangleButton():
-                self.drive_control.drive_manual(0.0,0.0,8.0,False)
+                self.drive_control.drive_point(vx,vy,0.0)
             elif primary.getCircleButton():
                 self.drive_control.drive_point(vx,vy,self.shooter_controller.target_angle)
             else:
@@ -359,13 +359,7 @@ class MyRobot(LemonRobot):
                     omega,
                     not primary.getCreateButton(),  # temporary
                 )
-            # else:
-
-            #     else:
-            #         self.drive_control.drive_point_joy(  # Keaton mode
-            #             vx, vy, primary_rx, primary_ry
-            #         )
-
+                
             if primary.getCrossButton():
                 self.drive_control.Xbrake()
 
@@ -382,26 +376,22 @@ class MyRobot(LemonRobot):
                 self.intake.set_bypass_limits()
 
             if secondary.getLeftTriggerAxis() >= 0.8:
-                self.intake.set_voltage(10.0)
+                self.intake.set_voltage(8.0)
             elif secondary_left_bumper:
-                self.intake.set_voltage(-10.0)
+                self.intake.set_voltage(-8.0)
 
-            if secondary.getBButton():
-                self.intake.set_arm_voltage(-0.25)
-
-            if secondary.getXButton():
+            if secondary.getRightTriggerAxis() >= 0.8:
                 self.intake.set_arm_voltage(0.25)
 
-            if secondary_right_bumper:
-                self.shooter_controller.request_unjam()
-                self.intake.set_voltage(-8.0)
+            if secondary.getRightBumper():
+                self.intake.set_arm_voltage(-0.25)
 
         """
         SHOOTER
         """
         with self.consumeExceptions():
-            if secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter_controller.request_shoot()
+            # if secondary.getRightTriggerAxis() >= 0.8:
+            #     self.shooter_controller.request_shoot()
 
             if secondary.getStartButton():
                 self.shooter_controller.request_force_shoot(15.0)
@@ -411,6 +401,12 @@ class MyRobot(LemonRobot):
 
             if secondary.getAButton():
                 self.shooter_controller.request_force_shoot(47.5)
+
+            if secondary.getBButton():
+                self.shooter_controller.request_force_shoot(30)
+
+            if secondary.getXButton():
+                self.shooter_controller.request_force_shoot(50.0)
 
     def disabledPeriodic(self):
         # self.odometry.execute()

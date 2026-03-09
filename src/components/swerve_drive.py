@@ -103,6 +103,7 @@ class SwerveDrive(Sendable):
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
+            .with_heading_pid(7.0,0.0,0.0)
         )
         # Field-absolute version (no operator-perspective rotation) — used by
         # the shooter controller whose target_angle is already in field coords.
@@ -113,6 +114,7 @@ class SwerveDrive(Sendable):
             .with_forward_perspective(requests.ForwardPerspectiveValue.BLUE_ALLIANCE)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
+            .with_heading_pid(7.0,0.0,0.0)
         )
         self.x_brake_req = requests.SwerveDriveBrake()
         self.idle_req = requests.Idle()
@@ -151,17 +153,6 @@ class SwerveDrive(Sendable):
         self.holonomic_controller = HolonomicDriveController(
             self.x_controller, self.y_controller, self.theta_controller
         )
-
-        # Sync facing-angle request PID from the rotation profile
-        rp = self.rotation_profile.gains
-        heading_kp = rp.get("kP", 7.0)
-        heading_ki = rp.get("kI", 0.0)
-        heading_kd = rp.get("kD", 0.0)
-        max_rot = rp.get("kMaxV", 0)
-        for req in (self.facing_angle_req, self.facing_angle_field_req):
-            req.with_heading_pid(7, 0, 0)
-            if max_rot > 0:
-                req.with_max_abs_rotational_rate(max_rot)
 
         # Apply steer & drive gains from SmartProfiles to all modules
         if self.tuning_enabled:
