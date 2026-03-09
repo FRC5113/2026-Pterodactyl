@@ -1,36 +1,36 @@
 from enum import Enum
 from typing import List
 from wpimath.geometry import Pose2d, Rotation2d
-from wpimath.units import meters, degrees
+from wpimath.units import meters, degrees, milliseconds
 from components.swerve_drive import SwerveDrive
 from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
 from magicbot import StateMachine
-
+import time
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
-
-
-class AutoStep:
-    """Base class for all auto steps"""
-
-    def execute(self, ctx) -> StepStatus:
-        raise NotImplementedError
 
 
 class AutoContext:
     sd: SwerveDrive
     sh: Shooter
     it: Intake
-    sc: StateMachine
+    sc: ShooterController
 
     def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: StateMachine):
         self.sd = sd
         self.sh = sh
         self.it = it
         self.sc = sc
+
+
+class AutoStep:
+    """Base class for all auto steps"""
+
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        raise NotImplementedError
 
 
 class AutoRunner:
@@ -124,29 +124,15 @@ class IntakeAuto(AutoStep):
 
 class ShootAuto(AutoStep):
     STATIC_ANGLE = 78  # Not sure this is right
-
-    def __init__(self):
+    start: milliseconds = 0
+    durration: milliseconds
+    def __init__(self, durration: milliseconds):
         self.started = False
-
-    def execute(self, durration: seconds, ctx: AutoContext) -> StepStatus:
+        self.durration = durration
+    def execute(self, ctx: AutoContext) -> StepStatus:
         if self.start == 0:
-            self.start = seconds(time.time())
-        if self.start + durration > time.time():
+            self.start = time.perf_counter()
+        if time.perf_counter() - self.start > self.durration:
             return StepStatus.DONE
-        ctx.sc._update_target() #type: ignore - I dont know if this call is nesscary
-        ctx.sc.
-
-
-
-# THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
-tempAutoRoutine = AutoRunner(
-    [
-        SwerveDriveAuto(1.5, 2.11, 45),
-        ParallelStep(SwerveDriveAuto(1.5, 4.59, 135), IntakeAuto(True)),
-        ParallelStep(SwerveDriveAuto(2.51, 4.59, 45), IntakeAuto(True)),
-        IntakeAuto(False),  # Turn off intake before going over bump
-        SwerveDriveAuto(2.51, 7.18, -45),
-        SwerveDriveAuto(2.51, 8.57, -135),
-        ShootAuto(),
-    ],
-)
+        ctx.sc.request_shoot()
+        return StepStatus.RUNNING
