@@ -1216,10 +1216,7 @@
               "period": 0.06,
               "rotation_turns": 0,
               "fps": 5,
-              "resolution": [
-                120.0,
-                0.0
-              ]
+              "resolution": [120.0, 0.0]
             }
           },
           {
@@ -1234,10 +1231,7 @@
               "period": 0.06,
               "rotation_turns": 0,
               "fps": 5,
-              "resolution": [
-                120.0,
-                0.0
-              ]
+              "resolution": [120.0, 0.0]
             }
           },
           {

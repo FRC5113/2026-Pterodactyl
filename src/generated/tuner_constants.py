@@ -1,6 +1,4 @@
-from typing import TYPE_CHECKING, overload
-
-from phoenix6 import CANBus, configs, hardware, signals, swerve, units
+from phoenix6 import CANBus, configs, signals, swerve, units
 from wpimath.units import inchesToMeters
 
 

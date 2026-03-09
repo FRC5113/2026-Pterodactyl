@@ -1,18 +1,17 @@
 import enum
 
-from magicbot import feedback, will_reset_to
+from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import TalonFXConfiguration
 from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
 from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
-    MotorAlignmentValue,
     NeutralModeValue,
 )
-from wpilib import DutyCycleEncoder
+from rev import PersistMode, ResetMode, SparkAbsoluteEncoder, SparkMax, SparkMaxConfig
 from wpimath import units
 
-from lemonlib.smart import SmartPreference, SmartProfile
+from lemonlib.smart import SmartProfile
 from lemonlib.util import Alert, AlertType
 
 
@@ -24,11 +23,11 @@ class IntakeAngle(enum.Enum):
 class Intake:
     spin_motor: TalonFX
 
-    left_motor: TalonFX
-    right_motor: TalonFX
+    left_motor: SparkMax
+    right_motor: SparkMax
 
-    left_encoder: DutyCycleEncoder
-    right_encoder: DutyCycleEncoder
+    left_encoder: SparkAbsoluteEncoder
+    right_encoder: SparkAbsoluteEncoder
 
     profile: SmartProfile
 
@@ -45,9 +44,6 @@ class Intake:
     INTAKEUP = IntakeAngle.UP.value
     INTAKING = IntakeAngle.INTAKING.value
 
-    right_offset = SmartPreference(0.7682499817062496)
-    left_offset = SmartPreference(1.215617517890438)
-
     def setup(self):
         self._cached_angle = 0.0
         spin_config = TalonFXConfiguration()
@@ -55,20 +51,21 @@ class Intake:
         spin_config.current_limits.supply_current_limit = self.spin_amps
         self.spin_motor.configurator.apply(spin_config)
 
-        arm_config = TalonFXConfiguration()
-        arm_config.motor_output.neutral_mode = NeutralModeValue.COAST
-        arm_config.current_limits.supply_current_limit = self.arm_amps
-        self.left_motor.configurator.apply(arm_config)
-        self.right_motor.configurator.apply(arm_config)
+        self.arm_config = SparkMaxConfig().setIdleMode(SparkMaxConfig.IdleMode.kBrake)
 
-        self.arm_control = controls.DutyCycleOut(0)
-        self.arm_follower = controls.Follower(
-            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
+        self.right_motor.configure(
+            self.arm_config,
+            ResetMode.kNoResetSafeParameters,
+            PersistMode.kPersistParameters,
+        )
+
+        self.left_motor.configure(
+            self.arm_config.follow(self.right_motor, True),
+            ResetMode.kNoResetSafeParameters,
+            PersistMode.kPersistParameters,
         )
 
         self.spin_control = controls.VoltageOut(0)
-
-        self.right_encoder.setInverted(True)
 
         self.hinge_alert = Alert(
             "intake hinge has rotated too far!", type=AlertType.WARNING
@@ -94,29 +91,27 @@ class Intake:
     INFORMATIONAL METHODS
     """
 
-    # @feedback
     def get_left_angle(self) -> units.degrees:
-        return (self.left_encoder.get() - self.left_offset - 0.5) % 1
+        return self.left_encoder.getPosition()
 
-    # @feedback
     def get_right_angle(self) -> units.degrees:
-        return (self.right_encoder.get() - self.right_offset - 0.5) % 1
-        
+        return self.right_encoder.getPosition()
 
     # @feedback
     def get_position(self) -> float:
-        pos =  ((self.get_left_angle() + self.get_right_angle()) / 2)
-        if pos < 0:
-            pos += 1
+        """Return the pos of the hinge normalized to [-0.5,0.5].
+        An angle of 0 refers to the intake in the up/stowed position.
+        """
+        right_angle = self.get_right_angle()
+        # left_angle = self.get_left_angle()
+        pos = right_angle
+        if pos > 0.5:
+            pos -= 1
         return pos
 
     """
     CONTROL METHODS
     """
-
-    def zero_encoders(self):
-        self.left_offset = self.left_encoder.get()
-        self.right_offset = self.right_encoder.get()
 
     def set_voltage(self, voltage: units.volts):
         self.spin_voltage = voltage
@@ -132,42 +127,33 @@ class Intake:
         self.bypass_limits = True
 
     def execute(self):
-        # # Cache angles once per cycle — avoids re-reading encoders multiple times
-        # left_angle = self.get_left_angle()
-        # right_angle = self.get_right_angle()
-        # pos = self.get_position()
+        pos = self.get_position()
 
-        # # if not self.arm_manual_control:
-        # #     self.arm_voltage = self.controller.calculate(pos, self.arm_angle)
+        # if not self.arm_manual_control:
+        #     self.arm_voltage = self.controller.calculate(pos, self.arm_angle)
 
-        # # making sure we don't try to move the arm past its limits or break
-        # angle_diff = abs(right_angle - left_angle)
-        # if angle_diff > 0.2:
-        #     if not self.bypass_limits:
-        #         self.arm_voltage = 0.0
-        #     self.break_alert.enable()
-        #     self.break_alert.set_text(
-        #         f"Intake arm may be breaking! Left: {left_angle:.2f}, Right: {right_angle:.2f}"
-        #     )
-        # if pos > (self.INTAKEUP + 0.1):
-        #     if not self.bypass_limits:
-        #         self.arm_voltage = max(self.arm_voltage, 0)
-        #     self.hinge_alert.enable()
-        #     self.hinge_alert.set_text(
-        #         f"Intake hinge has rotated too far! Position: {pos:.2f}"
-        #     )
-        # elif pos < (self.INTAKING - 0.1):
-        #     if not self.bypass_limits:
-        #         self.arm_voltage = min(self.arm_voltage, 0)
-        #     self.hinge_alert.enable()
-        #     self.hinge_alert.set_text(
-        #         f"Intake hinge has rotated too far! Position: {pos:.2f}"
-        #     )
+        # making sure we don't try to move the arm past its limits or break
+        if pos > (self.INTAKEUP + 0.1):
+            if not self.bypass_limits:
+                self.arm_voltage = max(self.arm_voltage, 0)
 
-        # if self.arm_voltage != self.prev_arm_voltage:
-        self.prev_arm_voltage = self.arm_voltage
-        self.right_motor.set_control(self.arm_control.with_output(self.arm_voltage))
-        self.left_motor.set_control(self.arm_follower)
+            self.hinge_alert.set_text(
+                f"Intake hinge has rotated too far! Position: {pos:.2f}"
+            )
+            self.hinge_alert.enable()
+        elif pos < (self.INTAKING - 0.1):
+            if not self.bypass_limits:
+                self.arm_voltage = min(self.arm_voltage, 0)
+
+            self.hinge_alert.set_text(
+                f"Intake hinge has rotated too far! Position: {pos:.2f}"
+            )
+            self.hinge_alert.enable()
+
+        if self.arm_voltage != self.prev_arm_voltage:
+            self.prev_arm_voltage = self.arm_voltage
+            self.right_motor.setVoltage(self.arm_voltage)
+
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage
             self.spin_motor.set_control(

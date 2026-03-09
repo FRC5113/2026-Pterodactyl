@@ -13,7 +13,6 @@ from phoenix6.signals import (
     NeutralModeValue,
 )
 from wpimath import units
-from magicbot import feedback
 
 from lemonlib.smart import SmartProfile
 
@@ -62,9 +61,7 @@ class Shooter:
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
-        self.shooter_control = (
-            controls.VelocityVoltage(0).with_slot(0)
-        )
+        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
         )
@@ -150,7 +147,6 @@ class Shooter:
             self.conveyor_motor.set_control(
                 self.voltage_control.with_output(self.conveyor_volt)
             )
-
 
         if self.manual_control:
             shooter_voltage = self.shooter_voltage

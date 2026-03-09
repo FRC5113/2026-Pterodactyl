@@ -6,7 +6,6 @@ from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
 from wpilib import DriverStation, SmartDashboard, Timer
-from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
 from wpimath.geometry import Pose2d, Rotation2d
@@ -103,7 +102,7 @@ class SwerveDrive(Sendable):
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0,0.0,0.0)
+            .with_heading_pid(7.0, 0.0, 0.0)
         )
         # Field-absolute version (no operator-perspective rotation) — used by
         # the shooter controller whose target_angle is already in field coords.
@@ -114,7 +113,7 @@ class SwerveDrive(Sendable):
             .with_forward_perspective(requests.ForwardPerspectiveValue.BLUE_ALLIANCE)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0,0.0,0.0)
+            .with_heading_pid(7.0, 0.0, 0.0)
         )
         self.x_brake_req = requests.SwerveDriveBrake()
         self.idle_req = requests.Idle()
@@ -341,7 +340,12 @@ class SwerveDrive(Sendable):
         self.drivetrain.seed_field_centric()
         self.pigeon_alert.enable()
 
-    def addVisionPoseEstimate(self, pose: Pose2d, timestamp: units.seconds):
+    def addVisionPoseEstimate(
+        self,
+        pose: Pose2d,
+        timestamp: units.seconds,
+        std_devs: tuple[float, float, float],
+    ) -> None:
         self.drivetrain.add_vision_measurement(
             pose, utils.fpga_to_current_time(timestamp)
         )
@@ -400,6 +404,7 @@ class SwerveDrive(Sendable):
             for ms in drive_state.module_states:
                 swerve_measurements += [ms.angle.degrees(), ms.speed]
             # SmartDashboard.putNumberArray("Swerve Measurements", swerve_measurements)
+
     """
     EXECUTE
     """

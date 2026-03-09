@@ -3,20 +3,17 @@
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
 import math
 
-import wpilib
-from phoenix6 import CANBus
+import robotpy_apriltag
+from magicbot import feedback
 from phoenix6.hardware import TalonFX, TalonFXS
+from rev import SparkMax
 from wpilib import (
-    DigitalInput,
     DriverStation,
-    DutyCycleEncoder,
     Field2d,
 )
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
-import robotpy_apriltag
-from magicbot import feedback
 
 from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
@@ -25,7 +22,7 @@ from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
-from game import apriltag_layout, is_alliance_hub_active
+from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
 from lemonlib import LemonCamera, LemonInput, LemonRobot
 from lemonlib.smart import SmartPreference, SmartProfile
@@ -132,11 +129,13 @@ class MyRobot(LemonRobot):
         INTAKE
         """
 
+        BRUSHED = SparkMax.MotorType.kBrushed
+
         self.intake_spin_motor = TalonFX(51)
-        self.intake_left_motor = TalonFX(52)
-        self.intake_right_motor = TalonFX(53)
-        self.intake_left_encoder = DutyCycleEncoder(DigitalInput(0))
-        self.intake_right_encoder = DutyCycleEncoder(DigitalInput(1))
+        self.intake_left_motor = SparkMax(52, BRUSHED)
+        self.intake_right_motor = SparkMax(53, BRUSHED)
+        self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
+        self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
         self.intake_spin_amps: units.amperes = 20.0
         self.intake_arm_amps: units.amperes = 20.0
@@ -196,7 +195,6 @@ class MyRobot(LemonRobot):
         #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
         # )
 
-        # Reuse the field layout already loaded in game.py
         self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
             robotpy_apriltag.AprilTagField.k2026RebuiltWelded
         )
@@ -208,25 +206,25 @@ class MyRobot(LemonRobot):
             -0.279,
             0.222,
             0.229,
-            Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(45)),
+            Rotation3d(0, units.degreesToRadians(-30), units.degreesToRadians(45)),
         )
         self.rtc_front_right = Transform3d(
             -0.279,
             -0.222,
             0.229,
-            Rotation3d(0, units.degreesToRadians(30), units.degreesToRadians(-45)),
+            Rotation3d(0, units.degreesToRadians(-30), units.degreesToRadians(-45)),
         )
         self.rtc_back_left = Transform3d(
             -ox,
-            -oy,
+            oy,
             0.21,
-            Rotation3d(0, units.degreesToRadians(10), units.degreesToRadians(135)),
+            Rotation3d(0, units.degreesToRadians(-10), units.degreesToRadians(135)),
         )
         self.rtc_back_right = Transform3d(
-            ox,
+            -ox,
             -oy,
             0.21,
-            Rotation3d(0, units.degreesToRadians(10), units.degreesToRadians(-135)),
+            Rotation3d(0, units.degreesToRadians(-10), units.degreesToRadians(-135)),
         )
 
         self.camera_front_left = LemonCamera(
@@ -254,8 +252,8 @@ class MyRobot(LemonRobot):
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
 
-        # self.led_length = 150
-        # self.leds = LEDController(2, self.led_length)
+        self.led_length = 150
+        self.leds = LEDController(0, self.led_length)
 
         # alerts
         AlertManager(self.logger)
@@ -274,31 +272,17 @@ class MyRobot(LemonRobot):
     def enabledperiodic(self):
         self.drive_control.engage()
         self.shooter_controller.engage()
-
-    def autonomousInit(self):
-        # globalProfiler.enable()
-        pass
-
-    def autonomousPeriodic(self):
         if not self.fms:
             self._display_auto_trajectory()
 
     def teleopInit(self):
-        # globalProfiler.enable()
         # initialize HIDs here in case they are changed after robot initializes
         self.primary = LemonInput(0)
         self.secondary = LemonInput(1)
 
-        self.x_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
-        )
-        self.y_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
-        )
-        self.omega_filter = SlewRateLimiter(
-            self.rasing_slew_rate  # , self.falling_slew_rate
-        )
-        # Cache inputs called multiple times
+        self.x_filter = SlewRateLimiter(self.rasing_slew_rate)
+        self.y_filter = SlewRateLimiter(self.rasing_slew_rate)
+        self.omega_filter = SlewRateLimiter(self.rasing_slew_rate)
 
     def teleopPeriodic(self):
         primary = self.primary
@@ -309,12 +293,10 @@ class MyRobot(LemonRobot):
         primary_ly = primary.getLeftY()
         primary_lx = primary.getLeftX()
         primary_rx = primary.getRightX()
-        primary_ry = primary.getRightX()
 
         secondary_left_bumper = secondary.getLeftBumper()
         secondary_right_bumper = secondary.getRightBumper()
         secondary_right_stick_button = secondary.getRightStickButton()
-        secondary_left_stick_button = secondary.getLeftStickButton()
 
         """
         SWERVE
@@ -349,9 +331,12 @@ class MyRobot(LemonRobot):
                 omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
 
             if primary.getTriangleButton():
-                self.drive_control.drive_point(vx,vy,0.0)
+                self.drive_control.drive_point(vx, vy, 0.0)
+
             elif primary.getCircleButton():
-                self.drive_control.drive_point(vx,vy,self.shooter_controller.target_angle)
+                self.drive_control.drive_point(
+                    vx, vy, self.shooter_controller.target_angle
+                )
             else:
                 self.drive_control.drive_manual(
                     vx,
@@ -359,7 +344,7 @@ class MyRobot(LemonRobot):
                     omega,
                     not primary.getCreateButton(),  # temporary
                 )
-                
+
             if primary.getCrossButton():
                 self.drive_control.Xbrake()
 
@@ -370,9 +355,7 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-            if secondary_right_stick_button and secondary_left_stick_button:
-                self.intake.zero_encoders()
-            elif secondary_right_stick_button:
+            if secondary_right_stick_button:
                 self.intake.set_bypass_limits()
 
             if secondary.getLeftTriggerAxis() >= 0.8:
@@ -381,10 +364,10 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(-8.0)
 
             if secondary.getRightTriggerAxis() >= 0.8:
-                self.intake.set_arm_voltage(0.25)
+                self.intake.set_arm_voltage(8)
 
-            if secondary.getRightBumper():
-                self.intake.set_arm_voltage(-0.25)
+            if secondary_right_bumper:
+                self.intake.set_arm_voltage(-8)
 
         """
         SHOOTER
@@ -401,28 +384,6 @@ class MyRobot(LemonRobot):
 
             if secondary.getAButton():
                 self.shooter_controller.request_force_shoot(47.5)
-
-            if secondary.getBButton():
-                self.shooter_controller.request_force_shoot(30)
-
-            if secondary.getXButton():
-                self.shooter_controller.request_force_shoot(50.0)
-
-    def disabledPeriodic(self):
-        # self.odometry.execute()
-        pass
-
-    def disabledInit(self):
-        # if not self.firstRun:
-        #     try:
-        #         globalProfiler.dump_stats("/home/lvuser/teleop.prof")
-        #         globalProfiler.disable()
-        #     except FileNotFoundError:
-        #         globalProfiler.dump_stats("./temp.prof")
-        #     except Exception as e:
-        # else:
-        #     self.firstRun = False
-        pass
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()

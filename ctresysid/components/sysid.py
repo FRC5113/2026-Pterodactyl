@@ -1,5 +1,5 @@
 from commands2.sysid import SysIdRoutine
-from phoenix6 import SignalLogger,swerve
+from phoenix6 import SignalLogger, swerve
 from wpilib.sysid import SysIdRoutineLog
 from wpimath import units
 import math
@@ -131,6 +131,4 @@ class SysIdDrive(MagicSysIdRoutine):
         )
 
         self.sysid_to_apply = self.sys_id_routine_rotation_rate
-        self.setup_sysid(
-            self.sysid_to_apply.config,self.sysid_to_apply.mechanism
-        )
+        self.setup_sysid(self.sysid_to_apply.config, self.sysid_to_apply.mechanism)

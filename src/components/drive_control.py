@@ -225,7 +225,6 @@ class DriveControl(StateMachine):
         elif not self.point_joy_target:
             self.next_state("free")
 
-
     @state
     def going_to_pose(self):
         """

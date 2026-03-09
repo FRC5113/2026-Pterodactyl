@@ -1,12 +1,12 @@
 import math
 
-from magicbot import StateMachine, state, will_reset_to, feedback
+from magicbot import StateMachine, feedback, state, will_reset_to
 from wpilib import DriverStation
 
 from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
-from game import get_hub_pos
+from game import get_hub_pos, is_alliance_hub_active
 
 _RED = DriverStation.Alliance.kRed
 
@@ -48,7 +48,7 @@ class ShooterController(StateMachine):
         self.min_distance = 1.597
         self.max_distance = 4.597
 
-        self.idle_speed_scalar = 0.8
+        self.idle_speed_scalar = 0.5
         self.kicker_duty = 8  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.05  # 5%
@@ -72,14 +72,14 @@ class ShooterController(StateMachine):
         is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)
 
-        distance = math.hypot((hub_pos.y - pose.y),(hub_pos.x - pose.x))
+        distance = math.hypot((hub_pos.y - pose.y), (hub_pos.x - pose.x))
         self.distance = distance
 
-        self.target_angle = math.atan2(
-            hub_pos.y - pose.y, hub_pos.x - pose.x
-        )
+        self.target_angle = math.atan2(hub_pos.y - pose.y, hub_pos.x - pose.x)
 
-        self.target_rps = self._linear_interp(distance,self.distance_lookup,self.speed_lookup)
+        self.target_rps = self._linear_interp(
+            distance, self.distance_lookup, self.speed_lookup
+        )
         self.valid_shot = self.min_distance <= distance <= self.max_distance
 
     def _linear_interp(self, x, xp, fp):
@@ -110,11 +110,10 @@ class ShooterController(StateMachine):
     # @feedback
     def is_at_speed(self):
         return self.at_speed
-    
+
     @feedback
     def is_valid_shot(self) -> bool:
         return self.valid_shot
-    
 
     def get_force_good(self):
         return self.forceshoottolgood
@@ -126,10 +125,10 @@ class ShooterController(StateMachine):
     @state(first=True)
     def idle(self):
         self._update_target()
-        if self.valid_shot:
-            self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
-        else:
-            self.shooter.set_velocity(0.0)
+        # if self.valid_shot:
+        self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
+        # else:
+        #     self.shooter.set_velocity(0.0)
 
         if self.unjamming:
             self.next_state("unjam")
@@ -195,10 +194,10 @@ class ShooterController(StateMachine):
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
-        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= (10.0)
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
         aim_ready = self._is_aimed()
 
-        self.at_speed = speed_ready and aim_ready
+        self.at_speed = speed_ready and aim_ready and is_alliance_hub_active()
 
         if not self.shooting:
             self.next_state("idle")
