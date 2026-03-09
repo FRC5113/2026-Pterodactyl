@@ -1,10 +1,9 @@
-from phoenix6.hardware import Pigeon2
-from wpilib import DriverStation
-from wpimath import units
-from wpimath.geometry import Pose2d
 from choreo.trajectory import SwerveSample
 from magicbot import StateMachine, will_reset_to
 from magicbot.state_machine import state
+from wpilib import DriverStation
+from wpimath import units
+from wpimath.geometry import Pose2d
 
 from components.swerve_drive import SwerveDrive
 
@@ -16,8 +15,6 @@ class DriveControl(StateMachine):
     """
 
     swerve_drive: SwerveDrive
-
-    pigeon: Pigeon2
 
     # will_reset_to ensures these values reset to their default each robot cycle
     # unless explicitly set, preventing stale commands from persisting
@@ -32,7 +29,14 @@ class DriveControl(StateMachine):
     sysid_volts = will_reset_to(0.0)
     point_to_target = will_reset_to(False)
     point_target: units.degrees = 0.0
-    sample: SwerveSample = None  # Trajectory sample for autonomous path following
+    point_joy_target = will_reset_to(False)
+    point_joy_x = will_reset_to(0.0)
+    point_joy_y = will_reset_to(0.0)
+    sample = will_reset_to(None)  # Trajectory sample for autonomous path following
+    xbrake_req = will_reset_to(False)  # Request to engage X-brake mode
+
+    def setup(self):
+        pass
 
     def drive_manual(
         self,
@@ -42,10 +46,11 @@ class DriveControl(StateMachine):
         field_relative: bool,
     ):
         """
-        Request manual drive control. Only accepted when in 'free' state
-        to prevent overriding other control modes.
+        Request manual drive control. Accepted in 'free' and 'point_towards_target'
+        states. In point_towards_target, translation is passed through but rotation
+        is overridden by the pointing PID.
         """
-        if self.current_state == "free":
+        if self.current_state in ("free", "point_towards_target", "point_towards_joy"):
             self.translationX = translationX
             self.translationY = translationY
             self.rotationX = rotationX
@@ -69,6 +74,38 @@ class DriveControl(StateMachine):
         self.point_to_target = True
         self.point_target = angle
 
+    def point_to_joy(self, rightX: float, rightY: float):
+        """Request the robot to point in the direction of the right joystick."""
+        self.point_joy_target = True
+        self.point_joy_x = rightX
+        self.point_joy_y = rightY
+
+    def drive_point(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        angle: units.radians,
+    ):
+        """Request drive while facing a field-absolute angle."""
+        self.translationX = vx
+        self.translationY = vy
+        self.point_to_target = True
+        self.point_target = angle
+
+    def drive_point_joy(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        joy_x: float,
+        joy_y: float,
+    ):
+        """Request drive while facing the direction of the right joystick."""
+        self.translationX = vx
+        self.translationY = vy
+        self.point_joy_target = True
+        self.point_joy_x = joy_x
+        self.point_joy_y = joy_y
+
     def drive_auto(self, sample: SwerveSample = None):
         """Provide a trajectory sample for autonomous path following."""
         self.sample = sample
@@ -90,6 +127,10 @@ class DriveControl(StateMachine):
         self.field_relative = field_relative
         self.drive_auto_man = True
 
+    def Xbrake(self):
+        """Engage X-brake mode for maximum resistance to movement."""
+        self.xbrake_req = True
+
     @state(first=True)
     def initialise(self):
         """
@@ -102,9 +143,10 @@ class DriveControl(StateMachine):
         self.field_relative = False
         if self.go_to_pose:
             self.next_state("going_to_pose")
-        if DriverStation.isAutonomousEnabled():
+        elif DriverStation.isAutonomousEnabled():
             self.next_state("run_auton_routine")
-        self.next_state("free")
+        else:
+            self.next_state("free")
 
     @state
     def free(self):
@@ -117,24 +159,64 @@ class DriveControl(StateMachine):
             self.translationY,
             self.rotationX,
             self.field_relative,
-            self.period,
         )
         # Check for state transitions in priority order
         if DriverStation.isAutonomousEnabled():
             self.next_state("run_auton_routine")
-        if self.go_to_pose:
+        elif self.go_to_pose:
             self.next_state("going_to_pose")
-        if self.drive_sysid:
+        elif self.xbrake_req:
+            self.next_state("x_brake_state")
+        elif self.point_to_target:
+            self.next_state("point_towards_target")
+        elif self.point_joy_target:
+            self.next_state("point_towards_joy")
+        elif self.drive_sysid:
             self.next_state("drive_sysid_state")
+
+    @state
+    def x_brake_state(self):
+        """
+        State to engage X-brake mode, which points swerve modules inward to resist movement.
+        Exits when X-brake request is cleared.
+        """
+        self.swerve_drive.XBrake()
+        if not self.xbrake_req:
+            self.next_state("free")
 
     @state
     def point_towards_target(self):
         """
-        State to rotate robot to face a specific target.
-        Exits when target is reached or no longer requested.
+        State to drive while pointing the robot at a specific target angle.
+        Translation comes from manual input; rotation is PID-controlled.
+        Exits when target is no longer requested.
         """
-        self.swerve_drive.point_towards(self.point_target)
+        self.swerve_drive.drive_point(
+            self.translationX,
+            self.translationY,
+            self.point_target,
+        )
         if not self.point_to_target:
+            self.next_state("free")
+
+    @state
+    def point_towards_joy(self):
+        """
+        State to drive while pointing the robot in the direction of the right joystick.
+        Translation comes from manual input; rotation is derived from joystick angle.
+        Exits when joystick pointing is no longer requested.
+        """
+        if self.point_to_target:
+            self.next_state("point_towards_target")
+        self.swerve_drive.drive_point_joy(
+            self.translationX,
+            self.translationY,
+            self.point_joy_x,
+            self.point_joy_y,
+        )
+        if self.xbrake_req:
+            self.next_state("x_brake_state")
+        elif not self.point_joy_target:
             self.next_state("free")
 
     @state
@@ -145,6 +227,7 @@ class DriveControl(StateMachine):
         """
         if not self.drive_sysid:
             self.next_state("free")
+            return
         self.swerve_drive.sysid_drive(self.sysid_volts)
 
     @state
@@ -155,6 +238,7 @@ class DriveControl(StateMachine):
         """
         if not self.go_to_pose:
             self.next_state("free")
+            return
         self.swerve_drive.set_desired_pose(self.desired_pose)
 
     @state
@@ -164,7 +248,15 @@ class DriveControl(StateMachine):
         Drive commands come from auto_base.py which calls drive_auto() with samples.
         Returns to free state when teleop begins.
         """
-        if self.sample is not None:
-            self.swerve_drive.follow_trajectory(self.sample)
         if DriverStation.isTeleop():
             self.next_state("free")
+            return
+        if self.drive_auto_man:
+            self.swerve_drive.drive(
+                self.translationX,
+                self.translationY,
+                self.rotationX,
+                self.field_relative,
+            )
+        elif self.sample is not None:
+            self.swerve_drive.follow_trajectory(self.sample)
