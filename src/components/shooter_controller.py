@@ -68,11 +68,11 @@ class ShooterController(StateMachine):
         self.force_shoot_rps = rps
 
     def _update_target(self):
-        pose = self.swerve_drive.get_estimated_pose()
+        pose = self.swerve_drive.get_estimated_pose().translation()
         is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)
 
-        distance = math.hypot((hub_pos.y - pose.y), (hub_pos.x - pose.x))
+        distance = hub_pos.distance(pose)
         self.distance = distance
 
         self.target_angle = math.atan2(hub_pos.y - pose.y, hub_pos.x - pose.x)
@@ -99,11 +99,11 @@ class ShooterController(StateMachine):
     INFORMATIONAL METHODS
     """
 
-    # @feedback
+    @feedback
     def get_target_rps(self):
         return self.target_rps
 
-    # @feedback
+    @feedback
     def get_distance(self):
         return self.distance
 

@@ -43,7 +43,7 @@ class MyRobot(LemonRobot):
 
     swerve_drive: SwerveDrive
     shooter: Shooter
-    intake: Intake
+    # intake: Intake
 
     # greatest speed that chassis should move (not greatest possible speed)
     top_speed = SmartPreference(4.7)
@@ -132,10 +132,10 @@ class MyRobot(LemonRobot):
         BRUSHED = SparkMax.MotorType.kBrushed
 
         self.intake_spin_motor = TalonFX(51)
-        self.intake_left_motor = SparkMax(52, BRUSHED)
-        self.intake_right_motor = SparkMax(53, BRUSHED)
-        self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
-        self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
+        # self.intake_left_motor = SparkMax(52, BRUSHED)
+        # self.intake_right_motor = SparkMax(53, BRUSHED)
+        # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
+        # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
         self.intake_spin_amps: units.amperes = 20.0
         self.intake_arm_amps: units.amperes = 20.0
@@ -354,27 +354,27 @@ class MyRobot(LemonRobot):
         """
         INTAKE
         """
-        with self.consumeExceptions():
-            if secondary_right_stick_button:
-                self.intake.set_bypass_limits()
+        # with self.consumeExceptions():
+        #     if secondary_right_stick_button:
+        #         self.intake.set_bypass_limits()
 
-            if secondary.getLeftTriggerAxis() >= 0.8:
-                self.intake.set_voltage(8.0)
-            elif secondary_left_bumper:
-                self.intake.set_voltage(-8.0)
+        #     if secondary.getLeftTriggerAxis() >= 0.8:
+        #         self.intake.set_voltage(8.0)
+        #     elif secondary_left_bumper:
+        #         self.intake.set_voltage(-8.0)
 
-            if secondary.getRightTriggerAxis() >= 0.8:
-                self.intake.set_arm_voltage(8)
+        #     # if secondary.getRightTriggerAxis() >= 0.8:
+        #     #     self.intake.set_arm_voltage(8)
 
-            if secondary_right_bumper:
-                self.intake.set_arm_voltage(-8)
+        #     if secondary_right_bumper:
+        #         self.intake.set_arm_voltage(-8)
 
         """
         SHOOTER
         """
         with self.consumeExceptions():
-            # if secondary.getRightTriggerAxis() >= 0.8:
-            #     self.shooter_controller.request_shoot()
+            if secondary.getRightTriggerAxis() >= 0.8:
+                self.shooter_controller.request_shoot()
 
             if secondary.getStartButton():
                 self.shooter_controller.request_force_shoot(15.0)

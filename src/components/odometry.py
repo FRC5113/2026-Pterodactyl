@@ -24,10 +24,10 @@ class Odometry:
     def setup(self):
         self._fms = DriverStation.isFMSAttached()
         cameras = (
-            self.camera_front_left,
+            # self.camera_front_left,
             self.camera_front_right,
-            self.camera_back_left,
-            self.camera_back_right,
+            # self.camera_back_left,
+            # self.camera_back_right,
         )
         self._camera_estimator_pairs = tuple(
             (cam, PhotonPoseEstimator(self.field_layout, cam.camera_to_bot))
@@ -44,8 +44,6 @@ class Odometry:
         # Gyro-fused fallback: track recent yaw rates for stability check
         self._yaw_rate_history: deque[float] = deque(maxlen=15)
 
-        if not DriverStation.isFMSAttached():
-            SmartDashboard.putData("Estimated Field", self.estimated_field)
 
     def _compute_std_devs(
         self, avg_dist: float, tag_count: int, is_single_tag_gyro_fused: bool = False
@@ -206,7 +204,14 @@ class Odometry:
                     twod_pose = pose3d.toPose2d()
                     ts = pupdate.timestampSeconds
                 else:
-                    continue
+                    pupdate = pose_est.estimateLowestAmbiguityPose(res)
+
+                    if pupdate is not None:
+                        pose3d = pupdate.estimatedPose
+                        twod_pose = pose3d.toPose2d()
+                        ts = pupdate.timestampSeconds
+                    else:
+                        continue
 
                 # Compute std devs
                 tag_count = len(targets)

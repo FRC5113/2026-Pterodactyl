@@ -5,7 +5,7 @@ from magicbot import will_reset_to
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
-from wpilib import DriverStation, SmartDashboard, Timer
+from wpilib import DriverStation, SmartDashboard, Timer,Field2d
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
 from wpimath.geometry import Pose2d, Rotation2d
@@ -37,6 +37,7 @@ class SwerveDrive(Sendable):
     steer_profile: SmartProfile
     drive_profile: SmartProfile
     tuning_enabled: bool
+    estimated_field: Field2d
 
     telemetry_enabled = SmartPreference(False)
     telemetry_period = SmartPreference(0.1)
@@ -140,7 +141,12 @@ class SwerveDrive(Sendable):
         self.last_telem_time = 0.0
 
         # Register telemetry callback (called from the odometry thread)
-        # self.drivetrain.register_telemetry(self._telemetry_callback)
+        self.drivetrain.register_telemetry(self.telemeterize)
+        SmartDashboard.putData("Estimated Field", self.estimated_field)
+
+    def telemeterize(self, state: swerve.SwerveDrivetrain.SwerveDriveState):
+        self.estimated_field.setRobotPose(state.pose)
+        
 
     def on_enable(self):
         # PID controllers for autonomous pose tracking
@@ -347,7 +353,7 @@ class SwerveDrive(Sendable):
         std_devs: tuple[float, float, float],
     ) -> None:
         self.drivetrain.add_vision_measurement(
-            pose, utils.fpga_to_current_time(timestamp)
+            pose, utils.fpga_to_current_time(timestamp), std_devs
         )
 
     def follow_trajectory(self, sample: SwerveSample):
