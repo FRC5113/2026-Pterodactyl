@@ -8,7 +8,7 @@ from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
     NeutralModeValue,
 )
-from rev import PersistMode, ResetMode, SparkAbsoluteEncoder, SparkMax, SparkMaxConfig
+from rev import SparkMaxConfig
 from wpimath import units
 
 from lemonlib.smart import SmartProfile
@@ -23,11 +23,11 @@ class IntakeAngle(enum.Enum):
 class Intake:
     spin_motor: TalonFX
 
-    left_motor: SparkMax
-    right_motor: SparkMax
+    # left_motor: SparkMax
+    # right_motor: SparkMax
 
-    left_encoder: SparkAbsoluteEncoder
-    right_encoder: SparkAbsoluteEncoder
+    # left_encoder: SparkAbsoluteEncoder
+    # right_encoder: SparkAbsoluteEncoder
 
     profile: SmartProfile
 
@@ -53,17 +53,17 @@ class Intake:
 
         self.arm_config = SparkMaxConfig().setIdleMode(SparkMaxConfig.IdleMode.kBrake)
 
-        self.right_motor.configure(
-            self.arm_config,
-            ResetMode.kNoResetSafeParameters,
-            PersistMode.kPersistParameters,
-        )
+        # self.right_motor.configure(
+        #     self.arm_config,
+        #     ResetMode.kNoResetSafeParameters,
+        #     PersistMode.kPersistParameters,
+        # )
 
-        self.left_motor.configure(
-            self.arm_config.follow(self.right_motor, True),
-            ResetMode.kNoResetSafeParameters,
-            PersistMode.kPersistParameters,
-        )
+        # self.left_motor.configure(
+        #     self.arm_config.follow(self.right_motor, True),
+        #     ResetMode.kNoResetSafeParameters,
+        #     PersistMode.kPersistParameters,
+        # )
 
         self.spin_control = controls.VoltageOut(0)
 
@@ -92,10 +92,12 @@ class Intake:
     """
 
     def get_left_angle(self) -> units.degrees:
-        return self.left_encoder.getPosition()
+        # return self.left_encoder.getPosition()
+        return 0.0
 
     def get_right_angle(self) -> units.degrees:
-        return self.right_encoder.getPosition()
+        # return self.right_encoder.getPosition()
+        return 0.0
 
     # @feedback
     def get_position(self) -> float:
@@ -150,9 +152,9 @@ class Intake:
             )
             self.hinge_alert.enable()
 
-        if self.arm_voltage != self.prev_arm_voltage:
-            self.prev_arm_voltage = self.arm_voltage
-            self.right_motor.setVoltage(self.arm_voltage)
+        # if self.arm_voltage != self.prev_arm_voltage:
+        #     self.prev_arm_voltage = self.arm_voltage
+        #     self.right_motor.setVoltage(self.arm_voltage)
 
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage

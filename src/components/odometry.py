@@ -24,10 +24,10 @@ class Odometry:
     def setup(self):
         self._fms = DriverStation.isFMSAttached()
         cameras = (
-            # self.camera_front_left,
+            self.camera_front_left,
             self.camera_front_right,
-            # self.camera_back_left,
-            # self.camera_back_right,
+            self.camera_back_left,
+            self.camera_back_right,
         )
         self._camera_estimator_pairs = tuple(
             (cam, PhotonPoseEstimator(self.field_layout, cam.camera_to_bot))
@@ -43,7 +43,7 @@ class Odometry:
 
         # Gyro-fused fallback: track recent yaw rates for stability check
         self._yaw_rate_history: deque[float] = deque(maxlen=15)
-
+        SmartDashboard.putData("Estimated Field", self.estimated_field)
 
     def _compute_std_devs(
         self, avg_dist: float, tag_count: int, is_single_tag_gyro_fused: bool = False
@@ -197,21 +197,17 @@ class Odometry:
 
                 # Try multi-tag estimation first (most accurate)
                 pupdate = pose_est.estimateCoprocMultiTagPose(res)
+
+                if pupdate is None:
+                    pupdate = pose_est.estimateCoprocMultiTagPose(res)
+                    if pupdate is None:
+                        continue
+
                 is_gyro_fused = False
 
-                if pupdate is not None:
-                    pose3d = pupdate.estimatedPose
-                    twod_pose = pose3d.toPose2d()
-                    ts = pupdate.timestampSeconds
-                else:
-                    pupdate = pose_est.estimateLowestAmbiguityPose(res)
-
-                    if pupdate is not None:
-                        pose3d = pupdate.estimatedPose
-                        twod_pose = pose3d.toPose2d()
-                        ts = pupdate.timestampSeconds
-                    else:
-                        continue
+                pose3d = pupdate.estimatedPose
+                twod_pose = pose3d.toPose2d()
+                ts = pupdate.timestampSeconds
 
                 # Compute std devs
                 tag_count = len(targets)
@@ -237,3 +233,4 @@ class Odometry:
                 pose, ts, stds = self._fuse_estimates(valid_estimates)
 
             self.swerve_drive.addVisionPoseEstimate(pose, ts, stds)
+            self.estimated_field.setRobotPose(self.swerve_drive.cached_pose)

@@ -43,7 +43,7 @@ class MyRobot(LemonRobot):
 
     swerve_drive: SwerveDrive
     shooter: Shooter
-    # intake: Intake
+    intake: Intake
 
     # greatest speed that chassis should move (not greatest possible speed)
     top_speed = SmartPreference(4.7)
@@ -129,7 +129,7 @@ class MyRobot(LemonRobot):
         INTAKE
         """
 
-        BRUSHED = SparkMax.MotorType.kBrushed
+        # BRUSHED = SparkMax.MotorType.kBrushed
 
         self.intake_spin_motor = TalonFX(51)
         # self.intake_left_motor = SparkMax(52, BRUSHED)
@@ -354,20 +354,20 @@ class MyRobot(LemonRobot):
         """
         INTAKE
         """
-        # with self.consumeExceptions():
-        #     if secondary_right_stick_button:
-        #         self.intake.set_bypass_limits()
+        with self.consumeExceptions():
+            if secondary_right_stick_button:
+                self.intake.set_bypass_limits()
 
-        #     if secondary.getLeftTriggerAxis() >= 0.8:
-        #         self.intake.set_voltage(8.0)
-        #     elif secondary_left_bumper:
-        #         self.intake.set_voltage(-8.0)
+            if secondary.getLeftTriggerAxis() >= 0.8:
+                self.intake.set_voltage(8.0)
+            elif secondary_left_bumper:
+                self.intake.set_voltage(-8.0)
 
-        #     # if secondary.getRightTriggerAxis() >= 0.8:
-        #     #     self.intake.set_arm_voltage(8)
+            # if secondary.getRightTriggerAxis() >= 0.8:
+            #     self.intake.set_arm_voltage(8)
 
-        #     if secondary_right_bumper:
-        #         self.intake.set_arm_voltage(-8)
+            if secondary_right_bumper:
+                self.intake.set_arm_voltage(-8)
 
         """
         SHOOTER
