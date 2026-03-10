@@ -67,20 +67,98 @@ class ShooterController(StateMachine):
         self.force_shoot_req = True
         self.force_shoot_rps = rps
 
-    def _update_target(self):
+    def _get_rps_curve(self, distance):
+        return
+
+    def _get_target_moving(self):
+        pose = self.swerve_drive.get_estimated_pose()
+        chassis = self.swerve_drive.get_velocity()
+
+        is_red = DriverStation.getAlliance() == _RED
+        hub_pos = get_hub_pos(is_red)
+
+        phase_delay = self.phase_delay
+        future_x = pose.x + chassis.vx * phase_delay
+        future_y = pose.y + chassis.vy * phase_delay
+        future_heading = pose.rotation().radians() + chassis.omega * phase_delay
+
+        cos_h = math.cos(future_heading)
+        sin_h = math.sin(future_heading)
+
+        offsetX = self.shooter_offsetX
+        offsetY = self.shooter_offsetY
+
+        launcher_x = future_x + offsetX * cos_h - offsetY * sin_h
+        launcher_y = future_y + offsetX * sin_h + offsetY * cos_h
+
+        omega = chassis.omega
+        rot_vx = -omega * offsetY
+        rot_vy = omega * offsetX
+
+        launcher_vx = chassis.vx + rot_vx
+        launcher_vy = chassis.vy + rot_vy
+
+        hub_x = hub_pos.x
+        hub_y = hub_pos.y
+        predicted_x = hub_x
+        predicted_y = hub_y
+
+        _hypot = math.hypot
+        _interp = self._linear_interp
+        dist_lut = self.distance_lookup
+        time_lut = self.time_lookup
+
+        lookahead_distance = _hypot(
+            predicted_x - launcher_x,
+            predicted_y - launcher_y,
+        )
+
+        for _ in range(self.lead_iterations):
+            time_of_flight = _interp(
+                lookahead_distance,
+                dist_lut,
+                time_lut,
+            )
+
+            predicted_x = hub_x - launcher_vx * time_of_flight
+            predicted_y = hub_y - launcher_vy * time_of_flight
+
+            lookahead_distance = _hypot(
+                predicted_x - launcher_x,
+                predicted_y - launcher_y,
+            )
+
+        target_angle = math.atan2(predicted_y - launcher_y, predicted_x - launcher_x)
+
+        return (target_angle, lookahead_distance)
+
+    def _get_target_stationary(self):
         pose = self.swerve_drive.get_estimated_pose().translation()
         is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)
 
         distance = hub_pos.distance(pose)
+
+        target_angle = math.atan2(hub_pos.y - pose.y, hub_pos.x - pose.x)
+
+        return (target_angle, distance)
+
+    def _update_target(self):
+        # target_angle, distance = self._get_target_stationary()
+        target_angle, distance = self._get_target_moving()
+
+        self.target_angle = target_angle
         self.distance = distance
 
-        self.target_angle = math.atan2(hub_pos.y - pose.y, hub_pos.x - pose.x)
-
-        self.target_rps = self._linear_interp(
-            distance, self.distance_lookup, self.speed_lookup
-        )
-        self.valid_shot = self.min_distance <= distance <= self.max_distance
+        if self.min_distance <= distance <= self.max_distance:
+            self.valid_shot = True
+            self.target_rps = self._linear_interp(
+                distance, self.distance_lookup, self.speed_lookup
+            )
+        else:
+            self.target_rps = (
+                0.29 * (distance**3) - 2.65 * (distance**2) + 11.03 * distance + 29.895
+            )
 
     def _linear_interp(self, x, xp, fp):
         if x <= xp[0]:

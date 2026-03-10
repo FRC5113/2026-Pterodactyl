@@ -49,10 +49,6 @@ class hard_code_shoot(AutoBase):
     def intake_out(self):
         self.intake.set_arm_voltage(1)
 
-    @timed_state(duration=10.0, next_state="next_step")
-    def shoot(self):
-        self.shooter_controller.request_force_shoot(40)
-
 
 class hard_code_spin_shoot(AutoBase):
     MODE_NAME = "Hard Code Spin Shoot"
