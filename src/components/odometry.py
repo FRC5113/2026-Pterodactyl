@@ -27,7 +27,7 @@ class Odometry:
             self.camera_front_left,
             self.camera_front_right,
             self.camera_back_left,
-            self.camera_back_right,
+            # self.camera_back_right,
         )
         self._camera_estimator_pairs = tuple(
             (cam, PhotonPoseEstimator(self.field_layout, cam.camera_to_bot))

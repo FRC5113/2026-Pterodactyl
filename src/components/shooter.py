@@ -71,6 +71,7 @@ class Shooter:
         self.kicker_motor_configs.commutation.motor_arrangement = (
             MotorArrangementValue.NEO550_JST
         )
+        self.kicker_motor_configs.current_limits.stator_current_limit = 20
 
         self.left_kicker_motor.configurator.apply(self.kicker_motor_configs)
         self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
@@ -80,6 +81,7 @@ class Shooter:
         self.conveyor_motor_configs.commutation.motor_arrangement = (
             MotorArrangementValue.BRUSHED_DC
         )
+        # self.conveyor_motor_configs.current_limits.stator_current_limit = 10
 
         self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
 
@@ -118,7 +120,7 @@ class Shooter:
 
     def set_kicker(self, value: float):
         self.kicker_duty = value  # ha duty thats funny right there
-        self.conveyor_volt = 4.5
+        self.conveyor_volt = 6
 
     """
     INFORMATIONAL METHODS

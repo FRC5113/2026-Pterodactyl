@@ -8,6 +8,8 @@ from components.shooter import Shooter
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos, is_alliance_hub_active
 
+from lemonlib.smart import SmartPreference
+
 _RED = DriverStation.Alliance.kRed
 
 
@@ -23,6 +25,8 @@ class ShooterController(StateMachine):
     force_shoot_rps = will_reset_to(0.0)
 
     forceshoottolgood = will_reset_to(False)
+
+    flywheel_speed = SmartPreference(30.0)
 
     def setup(self):
         # Meters
@@ -144,8 +148,8 @@ class ShooterController(StateMachine):
         return (target_angle, distance)
 
     def _update_target(self):
-        # target_angle, distance = self._get_target_stationary()
-        target_angle, distance = self._get_target_moving()
+        target_angle, distance = self._get_target_stationary()
+        # target_angle, distance = self._get_target_moving()
 
         self.target_angle = target_angle
         self.distance = distance

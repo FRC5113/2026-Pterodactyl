@@ -114,7 +114,7 @@ class SwerveDrive(Sendable):
             .with_forward_perspective(requests.ForwardPerspectiveValue.BLUE_ALLIANCE)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0, 0.0, 0.0)
+            .with_heading_pid(3.0, 0.0, 0.0)
         )
         self.x_brake_req = requests.SwerveDriveBrake()
         self.idle_req = requests.Idle()

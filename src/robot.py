@@ -32,7 +32,7 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
-
+from pathlib import Path
 
 class MyRobot(LemonRobot):
     # led_strip: LEDStrip
@@ -52,8 +52,6 @@ class MyRobot(LemonRobot):
     rasing_slew_rate = SmartPreference(8.0)
     # falling_slew_rate = SmartPreference(20.0)
     firstRun = True
-
-    # flywheel_speed = SmartPreference(30.0)
 
     def createObjects(self):
         """This method is where all attributes to be injected are
@@ -169,7 +167,7 @@ class MyRobot(LemonRobot):
         self.shooter_profile = SmartProfile(
             "shooter",
             {
-                "kP": 0.3,
+                "kP": 0.35,
                 "kI": 0.0,
                 "kD": 0.0,
                 "kS": 0.0,
@@ -191,13 +189,13 @@ class MyRobot(LemonRobot):
         ODOMETRY
         """
         # Custom apriltag field layout
-        # self.field_layout = AprilTagFieldLayout(
-        #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
-        # )
-
-        self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-            robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
+            str(Path(__file__).parent.resolve() / "2026_test_field.json")
         )
+
+        # self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
+        #     robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        # )
 
         # Robot to Camera Transforms
         ox = 0.298
@@ -339,8 +337,8 @@ class MyRobot(LemonRobot):
                 )
             else:
                 self.drive_control.drive_manual(
-                    vx,
-                    vy,
+                    -vx,
+                    -vy,
                     omega,
                     not primary.getCreateButton(),  # temporary
                 )
