@@ -12,6 +12,10 @@ from wpimath.geometry import (
     Translation2d,
 )
 
+# Cache frequently used enum values
+_Alliance = wpilib.DriverStation.Alliance
+_RED = _Alliance.kRed
+
 apriltag_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
     robotpy_apriltag.AprilTagField.k2026RebuiltWelded
 )
@@ -108,3 +112,66 @@ def field_flip_translation2d(t: Translation2d):
 # This will default to the blue alliance if a proper link to the driver station has not yet been established
 def is_red() -> bool:
     return wpilib.DriverStation.getAlliance() == wpilib.DriverStation.Alliance.kRed
+
+
+def is_match() -> bool:
+    return wpilib.DriverStation.isFMSAttached()
+
+
+def is_sim() -> bool:
+    return wpilib.RobotBase.isSimulation()
+
+
+def is_auton() -> bool:
+    mode = wpilib.SmartDashboard.getString("/robot/mode", "")
+    return mode in ["auto"]
+
+
+def is_disabled() -> bool:
+    mode = wpilib.SmartDashboard.getString("/robot/mode", "")
+    return mode in ["disabled", ""]
+
+
+def is_alliance_hub_active() -> bool:
+    alliance = wpilib.DriverStation.getAlliance()
+
+    # If we have no alliance, we cannot be enabled, therefore no hub.
+    if alliance is None:
+        return False
+
+    # Hub is always enabled in autonomous.
+    if wpilib.DriverStation.isAutonomousEnabled():
+        return True
+
+    # If we're not teleop enabled, there is no hub.
+    if not wpilib.DriverStation.isTeleopEnabled():
+        return False
+
+    # We're teleop enabled, compute.
+    match_time = wpilib.DriverStation.getMatchTime()
+    game_data = wpilib.DriverStation.getGameSpecificMessage()
+
+    match game_data:
+        case "R":
+            red_inactive_first = True
+        case "B":
+            red_inactive_first = False
+        case _:
+            # No or invalid game data, assume hub is active.
+            return True
+
+    # Shift 1 is active for blue if red won auto, or red if blue won auto.
+    shift1_active = not red_inactive_first if alliance == _RED else red_inactive_first
+
+    if match_time > 130:
+        return True  # Transition shift, hub is active
+    elif match_time > 105:
+        return shift1_active
+    elif match_time > 80:
+        return not shift1_active
+    elif match_time > 55:
+        return shift1_active
+    elif match_time > 30:
+        return not shift1_active
+    else:
+        return True  # End game, hub always active

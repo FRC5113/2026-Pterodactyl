@@ -3,7 +3,15 @@
  "version":2,
  "type":"Swerve",
  "variables":{
-  "expressions":{},
+  "expressions":{
+   "left_ball_front":{
+    "dimension":"Number",
+    "var":{
+     "exp":"0",
+     "val":0.0
+    }
+   }
+  },
   "poses":{
    "climber":{
     "x":{
@@ -19,6 +27,34 @@
      "val":0.0
     }
    },
+   "end_left_intake":{
+    "x":{
+     "exp":"7.8 m",
+     "val":7.8
+    },
+    "y":{
+     "exp":"4 m",
+     "val":4.0
+    },
+    "heading":{
+     "exp":"270 degrees",
+     "val":4.71238898038469
+    }
+   },
+   "end_right_intake":{
+    "x":{
+     "exp":"7.8 m",
+     "val":7.8
+    },
+    "y":{
+     "exp":"4 m",
+     "val":4.0
+    },
+    "heading":{
+     "exp":"90 degrees",
+     "val":1.5707963267948966
+    }
+   },
    "hubfront":{
     "x":{
      "exp":"3.5 m",
@@ -29,8 +65,64 @@
      "val":4.035
     },
     "heading":{
-     "exp":"180 degrees",
-     "val":3.141592653589793
+     "exp":"0 degrees",
+     "val":0.0
+    }
+   },
+   "hubfront_faceaway":{
+    "x":{
+     "exp":"3.5 m",
+     "val":3.5
+    },
+    "y":{
+     "exp":"4.04 m",
+     "val":4.04
+    },
+    "heading":{
+     "exp":"3.1415 rad",
+     "val":3.1415
+    }
+   },
+   "left_ball_enter":{
+    "x":{
+     "exp":"7.021 m",
+     "val":7.021
+    },
+    "y":{
+     "exp":"5.663 m",
+     "val":5.663
+    },
+    "heading":{
+     "exp":"0 rad",
+     "val":0.0
+    }
+   },
+   "left_intake":{
+    "x":{
+     "exp":"7.8 m",
+     "val":7.8
+    },
+    "y":{
+     "exp":"7 m",
+     "val":7.0
+    },
+    "heading":{
+     "exp":"270 degrees",
+     "val":4.71238898038469
+    }
+   },
+   "left_trench":{
+    "x":{
+     "exp":"3.616 m",
+     "val":3.616
+    },
+    "y":{
+     "exp":"7.367 m",
+     "val":7.367
+    },
+    "heading":{
+     "exp":"0 rad",
+     "val":0.0
     }
    },
    "outpost":{
@@ -41,6 +133,34 @@
     "y":{
      "exp":"0.66 m",
      "val":0.66
+    },
+    "heading":{
+     "exp":"90 degrees",
+     "val":1.5707963267948966
+    }
+   },
+   "right_intake":{
+    "x":{
+     "exp":"7.8 m",
+     "val":7.8
+    },
+    "y":{
+     "exp":"1 m",
+     "val":1.0
+    },
+    "heading":{
+     "exp":"90 degrees",
+     "val":1.5707963267948966
+    }
+   },
+   "right_trench":{
+    "x":{
+     "exp":"3.616 m",
+     "val":3.616
+    },
+    "y":{
+     "exp":"0.72 m",
+     "val":0.72
     },
     "heading":{
      "exp":"0 rad",
@@ -59,6 +179,34 @@
     "heading":{
      "exp":"0 rad",
      "val":0.0
+    }
+   },
+   "shoot_left":{
+    "x":{
+     "exp":"3 m",
+     "val":3.0
+    },
+    "y":{
+     "exp":"5 m",
+     "val":5.0
+    },
+    "heading":{
+     "exp":"-45 degrees",
+     "val":-0.7853981633974483
+    }
+   },
+   "shoot_right":{
+    "x":{
+     "exp":"3 m",
+     "val":3.0
+    },
+    "y":{
+     "exp":"3 m",
+     "val":3.0
+    },
+    "heading":{
+     "exp":"45 degrees",
+     "val":0.7853981633974483
     }
    }
   }
@@ -85,12 +233,12 @@
    }
   },
   "mass":{
-   "exp":"100 lbs",
-   "val":45.359237
+   "exp":"115 lbs",
+   "val":52.16312255
   },
   "inertia":{
-   "exp":"1 kg m ^ 2",
-   "val":1.0
+   "exp":"4 kg m ^ 2",
+   "val":4.0
   },
   "gearing":{
    "exp":"6.75",
