@@ -5,7 +5,7 @@ from magicbot import will_reset_to
 from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
-from wpilib import DriverStation, SmartDashboard, Timer, Field2d
+from wpilib import DriverStation, Field2d, SmartDashboard, Timer
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
 from wpimath.geometry import Pose2d, Rotation2d
@@ -284,10 +284,11 @@ class SwerveDrive(Sendable):
         angle: units.radians,
     ):
         """Drive while pointing the robot at a field-absolute angle.
-        Uses BLUE_ALLIANCE perspective (for shooter / field-relative targets)."""
+        Uses OPERATOR_PERSPECTIVE so that vx/vy from the joystick keep
+        their normal orientation regardless of alliance colour."""
         self.stopped = False
         self.pending_request = (
-            self.facing_angle_field_req.with_velocity_x(vx)
+            self.facing_angle_req.with_velocity_x(vx)
             .with_velocity_y(vy)
             .with_target_direction(Rotation2d(angle))
         )

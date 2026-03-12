@@ -2,11 +2,11 @@
 
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
 import math
+from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
 from phoenix6.hardware import TalonFX, TalonFXS
-from rev import SparkMax
 from wpilib import (
     DriverStation,
     Field2d,
@@ -32,7 +32,7 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
-from pathlib import Path
+
 
 class MyRobot(LemonRobot):
     # led_strip: LEDStrip
@@ -329,11 +329,11 @@ class MyRobot(LemonRobot):
                 omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
 
             if primary.getTriangleButton():
-                self.drive_control.drive_point(vx, vy, 0.0)
+                self.drive_control.drive_point(-vx, -vy, 0.0)
 
             elif primary.getCircleButton():
                 self.drive_control.drive_point(
-                    vx, vy, self.shooter_controller.target_angle
+                    -vx, -vy, self.shooter_controller.target_angle
                 )
             else:
                 self.drive_control.drive_manual(

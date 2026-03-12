@@ -159,10 +159,9 @@ class DriveControl(StateMachine):
         """
         Default teleop state - accepts manual joystick input.
         Continuously checks for state transition triggers.
+        Issue a drive command THIS frame even when transitioning so there
+        is no one-frame gap where no command reaches the swerve drive.
         """
-        # Check for state transitions in priority order.
-        # next_state_now executes the target state this cycle so there is
-        # no one-frame lag where drive() sends stale commands.
         if _isAutonomousEnabled():
             self.next_state("run_auton_routine")
 
@@ -173,9 +172,21 @@ class DriveControl(StateMachine):
             self.next_state("x_brake_state")
 
         elif self.point_to_target:
+            # Drive-point this frame so there is no stutter on transition
+            self.swerve_drive.drive_point(
+                self.translationX,
+                self.translationY,
+                self.point_target,
+            )
             self.next_state("point_towards_target")
 
         elif self.point_joy_target:
+            self.swerve_drive.drive_point_joy(
+                self.translationX,
+                self.translationY,
+                self.point_joy_x,
+                self.point_joy_y,
+            )
             self.next_state("point_towards_joy")
 
         elif self.drive_sysid:
