@@ -60,8 +60,8 @@ class ShooterController(StateMachine):
         config = ShotConfig(
             launcher_offset_x=0.25,
             launcher_offset_y=0.0,
-            min_scoring_distance=min_d,
-            max_scoring_distance=max_d,
+            min_scoring_distance=0,
+            max_scoring_distance=99,
             phase_delay_ms=30.0,
             mech_latency_ms=20.0,
         )

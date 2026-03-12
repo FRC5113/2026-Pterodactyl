@@ -16,6 +16,8 @@ from wpimath import units
 
 from lemonlib.smart import SmartProfile
 
+from magicbot import feedback
+
 
 class Shooter:
     """low level component that directly manages the shooter motors and their configuration. controlled by the shooter controller component, but can also be directly controlled for testing purposes"""
@@ -29,6 +31,7 @@ class Shooter:
     shooter_profile: SmartProfile
     shooter_gear_ratio: float
     shooter_amps: units.amperes
+    shooter_conveyor_amps: units.amperes
     tuning_enabled: bool
 
     shooter_velocity = will_reset_to(0.0)
@@ -61,7 +64,7 @@ class Shooter:
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
-        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
+        self.shooter_control = controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
         )
@@ -71,17 +74,16 @@ class Shooter:
         self.kicker_motor_configs.commutation.motor_arrangement = (
             MotorArrangementValue.NEO550_JST
         )
-        self.kicker_motor_configs.current_limits.stator_current_limit = 20
 
         self.left_kicker_motor.configurator.apply(self.kicker_motor_configs)
         self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
 
         self.conveyor_motor_configs = TalonFXSConfiguration()
-        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.COAST
         self.conveyor_motor_configs.commutation.motor_arrangement = (
-            MotorArrangementValue.BRUSHED_DC
+            MotorArrangementValue.NEO550_JST
         )
-        # self.conveyor_motor_configs.current_limits.stator_current_limit = 10
+        self.conveyor_motor_configs.current_limits.supply_current_limit = 30
 
         self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
 
@@ -120,13 +122,13 @@ class Shooter:
 
     def set_kicker(self, value: float):
         self.kicker_duty = value  # ha duty thats funny right there
-        self.conveyor_volt = 6
+        self.conveyor_volt = 8
 
     """
     INFORMATIONAL METHODS
     """
 
-    # @feedback
+    @feedback
     def get_velocity(self) -> float:
         return self._cached_velocity
 
