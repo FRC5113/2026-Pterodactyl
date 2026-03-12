@@ -6,7 +6,6 @@ from wpimath.geometry import Translation2d
 from wpimath.kinematics import ChassisSpeeds
 
 from components.drive_control import DriveControl
-from components.projectile_simulator import ProjectileSimulator, SimParameters
 from components.shooter import Shooter
 from components.shot_calculator import (
     INVALID,
@@ -46,33 +45,6 @@ class ShooterController(StateMachine):
     min_confidence = SmartPreference(40.0)
 
     def setup(self):
-        # Generate the shooter LUT from projectile physics instead of
-        # hand-tuning.  ProjectileSimulator binary-searches RPM for each
-        # distance so the ball arrives at hub-entry height.
-        sim_params = SimParameters(
-            ball_mass_kg=0.215,
-            ball_diameter_m=0.1501,
-            drag_coeff=0.47,
-            magnus_coeff=0.2,
-            air_density=1.225,
-            exit_height_m=0.5334,
-            wheel_diameter_m=0.1016,
-            target_height_m=1.83,
-            slip_factor=0.6,
-            fixed_launch_angle_deg=67.0,
-            dt=0.001,
-            rpm_min=1500,
-            rpm_max=6000,
-            binary_search_iters=25,
-            max_sim_time=5.0,
-        )
-        self.projectile_sim = ProjectileSimulator(sim_params)
-        lut = self.projectile_sim.generate_lut()
-
-        # Build the shot calculator
-        min_d = lut.entries[0].distance_m if lut.entries else 0.5
-        max_d = lut.max_range_m if lut.max_range_m > 0 else 5.0
-
         self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
         # RPS
@@ -80,6 +52,10 @@ class ShooterController(StateMachine):
 
         # Seconds — measured flight times at each distance
         self.time_lookup = [0.97, 1.21, 1.2, 1.2]  # TODO Tune these values
+
+        # Build the shot calculator
+        min_d = self.distance_lookup[0]
+        max_d = self.distance_lookup[-1]
 
         config = ShotConfig(
             launcher_offset_x=0.25,
@@ -93,10 +69,8 @@ class ShooterController(StateMachine):
 
         # Load every reachable LUT entry.  RPM from the sim is wheel RPM;
         # the shooter LUT expects flywheel RPS (= RPM / 60 * gear_ratio,
-        for entry in lut.entries:
-            if entry.reachable:
-                rps = entry.rpm / 60.0
-                self.calculator.load_lut_entry(entry.distance_m, rps, entry.tof)
+        for dis, rps, tof in zip(self.distance_lookup, self.speed_lookup, self.time_lookup):
+                self.calculator.load_lut_entry(dis, rps, tof)
 
         # Cached solver output
         self.launch: LaunchParameters = INVALID
