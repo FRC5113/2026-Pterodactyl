@@ -130,13 +130,12 @@ class MyRobot(LemonRobot):
         # BRUSHED = SparkMax.MotorType.kBrushed
 
         self.intake_spin_motor = TalonFX(51)
-        # self.intake_left_motor = SparkMax(52, BRUSHED)
-        # self.intake_right_motor = SparkMax(53, BRUSHED)
+
+        self.intake_left_rollout_motor = TalonFXS(52)
+        self.intake_right_rollout_motor = TalonFXS(53)
         # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
         # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
-        self.intake_spin_amps: units.amperes = 20.0
-        self.intake_arm_amps: units.amperes = 20.0
 
         self.intake_profile = SmartProfile(
             "intake",
@@ -353,19 +352,18 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-            if secondary_right_stick_button:
-                self.intake.set_bypass_limits()
+
 
             if secondary.getLeftTriggerAxis() >= 0.8:
-                self.intake.set_voltage(8.0)
+                self.intake.on()
             elif secondary_left_bumper:
-                self.intake.set_voltage(-8.0)
+                self.intake.off()
 
             # if secondary.getRightTriggerAxis() >= 0.8:
             #     self.intake.set_arm_voltage(8)
 
             if secondary_right_bumper:
-                self.intake.set_arm_voltage(-8)
+                self.intake.down()
 
         """
         SHOOTER
