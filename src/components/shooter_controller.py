@@ -2,15 +2,28 @@ import math
 
 from magicbot import StateMachine, feedback, state, will_reset_to
 from wpilib import DriverStation
+from wpimath.geometry import Translation2d
+from wpimath.kinematics import ChassisSpeeds
 
 from components.drive_control import DriveControl
 from components.shooter import Shooter
+from components.shot_calculator import (
+    INVALID,
+    LaunchParameters,
+    ShotCalculator,
+    ShotConfig,
+    ShotInputs,
+)
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos, is_alliance_hub_active
-
 from lemonlib.smart import SmartPreference
 
 _RED = DriverStation.Alliance.kRed
+
+# Hub forward vectors — points from behind the hub toward the field.
+# Used by ShotCalculator to reject shots from behind the hub.
+_RED_HUB_FORWARD = Translation2d(-1.0, 0.0)
+_BLUE_HUB_FORWARD = Translation2d(1.0, 0.0)
 
 
 class ShooterController(StateMachine):
@@ -28,8 +41,10 @@ class ShooterController(StateMachine):
 
     flywheel_speed = SmartPreference(30.0)
 
+    # Minimum confidence (0-100) from the solver to accept a shot
+    min_confidence = SmartPreference(40.0)
+
     def setup(self):
-        # Meters
         self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
         # RPS
@@ -38,24 +53,40 @@ class ShooterController(StateMachine):
         # Seconds — measured flight times at each distance
         self.time_lookup = [0.97, 1.21, 1.2, 1.2]  # TODO Tune these values
 
+        # Build the shot calculator
+        min_d = self.distance_lookup[0]
+        max_d = self.distance_lookup[-1]
+
+        config = ShotConfig(
+            launcher_offset_x=0.25,
+            launcher_offset_y=0.0,
+            min_scoring_distance=min_d,
+            max_scoring_distance=max_d,
+            phase_delay_ms=30.0,
+            mech_latency_ms=20.0,
+        )
+        self.calculator = ShotCalculator(config)
+
+        # Load every reachable LUT entry.  RPM from the sim is wheel RPM;
+        # the shooter LUT expects flywheel RPS (= RPM / 60 * gear_ratio,
+        for dis, rps, tof in zip(
+            self.distance_lookup, self.speed_lookup, self.time_lookup
+        ):
+            self.calculator.load_lut_entry(dis, rps, tof)
+
+        # Cached solver output
+        self.launch: LaunchParameters = INVALID
         self.target_rps = 0.0
         self.target_angle = 0.0
         self.distance = 0.0
         self.valid_shot = False
+        self.shot_confidence = 0.0
 
-        self.phase_delay = 0.03
-        self.lead_iterations = 15
-
-        self.shooter_offsetX = 0.25  # meters forward of robot center
-        self.shooter_offsetY = 0.0  # meters left (+) / right (-)
-
-        self.min_distance = 1.597
-        self.max_distance = 4.597
-
+        # Tuning constants
         self.idle_speed_scalar = 0.5
         self.kicker_duty = 8  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
-        self.speed_tolerance = 0.05  # 5%
+        self.speed_tolerance = 0.05  # 5 %
 
     """
     CONTROL METHODS
@@ -71,111 +102,53 @@ class ShooterController(StateMachine):
         self.force_shoot_req = True
         self.force_shoot_rps = rps
 
-    def _get_rps_curve(self, distance):
-        return
+    def adjust_rpm_offset(self, delta: float):
+        """Copilot D-pad trim.  Persists until reset."""
+        self.calculator.adjust_offset(delta)
 
-    def _get_target_moving(self):
+    def reset_rpm_offset(self):
+        self.calculator.reset_offset()
+
+    def _build_shot_inputs(self) -> ShotInputs:
         pose = self.swerve_drive.get_estimated_pose()
-        chassis = self.swerve_drive.get_velocity()
+        robot_vel = self.swerve_drive.get_velocity()  # robot-relative
+
+        # Convert robot-relative velocity > field-relative
+        heading = pose.rotation().radians()
+        cos_h = math.cos(heading)
+        sin_h = math.sin(heading)
+        field_vx = robot_vel.vx * cos_h - robot_vel.vy * sin_h
+        field_vy = robot_vel.vx * sin_h + robot_vel.vy * cos_h
+        field_vel = ChassisSpeeds(field_vx, field_vy, robot_vel.omega)
 
         is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)
+        hub_forward = _RED_HUB_FORWARD if is_red else _BLUE_HUB_FORWARD
 
-        phase_delay = self.phase_delay
-        future_x = pose.x + chassis.vx * phase_delay
-        future_y = pose.y + chassis.vy * phase_delay
-        future_heading = pose.rotation().radians() + chassis.omega * phase_delay
-
-        cos_h = math.cos(future_heading)
-        sin_h = math.sin(future_heading)
-
-        offsetX = self.shooter_offsetX
-        offsetY = self.shooter_offsetY
-
-        launcher_x = future_x + offsetX * cos_h - offsetY * sin_h
-        launcher_y = future_y + offsetX * sin_h + offsetY * cos_h
-
-        omega = chassis.omega
-        rot_vx = -omega * offsetY
-        rot_vy = omega * offsetX
-
-        launcher_vx = chassis.vx + rot_vx
-        launcher_vy = chassis.vy + rot_vy
-
-        hub_x = hub_pos.x
-        hub_y = hub_pos.y
-        predicted_x = hub_x
-        predicted_y = hub_y
-
-        _hypot = math.hypot
-        _interp = self._linear_interp
-        dist_lut = self.distance_lookup
-        time_lut = self.time_lookup
-
-        lookahead_distance = _hypot(
-            predicted_x - launcher_x,
-            predicted_y - launcher_y,
+        return ShotInputs(
+            robot_pose=pose,
+            field_velocity=field_vel,
+            robot_velocity=robot_vel,
+            hub_center=hub_pos,
+            hub_forward=hub_forward,
         )
 
-        for _ in range(self.lead_iterations):
-            time_of_flight = _interp(
-                lookahead_distance,
-                dist_lut,
-                time_lut,
-            )
-
-            predicted_x = hub_x - launcher_vx * time_of_flight
-            predicted_y = hub_y - launcher_vy * time_of_flight
-
-            lookahead_distance = _hypot(
-                predicted_x - launcher_x,
-                predicted_y - launcher_y,
-            )
-
-        target_angle = math.atan2(predicted_y - launcher_y, predicted_x - launcher_x)
-
-        return (target_angle, lookahead_distance)
-
-    def _get_target_stationary(self):
-        pose = self.swerve_drive.get_estimated_pose().translation()
-        is_red = DriverStation.getAlliance() == _RED
-        hub_pos = get_hub_pos(is_red)
-
-        distance = hub_pos.distance(pose)
-
-        target_angle = math.atan2(hub_pos.y - pose.y, hub_pos.x - pose.x)
-
-        return (target_angle, distance)
-
     def _update_target(self):
-        target_angle, distance = self._get_target_stationary()
-        # target_angle, distance = self._get_target_moving()
+        inputs = self._build_shot_inputs()
+        self.distance = self.calculator.get_distance_from_hub(inputs)
+        self.launch = self.calculator.calculate(inputs)
 
-        self.target_angle = target_angle
-        self.distance = distance
-
-        if self.min_distance <= distance <= self.max_distance:
+        if self.launch.is_valid:
             self.valid_shot = True
-            self.target_rps = self._linear_interp(
-                distance, self.distance_lookup, self.speed_lookup
-            )
+            self.target_rps = self.launch.rpm
+            self.target_angle = self.launch.drive_angle.radians()
+            self.shot_confidence = self.launch.confidence
         else:
-            self.target_rps = (
-                0.29 * (distance**3) - 2.65 * (distance**2) + 11.03 * distance + 29.895
-            )
-
-    def _linear_interp(self, x, xp, fp):
-        if x <= xp[0]:
-            return fp[0]
-        if x >= xp[-1]:
-            return fp[-1]
-
-        for i in range(len(xp) - 1):
-            if xp[i] <= x <= xp[i + 1]:
-                t = (x - xp[i]) / (xp[i + 1] - xp[i])
-                return fp[i] + t * (fp[i + 1] - fp[i])
-
-        return fp[-1]
+            self.valid_shot = False
+            self.target_rps = 0.0
+            self.shot_confidence = 0.0
+            # Keep target_angle from last valid solution so idle spin-up
+            # doesn't jump around.
 
     """
     INFORMATIONAL METHODS
@@ -188,6 +161,10 @@ class ShooterController(StateMachine):
     @feedback
     def get_distance(self):
         return self.distance
+
+    @feedback
+    def get_confidence(self):
+        return self.shot_confidence
 
     # @feedback
     def is_at_speed(self):
@@ -207,10 +184,7 @@ class ShooterController(StateMachine):
     @state(first=True)
     def idle(self):
         self._update_target()
-        # if self.valid_shot:
         self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
-        # else:
-        #     self.shooter.set_velocity(0.0)
 
         if self.unjamming:
             self.next_state("unjam")
@@ -236,7 +210,9 @@ class ShooterController(StateMachine):
     @state
     def force_shoot(self):
         self.shooter.set_velocity(self.force_shoot_rps)
-        if abs(self.shooter.get_velocity() - self.target_rps) <= (10.0):
+        tolerance = self.speed_tolerance * self.target_rps
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        if speed_ready:
             self.forceshoottolgood = True
             self.shooter.set_kicker(self.kicker_duty)
         if not self.force_shoot_req:
@@ -246,18 +222,21 @@ class ShooterController(StateMachine):
     def spin_up(self):
         self._update_target()
 
-        if not self.valid_shot:
-            self.next_state("idle")
-            return
-
+        # Keep spinning and aiming even if the shot is momentarily invalid
+        # (e.g. heading error spike) — don't drop back to idle and stop
+        # pointing, which causes drive-state flutter.
         self.shooter.set_velocity(self.target_rps)
         self.drive_control.point_to(self.target_angle)
 
         tolerance = self.speed_tolerance * self.target_rps
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
-        aim_ready = self._is_aimed()
 
-        self.at_speed = speed_ready and aim_ready
+        # Gate on the SOTM solver's confidence instead of a raw heading
+        # check — the solver already penalises heading error, so this
+        # lets us shoot while moving without flickering on/off.
+        confident = self.shot_confidence >= self.min_confidence
+
+        self.at_speed = speed_ready and confident
 
         if not self.shooting:
             self.next_state("idle")
@@ -268,22 +247,22 @@ class ShooterController(StateMachine):
     def shoot(self):
         self._update_target()
 
-        if not self.valid_shot:
-            self.next_state("idle")
-            return
-
+        # Always keep aiming and spinning — don't bail on momentary invalid
         self.drive_control.point_to(self.target_angle)
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
-        aim_ready = self._is_aimed()
+        confident = self.valid_shot and self.shot_confidence >= self.min_confidence
 
-        self.at_speed = speed_ready and aim_ready and is_alliance_hub_active()
+        self.at_speed = speed_ready and confident and is_alliance_hub_active()
 
         if not self.shooting:
             self.next_state("idle")
-        elif not self.at_speed:
+        elif not speed_ready:
+            # Only drop back to spin_up when the flywheel actually loses
+            # speed — NOT for heading drift.  The SOTM solver continuously
+            # updates the aim, so small heading errors are compensated.
             self.next_state("spin_up")
-        else:
+        elif self.at_speed:
             self.shooter.set_kicker(self.kicker_duty)
