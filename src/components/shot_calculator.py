@@ -244,6 +244,63 @@ class ShotCalculator:
 
     """Main solver"""
 
+    def get_distance_from_hub(
+        self,
+        inputs: ShotInputs,
+        *,
+        use_launcher_offset: bool = True,
+        latency_compensated: bool = True,
+    ) -> float:
+        """Return planar distance to hub independent of shot validity gates.
+
+        This can be used for telemetry/UI even when :meth:`calculate` would
+        return an invalid shot (tilt, behind hub, speed limits, etc.).
+        Returns 0.0 only when pose/hub inputs are missing or non-finite.
+        """
+        if inputs is None or inputs.robot_pose is None or inputs.hub_center is None:
+            return 0.0
+
+        pose = inputs.robot_pose
+        pose_x = pose.x
+        pose_y = pose.y
+        if (
+            math.isnan(pose_x)
+            or math.isnan(pose_y)
+            or math.isinf(pose_x)
+            or math.isinf(pose_y)
+        ):
+            return 0.0
+
+        cfg = self.config
+
+        if latency_compensated:
+            robot_vel = inputs.robot_velocity
+            dt = cfg.phase_delay_ms / 1000.0
+            ax = (robot_vel.vx - self._prev_robot_vx) / 0.02
+            ay = (robot_vel.vy - self._prev_robot_vy) / 0.02
+            a_omega = (robot_vel.omega - self._prev_robot_omega) / 0.02
+            pose = pose.exp(
+                Twist2d(
+                    robot_vel.vx * dt + 0.5 * ax * dt * dt,
+                    robot_vel.vy * dt + 0.5 * ay * dt * dt,
+                    robot_vel.omega * dt + 0.5 * a_omega * dt * dt,
+                )
+            )
+
+        origin_x = pose.x
+        origin_y = pose.y
+
+        if use_launcher_offset:
+            heading = pose.rotation().radians()
+            cos_h = math.cos(heading)
+            sin_h = math.sin(heading)
+            origin_x += cfg.launcher_offset_x * cos_h - cfg.launcher_offset_y * sin_h
+            origin_y += cfg.launcher_offset_x * sin_h + cfg.launcher_offset_y * cos_h
+
+        dx = inputs.hub_center.x - origin_x
+        dy = inputs.hub_center.y - origin_y
+        return math.hypot(dx, dy)
+
     def calculate(self, inputs: ShotInputs) -> LaunchParameters:
         """Solve for the firing solution.  Call once per cycle."""
         if inputs is None or inputs.robot_pose is None:

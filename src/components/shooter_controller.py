@@ -60,8 +60,8 @@ class ShooterController(StateMachine):
         config = ShotConfig(
             launcher_offset_x=0.25,
             launcher_offset_y=0.0,
-            min_scoring_distance=0,
-            max_scoring_distance=99,
+            min_scoring_distance=min_d,
+            max_scoring_distance=max_d,
             phase_delay_ms=30.0,
             mech_latency_ms=20.0,
         )
@@ -69,8 +69,10 @@ class ShooterController(StateMachine):
 
         # Load every reachable LUT entry.  RPM from the sim is wheel RPM;
         # the shooter LUT expects flywheel RPS (= RPM / 60 * gear_ratio,
-        for dis, rps, tof in zip(self.distance_lookup, self.speed_lookup, self.time_lookup):
-                self.calculator.load_lut_entry(dis, rps, tof)
+        for dis, rps, tof in zip(
+            self.distance_lookup, self.speed_lookup, self.time_lookup
+        ):
+            self.calculator.load_lut_entry(dis, rps, tof)
 
         # Cached solver output
         self.launch: LaunchParameters = INVALID
@@ -133,18 +135,17 @@ class ShooterController(StateMachine):
 
     def _update_target(self):
         inputs = self._build_shot_inputs()
+        self.distance = self.calculator.get_distance_from_hub(inputs)
         self.launch = self.calculator.calculate(inputs)
 
         if self.launch.is_valid:
             self.valid_shot = True
             self.target_rps = self.launch.rpm
             self.target_angle = self.launch.drive_angle.radians()
-            self.distance = self.launch.solved_distance_m
             self.shot_confidence = self.launch.confidence
         else:
             self.valid_shot = False
             self.target_rps = 0.0
-            self.distance = 0.0
             self.shot_confidence = 0.0
             # Keep target_angle from last valid solution so idle spin-up
             # doesn't jump around.
@@ -209,7 +210,9 @@ class ShooterController(StateMachine):
     @state
     def force_shoot(self):
         self.shooter.set_velocity(self.force_shoot_rps)
-        if abs(self.shooter.get_velocity() - self.target_rps) <= (10.0):
+        tolerance = self.speed_tolerance * self.target_rps
+        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        if speed_ready:
             self.forceshoottolgood = True
             self.shooter.set_kicker(self.kicker_duty)
         if not self.force_shoot_req:
