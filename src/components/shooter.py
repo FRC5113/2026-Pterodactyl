@@ -1,4 +1,4 @@
-from magicbot import will_reset_to
+from magicbot import feedback, will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
@@ -15,8 +15,6 @@ from phoenix6.signals import (
 from wpimath import units
 
 from lemonlib.smart import SmartProfile
-
-from magicbot import feedback
 
 
 class Shooter:
@@ -64,7 +62,9 @@ class Shooter:
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
-        self.shooter_control = controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
+        self.shooter_control = (
+            controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
+        )
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
         )
@@ -92,9 +92,12 @@ class Shooter:
         self.kicker_follower = controls.Follower(
             self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
         )
+        self.coast_control = controls.CoastOut()
 
         self.prev_kicker_control = 0.0
         self.prev_shooter_control = 0.0
+
+        self.component_enabled = True
 
     def on_enable(self):
         if self.tuning_enabled:
@@ -124,6 +127,12 @@ class Shooter:
         self.kicker_duty = value  # ha duty thats funny right there
         self.conveyor_volt = 8
 
+    def turn_off_component(self):
+        self.component_enabled = False
+
+    def turn_on_component(self):
+        self.component_enabled = True
+
     """
     INFORMATIONAL METHODS
     """
@@ -137,6 +146,15 @@ class Shooter:
         return self.shooter_velocity
 
     def execute(self):
+        # thing so that if batt low we can turn off to save energy
+        if not self.component_enabled:
+            self.right_motor.set_control(self.coast_control)
+            self.left_motor.set_control(self.coast_control)
+            self.right_kicker_motor.set_control(self.coast_control)
+            self.left_kicker_motor.set_control(self.coast_control)
+            self.conveyor_motor.set_control(self.coast_control)
+            return
+
         # Cache velocity once per cycle for feedback and shooter_controller use
         self._cached_velocity = self.left_motor.get_velocity().value
 

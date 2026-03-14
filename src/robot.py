@@ -291,10 +291,12 @@ class MyRobot(LemonRobot):
         primary_ly = primary.getLeftY()
         primary_lx = primary.getLeftX()
         primary_rx = primary.getRightX()
+        primary_pov = primary.getPOV()
 
         secondary_left_bumper = secondary.getLeftBumper()
         secondary_right_bumper = secondary.getRightBumper()
         secondary_right_stick_button = secondary.getRightStickButton()
+        secondary_pov = secondary.getPOV()
 
         """
         SWERVE
@@ -348,6 +350,19 @@ class MyRobot(LemonRobot):
 
             if primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
+
+        """
+        GENERAL CONTROLS
+        """
+        with self.consumeExceptions():
+            if secondary_pov == 0 or primary_pov == 0:
+                self.shooter.turn_off_component()
+                self.intake.turn_off_component()
+                return
+            elif secondary_pov == 180 or primary_pov == 180:
+                self.shooter.turn_on_component()
+                self.intake.turn_on_component()
+                return
 
         """
         INTAKE

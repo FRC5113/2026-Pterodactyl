@@ -23,6 +23,10 @@ def _clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
+def _is_finite(value: float) -> bool:
+    return not math.isnan(value) and not math.isinf(value)
+
+
 def _angle_modulus(angle_rad: float) -> float:
     """Wrap to (-pi, pi]."""
     return math.atan2(math.sin(angle_rad), math.cos(angle_rad))
@@ -263,12 +267,7 @@ class ShotCalculator:
         pose = inputs.robot_pose
         pose_x = pose.x
         pose_y = pose.y
-        if (
-            math.isnan(pose_x)
-            or math.isnan(pose_y)
-            or math.isinf(pose_x)
-            or math.isinf(pose_y)
-        ):
+        if not _is_finite(pose_x) or not _is_finite(pose_y):
             return 0.0
 
         cfg = self.config
@@ -297,8 +296,13 @@ class ShotCalculator:
             origin_x += cfg.launcher_offset_x * cos_h - cfg.launcher_offset_y * sin_h
             origin_y += cfg.launcher_offset_x * sin_h + cfg.launcher_offset_y * cos_h
 
-        dx = inputs.hub_center.x - origin_x
-        dy = inputs.hub_center.y - origin_y
+        hub_x = inputs.hub_center.x
+        hub_y = inputs.hub_center.y
+        if not _is_finite(hub_x) or not _is_finite(hub_y):
+            return 0.0
+
+        dx = hub_x - origin_x
+        dy = hub_y - origin_y
         return math.hypot(dx, dy)
 
     def calculate(self, inputs: ShotInputs) -> LaunchParameters:
@@ -311,14 +315,17 @@ class ShotCalculator:
         field_vel = inputs.field_velocity
         robot_vel = inputs.robot_velocity
 
+        if (
+            inputs.hub_center is None
+            or inputs.hub_forward is None
+            or field_vel is None
+            or robot_vel is None
+        ):
+            return INVALID
+
         pose_x = raw_pose.x
         pose_y = raw_pose.y
-        if (
-            math.isnan(pose_x)
-            or math.isnan(pose_y)
-            or math.isinf(pose_x)
-            or math.isinf(pose_y)
-        ):
+        if not _is_finite(pose_x) or not _is_finite(pose_y):
             return INVALID
 
         # Second-order pose prediction:  v*dt + 0.5*a*dt^2
@@ -344,9 +351,13 @@ class ShotCalculator:
 
         hub_x = inputs.hub_center.x
         hub_y = inputs.hub_center.y
+        if not _is_finite(hub_x) or not _is_finite(hub_y):
+            return INVALID
 
         # Behind-hub detection
         hf = inputs.hub_forward
+        if not _is_finite(hf.x) or not _is_finite(hf.y):
+            return INVALID
         dot = (hub_x - robot_x) * hf.x + (hub_y - robot_y) * hf.y
         if dot < 0:
             return INVALID
@@ -440,6 +451,16 @@ class ShotCalculator:
                 f = lookup_tof - tof
                 f_prime = g_prime * d_prime - 1.0
 
+                if (
+                    not _is_finite(lookup_tof)
+                    or not _is_finite(g_prime)
+                    or not _is_finite(f)
+                    or not _is_finite(f_prime)
+                ):
+                    tof = self.effective_tof(distance)
+                    iterations_used = max_iter + 1
+                    break
+
                 # Newton step with near-zero denominator guard
                 if _abs(f_prime) > 0.01:
                     tof = tof - f / f_prime
@@ -453,7 +474,7 @@ class ShotCalculator:
                     break
 
             # Divergence guard
-            if tof > cfg.tof_max or tof < 0.0 or math.isnan(tof):
+            if tof > cfg.tof_max or tof < 0.0 or not _is_finite(tof):
                 tof = self.effective_tof(distance)
                 iterations_used = max_iter + 1
 
@@ -462,7 +483,9 @@ class ShotCalculator:
         # Save for warm start
         self._previous_tof = solved_tof
 
-        effective_tof_val = solved_tof + cfg.mech_latency_ms / 1000.0
+        effective_tof_val = _clamp(
+            solved_tof + cfg.mech_latency_ms / 1000.0, cfg.tof_min, cfg.tof_max
+        )
 
         # RPM from LUT at solved distance
         effective_rpm_val = self.effective_rpm(proj_dist)
@@ -478,7 +501,10 @@ class ShotCalculator:
 
         aim_x = comp_target_x - robot_x
         aim_y = comp_target_y - robot_y
-        drive_angle = Rotation2d(aim_x, aim_y)
+        if abs(aim_x) < 1e-9 and abs(aim_y) < 1e-9:
+            drive_angle = compensated_pose.rotation()
+        else:
+            drive_angle = Rotation2d(aim_x, aim_y)
 
         heading_error_rad = _angle_modulus(drive_angle.radians() - heading)
 
@@ -538,20 +564,32 @@ class ShotCalculator:
 
         convergence_quality = solver_quality
 
-        speed_delta = abs(current_speed - self._previous_speed)
-        velocity_stability = _clamp(1.0 - speed_delta / 0.5, 0, 1)
+        if current_speed < cfg.min_sotm_speed:
+            velocity_stability = 1.0
+        else:
+            speed_delta = abs(current_speed - self._previous_speed)
+            velocity_stability = _clamp(1.0 - speed_delta / 0.5, 0, 1)
 
         vision_conf = _clamp(vision_confidence, 0, 1)
 
-        distance_scale = _clamp(cfg.heading_reference_distance / distance, 0.5, 2.0)
+        safe_distance = max(distance, 1e-6)
+        distance_scale = _clamp(
+            cfg.heading_reference_distance / safe_distance, 0.5, 2.0
+        )
         speed_scale = 1.0 / (1.0 + cfg.heading_speed_scalar * current_speed)
-        scaled_max_error = cfg.heading_max_error_rad * distance_scale * speed_scale
+        scaled_max_error = max(
+            cfg.heading_max_error_rad * distance_scale * speed_scale,
+            1e-6,
+        )
         heading_err = abs(heading_error_rad)
         heading_accuracy = _clamp(1.0 - heading_err / scaled_max_error, 0, 1)
 
         range_span = cfg.max_scoring_distance - cfg.min_scoring_distance
-        range_fraction = (distance - cfg.min_scoring_distance) / range_span
-        dist_in_range = _clamp(1.0 - 2.0 * abs(range_fraction - 0.5), 0, 1)
+        if range_span <= 1e-9:
+            dist_in_range = 1.0
+        else:
+            range_fraction = (distance - cfg.min_scoring_distance) / range_span
+            dist_in_range = _clamp(1.0 - 2.0 * abs(range_fraction - 0.5), 0, 1)
 
         components = (
             convergence_quality,

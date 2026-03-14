@@ -66,6 +66,7 @@ class Intake:
         # )
 
         self.spin_control = controls.VoltageOut(0)
+        self.coast_control = controls.CoastOut()
 
         self.hinge_alert = Alert(
             "intake hinge has rotated too far!", type=AlertType.WARNING
@@ -83,6 +84,8 @@ class Intake:
 
         self.prev_arm_voltage = 0.0
         self.prev_spin_voltage = 0.0
+
+        self.component_enabled = True
 
     def on_enable(self):
         self.controller = self.profile.create_arm_controller("intake_arm")
@@ -128,7 +131,20 @@ class Intake:
     def set_bypass_limits(self):
         self.bypass_limits = True
 
+    def turn_off_component(self):
+        self.component_enabled = False
+
+    def turn_on_component(self):
+        self.component_enabled = True
+
     def execute(self):
+        # thing so that if batt low we can turn off to save energy
+        if not self.component_enabled:
+            self.spin_motor.set_control(self.coast_control)
+            # self.right_motor.set_control(self.coast_control)
+            # self.left_motor.set_control(self.coast_control)
+            return
+
         pos = self.get_position()
 
         # if not self.arm_manual_control:
