@@ -1,8 +1,8 @@
 import math
 
 from magicbot import StateMachine, feedback, state, will_reset_to
-from wpilib import DriverStation
-from wpimath.geometry import Translation2d
+from wpilib import DriverStation, Field2d
+from wpimath.geometry import Pose2d, Rotation2d, Translation2d
 from wpimath.kinematics import ChassisSpeeds
 
 from components.drive_control import DriveControl
@@ -15,7 +15,7 @@ from components.shot_calculator import (
     ShotInputs,
 )
 from components.swerve_drive import SwerveDrive
-from game import get_hub_pos, is_alliance_hub_active
+from game import get_hub_pos
 from lemonlib.smart import SmartPreference
 
 _RED = DriverStation.Alliance.kRed
@@ -30,6 +30,8 @@ class ShooterController(StateMachine):
     drive_control: DriveControl
     shooter: Shooter
     swerve_drive: SwerveDrive
+
+    estimated_field: Field2d
 
     at_speed = will_reset_to(False)
     shooting = will_reset_to(False)
@@ -210,8 +212,10 @@ class ShooterController(StateMachine):
     @state
     def force_shoot(self):
         self.shooter.set_velocity(self.force_shoot_rps)
-        tolerance = self.speed_tolerance * self.target_rps
-        speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
+        tolerance = self.speed_tolerance * self.force_shoot_rps
+        speed_ready = (
+            abs(self.shooter.get_velocity() - self.force_shoot_rps) <= tolerance
+        )
         if speed_ready:
             self.forceshoottolgood = True
             self.shooter.set_kicker(self.kicker_duty)
@@ -255,7 +259,7 @@ class ShooterController(StateMachine):
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
         confident = self.valid_shot and self.shot_confidence >= self.min_confidence
 
-        self.at_speed = speed_ready and confident and is_alliance_hub_active()
+        self.at_speed = speed_ready and confident
 
         if not self.shooting:
             self.next_state("idle")

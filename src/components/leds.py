@@ -2,11 +2,13 @@ from magicbot import will_reset_to
 from wpilib import Color, DriverStation
 
 from components.swerve_drive import SwerveDrive
+from components.shooter_controller import ShooterController
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
 
 
 class LEDStrip:
+    shooter_controller: ShooterController
     swerve_drive: SwerveDrive
     leds: LEDController
 

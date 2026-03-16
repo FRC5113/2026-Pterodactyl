@@ -6,9 +6,7 @@ from phoenix6.signals import MotorAlignmentValue, NeutralModeValue
 from wpilib import DutyCycleEncoder
 from wpimath.units import volts
 
-from lemonlib.util.alert importAlertManager, AlertType
-
-
+from lemonlib.util.alert import AlertManager, AlertType
 
 
 class Climber:

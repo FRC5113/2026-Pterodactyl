@@ -284,6 +284,6 @@
   "root":"home/ryan/Documents/2026-Rebuild/src",
   "genVars":true,
   "genTrajData":true,
-  "useChoreoLib":true
+  "useChoreoLib":false
  }
 }
