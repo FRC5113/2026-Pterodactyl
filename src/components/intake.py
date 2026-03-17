@@ -34,16 +34,22 @@ class Intake:
         right_rollout_config = TalonFXSConfiguration()
         right_rollout_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         right_rollout_config.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE
+        self.right_rollout_motor.configurator.apply(right_rollout_config)
 
         spin_motor_config = TalonFXConfiguration()
         spin_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.spin_motor.configurator.apply(spin_motor_config)
 
+        # Configure encoders so that one full rotation corresponds to 360 degrees.
+        # This ensures getDistance() returns angles in degrees, matching IntakeAngle.
+        self.left_encoder.setDistancePerRotation(360.0)
+        self.right_encoder.setDistancePerRotation(360.0)
+
     @feedback
     def get_angle(self) -> float:
-        """NOTE: They might change the encoder rotations, so if there is a bug look here"""
-        left = self.left_encoder.get()
-        right = self.right_encoder.get()
+        """Return the average intake angle in degrees from the two encoders."""
+        left = self.left_encoder.getDistance()
+        right = self.right_encoder.getDistance()
 
         return (left + right) / 2
 
