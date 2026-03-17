@@ -251,7 +251,7 @@ class MyRobot(LemonRobot):
 
         self.led_length = 150
         self.leds = LEDController(0, self.led_length)
-
+        self.leds_intake = self.intake
         # alerts
         AlertManager(self.logger)
         if self.low_bandwidth:

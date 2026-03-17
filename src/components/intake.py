@@ -49,24 +49,24 @@ class Intake:
         self.is_on = False
 
     def teleop_periodic(self):
-        TOLLERANCE = 0.001
+        TOLERANCE = 0.001
         POS_VOLTAGE_CONTROL = VoltageOut(8)
         NEG_VOLTAGE_CONTROL = VoltageOut(-8)
         STOP_VOLTAGE_CONTROL = VoltageOut(0)
-        dx = 0
+        changeNeeded = 0
         if self.is_lowered:
-            dx = IntakeAngle.DOWN - self.get_angle()
+            changeNeeded = IntakeAngle.DOWN - self.get_angle()
         else:
-            dx = IntakeAngle.UP - self.get_angle()
+            changeNeeded = IntakeAngle.UP - self.get_angle()
 
-        if dx > 0 and dx > TOLLERANCE:
-            #to high
-            self.left_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
-            self.right_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
-        elif dx < 0 and abs(dx) > TOLLERANCE:
+        if changeNeeded > 0 and changeNeeded > TOLERANCE:
             #to low
             self.left_rollout_motor.set_control(NEG_VOLTAGE_CONTROL)
             self.right_rollout_motor.set_control(NEG_VOLTAGE_CONTROL)
+        elif changeNeeded < 0 and abs(changeNeeded) > TOLERANCE:
+            #to high
+            self.left_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
+            self.right_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
         else:
             self.left_rollout_motor.set_control(STOP_VOLTAGE_CONTROL)
             self.right_rollout_motor.set_control(STOP_VOLTAGE_CONTROL)

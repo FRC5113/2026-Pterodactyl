@@ -2,6 +2,7 @@ from magicbot import will_reset_to
 from wpilib import Color, DriverStation
 
 from components.swerve_drive import SwerveDrive
+from components.intake import Intake
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
 
@@ -9,7 +10,7 @@ from lemonlib.util import AlertManager, AlertType, LEDController
 class LEDStrip:
     swerve_drive: SwerveDrive
     leds: LEDController
-
+    intake: Intake
     justin_bool = will_reset_to(False)
     is_aligned = will_reset_to(False)
 
@@ -50,7 +51,6 @@ class LEDStrip:
     def justin_fun(self):
         # I miss you justin
         self.justin_bool = True
-
     """
     EXECUTE
     """
@@ -58,6 +58,8 @@ class LEDStrip:
     def execute(self):
         if self.has_errors_present():
             self.leds.set_solid_color(self.error_color)
+        elif self.intake.is_lowered:
+            self.leds.set_solid_color((155, 41, 255))
         elif self.has_warnings_present():
             self.leds.set_solid_color(self.warning_color)
         elif DriverStation.isAutonomousEnabled():
