@@ -5,11 +5,12 @@ from components.swerve_drive import SwerveDrive
 from components.shooter_controller import ShooterController
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
-
+from components.intake import Intake, IntakeAngle
 
 class LEDStrip:
     shooter_controller: ShooterController
     swerve_drive: SwerveDrive
+    intake: Intake
     leds: LEDController
 
     justin_bool = will_reset_to(False)
@@ -44,8 +45,8 @@ class LEDStrip:
 
     def has_errors_present(self) -> bool:
         return len(AlertManager.get_strings(AlertType.ERROR)) > 0
-
     """
+
     CONTROL METHODS
     """
 
@@ -64,6 +65,8 @@ class LEDStrip:
             self.leds.set_solid_color(self.warning_color)
         elif DriverStation.isAutonomousEnabled():
             self.leds.move_across(self.auton_color, 20, 50)
+        elif self.intake.get_position() > 0.8: #python does not lie IntakeAngle.UP b/c type system is awfull
+            self.leds.set_solid_color((141, 55, 255))
         elif is_alliance_hub_active():
             self.leds.blink((255, 0, 0), (0, 0, 255), 1.0)
         else:

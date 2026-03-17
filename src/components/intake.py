@@ -2,13 +2,17 @@ import enum
 
 from magicbot import will_reset_to
 from phoenix6 import controls
-from phoenix6.configs import TalonFXConfiguration
-from phoenix6.configs.talon_fx_configs import TalonFXConfiguration
-from phoenix6.hardware import TalonFX
-from phoenix6.signals import (
-    NeutralModeValue,
+from phoenix6.configs import (
+    TalonFXConfiguration,
+    TalonFXSConfiguration,
 )
-from rev import SparkMaxConfig
+from phoenix6.hardware import TalonFX, TalonFXS
+from phoenix6.signals import (
+    MotorAlignmentValue,
+    MotorArrangementValue,
+    NeutralModeValue,
+    ExternalFeedbackSensorSourceValue
+)
 from wpimath import units
 
 from lemonlib.smart import SmartProfile
@@ -23,8 +27,8 @@ class IntakeAngle(enum.Enum):
 class Intake:
     spin_motor: TalonFX
 
-    # left_motor: SparkMax
-    # right_motor: SparkMax
+    left_motor: TalonFXS
+    right_motor: TalonFXS
 
     # left_encoder: SparkAbsoluteEncoder
     # right_encoder: SparkAbsoluteEncoder
@@ -49,23 +53,30 @@ class Intake:
         spin_config = TalonFXConfiguration()
         spin_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         spin_config.current_limits.supply_current_limit = self.spin_amps
+        spin_config.current_limits.supply_current_limit_enable = True
         self.spin_motor.configurator.apply(spin_config)
 
-        self.arm_config = SparkMaxConfig().setIdleMode(SparkMaxConfig.IdleMode.kBrake)
+        self.arm_motor_config = TalonFXSConfiguration()
+        self.arm_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
 
-        # self.right_motor.configure(
-        #     self.arm_config,
-        #     ResetMode.kNoResetSafeParameters,
-        #     PersistMode.kPersistParameters,
-        # )
+        self.arm_motor_config.current_limits.stator_current_limit = self.arm_amps
+        self.arm_motor_config.current_limits.stator_current_limit_enable = True
 
-        # self.left_motor.configure(
-        #     self.arm_config.follow(self.right_motor, True),
-        #     ResetMode.kNoResetSafeParameters,
-        #     PersistMode.kPersistParameters,
-        # )
+        self.arm_motor_config.commutation.motor_arrangement = (
+            MotorArrangementValue.BRUSHED_DC
+        )
+        self.arm_motor_config.external_feedback.external_feedback_sensor_source = ExternalFeedbackSensorSourceValue.QUADRATURE
+        self.arm_motor_config.external_feedback.quadrature_edges_per_rotation = 2048 
+
+        self.left_motor.configurator.apply(self.arm_motor_config)
+        self.right_motor.configurator.apply(self.arm_motor_config)
 
         self.spin_control = controls.VoltageOut(0)
+        self.arm_voltage_control = controls.VoltageOut(0)
+        self.arm_position_control = controls.PositionVoltage(0).with_slot(0)
+        self.arm_follower = controls.Follower(
+            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
+        )
         self.coast_control = controls.CoastOut()
 
         self.hinge_alert = Alert(
@@ -88,19 +99,19 @@ class Intake:
         self.component_enabled = True
 
     def on_enable(self):
-        self.controller = self.profile.create_arm_controller("intake_arm")
+        self.arm_motor_config.slot0 = self.profile.create_ctre_pid_controller()
+        self.left_motor.configurator.apply(self.arm_motor_config)
+        self.right_motor.configurator.apply(self.arm_motor_config)
 
     """
     INFORMATIONAL METHODS
     """
 
     def get_left_angle(self) -> units.degrees:
-        # return self.left_encoder.getPosition()
-        return 0.0
+        return self.left_motor.get_position().value
 
     def get_right_angle(self) -> units.degrees:
-        # return self.right_encoder.getPosition()
-        return 0.0
+        return self.right_motor.get_position().value
 
     # @feedback
     def get_position(self) -> float:
@@ -121,12 +132,13 @@ class Intake:
     def set_voltage(self, voltage: units.volts):
         self.spin_voltage = voltage
 
-    def set_arm_voltage(self, volts):
+    def set_arm_voltage(self, volts: units.volts):
         self.arm_voltage = volts
         self.arm_manual_control = True
 
     def set_arm_angle(self, angle: units.degrees):
         self.arm_angle = angle
+        self.arm_manual_control = False
 
     def set_bypass_limits(self):
         self.bypass_limits = True
@@ -141,14 +153,18 @@ class Intake:
         # thing so that if batt low we can turn off to save energy
         if not self.component_enabled:
             self.spin_motor.set_control(self.coast_control)
-            # self.right_motor.set_control(self.coast_control)
-            # self.left_motor.set_control(self.coast_control)
+            self.right_motor.set_control(self.coast_control)
+            self.left_motor.set_control(self.coast_control)
             return
 
         pos = self.get_position()
 
-        # if not self.arm_manual_control:
-        #     self.arm_voltage = self.controller.calculate(pos, self.arm_angle)
+        if not self.arm_manual_control and self.arm_angle != self.prev_arm_voltage:
+            self.prev_arm_voltage = self.arm_angle
+            self.right_motor.set_control(
+                self.arm_position_control.with_position(self.arm_angle)
+            )
+            self.left_motor.set_control(self.arm_follower)
 
         # making sure we don't try to move the arm past its limits or break
         if pos > (self.INTAKEUP + 0.1):
@@ -168,9 +184,12 @@ class Intake:
             )
             self.hinge_alert.enable()
 
-        # if self.arm_voltage != self.prev_arm_voltage:
-        #     self.prev_arm_voltage = self.arm_voltage
-        #     self.right_motor.setVoltage(self.arm_voltage)
+        if self.arm_manual_control and self.arm_voltage != self.prev_arm_voltage:
+            self.prev_arm_voltage = self.arm_voltage
+            self.right_motor.set_control(
+                self.arm_voltage_control.with_output(self.arm_voltage)
+            )
+            self.left_motor.set_control(self.arm_follower)
 
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage
