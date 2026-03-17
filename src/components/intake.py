@@ -59,7 +59,7 @@ class Intake:
     def off(self):
         self.is_on = False
 
-    def teleop_periodic(self):
+    def execute(self):
         TOLERANCE = 0.001
         POS_VOLTAGE_CONTROL = VoltageOut(8)
         NEG_VOLTAGE_CONTROL = VoltageOut(-8)

@@ -133,8 +133,8 @@ class MyRobot(LemonRobot):
 
         self.intake_left_rollout_motor = TalonFXS(52)
         self.intake_right_rollout_motor = TalonFXS(53)
-        # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
-        # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
+        self.intake_left_encoder = self.intake_left_rollout_motor.getAbsoluteEncoder()
+        self.intake_right_encoder = self.intake_right_rollout_motor.getAbsoluteEncoder()
 
         self.intake_profile = SmartProfile(
             "intake",
@@ -250,7 +250,6 @@ class MyRobot(LemonRobot):
 
         self.led_length = 150
         self.leds = LEDController(0, self.led_length)
-        self.leds_intake = self.intake
         # alerts
         AlertManager(self.logger)
         if self.low_bandwidth:
@@ -362,6 +361,8 @@ class MyRobot(LemonRobot):
 
             if secondary_right_bumper:
                 self.intake.down()
+            if secondary.getRightTriggerAxis() >= 0.8:
+                self.intake.up() #these controls are dumb - TODO: Fix
 
         """
         SHOOTER
