@@ -19,7 +19,7 @@ class AutoContext:
     it: Intake
     sc: ShooterController
 
-    def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: StateMachine):
+    def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: ShooterController):
         self.sd = sd
         self.sh = sh
         self.it = it
@@ -125,14 +125,14 @@ class IntakeAuto(AutoStep):
 class ShootAuto(AutoStep):
     STATIC_ANGLE = 78  # Not sure this is right
     start: milliseconds = 0
-    durration: milliseconds
-    def __init__(self, durration: milliseconds):
+    duration: milliseconds
+    def __init__(self, duration: milliseconds):
         self.started = False
-        self.durration = durration
+        self.duration = duration
     def execute(self, ctx: AutoContext) -> StepStatus:
         if self.start == 0:
             self.start = time.perf_counter()
-        if time.perf_counter() - self.start > self.durration:
+        if time.perf_counter() - self.start > self.duration:
             return StepStatus.DONE
         ctx.sc.request_shoot()
         return StepStatus.RUNNING
