@@ -51,6 +51,7 @@ class LEDStrip:
     def justin_fun(self):
         # I miss you justin
         self.justin_bool = True
+
     """
     EXECUTE
     """

@@ -136,7 +136,6 @@ class MyRobot(LemonRobot):
         # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
         # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
-
         self.intake_profile = SmartProfile(
             "intake",
             {
@@ -352,7 +351,6 @@ class MyRobot(LemonRobot):
         INTAKE
         """
         with self.consumeExceptions():
-
 
             if secondary.getLeftTriggerAxis() >= 0.8:
                 self.intake.on()

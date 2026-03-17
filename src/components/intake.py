@@ -5,10 +5,14 @@ from phoenix6.controls import VoltageOut
 from wpilib import DutyCycleEncoder
 from magicbot import feedback
 import enum
+
+
 class IntakeAngle(enum.IntEnum):
-    #these values might be (are) wrong
+    # these values might be (are) wrong
     UP = 85
     DOWN = 5
+
+
 class Intake:
     left_rollout_motor: TalonFXS
     right_rollout_motor: TalonFXS
@@ -18,16 +22,19 @@ class Intake:
 
     is_lowered = False
     is_on = False
+
     def setup(self) -> None:
         left_rollout_config = TalonFXSConfiguration()
         left_rollout_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
-        left_rollout_config.motor_output.inverted = InvertedValue.COUNTER_CLOCKWISE_POSITIVE
+        left_rollout_config.motor_output.inverted = (
+            InvertedValue.COUNTER_CLOCKWISE_POSITIVE
+        )
         self.left_rollout_motor.configurator.apply(left_rollout_config)
 
         right_rollout_config = TalonFXSConfiguration()
         right_rollout_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         right_rollout_config.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE
-        
+
         spin_motor_config = TalonFXConfiguration()
         spin_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.spin_motor.configurator.apply(spin_motor_config)
@@ -39,12 +46,16 @@ class Intake:
         right = self.right_encoder.get()
 
         return (left + right) / 2
+
     def down(self):
         self.is_lowered = True
+
     def up(self):
         self.is_lowered = False
+
     def on(self):
         self.is_on = True
+
     def off(self):
         self.is_on = False
 
@@ -60,17 +71,17 @@ class Intake:
             changeNeeded = IntakeAngle.UP - self.get_angle()
 
         if changeNeeded > 0 and changeNeeded > TOLERANCE:
-            #to low
+            # to low
             self.left_rollout_motor.set_control(NEG_VOLTAGE_CONTROL)
             self.right_rollout_motor.set_control(NEG_VOLTAGE_CONTROL)
         elif changeNeeded < 0 and abs(changeNeeded) > TOLERANCE:
-            #to high
+            # to high
             self.left_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
             self.right_rollout_motor.set_control(POS_VOLTAGE_CONTROL)
         else:
             self.left_rollout_motor.set_control(STOP_VOLTAGE_CONTROL)
             self.right_rollout_motor.set_control(STOP_VOLTAGE_CONTROL)
 
-        INTAKE_ON = VoltageOut(8) #you can tune this
+        INTAKE_ON = VoltageOut(8)  # you can tune this
         INTAKE_OFF = VoltageOut(0)
-        self.spin_motor.set_control(INTAKE_ON if self.is_on else INTAKE_OFF )
+        self.spin_motor.set_control(INTAKE_ON if self.is_on else INTAKE_OFF)

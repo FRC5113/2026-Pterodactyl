@@ -64,7 +64,9 @@ class Shooter:
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
 
-        self.shooter_control = controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
+        self.shooter_control = (
+            controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
+        )
         self.shooter_follower = controls.Follower(
             self.right_motor.device_id, MotorAlignmentValue.OPPOSED
         )
