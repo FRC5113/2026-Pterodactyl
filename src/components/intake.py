@@ -34,6 +34,7 @@ class Intake:
         right_rollout_config = TalonFXSConfiguration()
         right_rollout_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         right_rollout_config.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE
+        self.right_rollout_motor.configurator.apply(right_rollout_config)
 
         spin_motor_config = TalonFXConfiguration()
         spin_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
