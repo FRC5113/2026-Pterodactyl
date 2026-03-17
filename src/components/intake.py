@@ -40,18 +40,14 @@ class Intake:
         spin_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.spin_motor.configurator.apply(spin_motor_config)
 
-        # Configure encoders so that one full rotation corresponds to 360 degrees.
-        # This ensures getDistance() returns angles in degrees, matching IntakeAngle.
-        self.left_encoder.setDistancePerRotation(360.0)
-        self.right_encoder.setDistancePerRotation(360.0)
 
     @feedback
     def get_angle(self) -> float:
         """Return the average intake angle in degrees from the two encoders."""
-        left = self.left_encoder.getDistance()
-        right = self.right_encoder.getDistance()
+        left = self.left_encoder.get()
+        right = self.right_encoder.get()
 
-        return (left + right) / 2
+        return ((left + right) / 2) * 360
 
     def down(self):
         self.is_lowered = True
