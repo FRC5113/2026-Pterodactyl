@@ -11,6 +11,7 @@ from phoenix6.signals import (
     MotorAlignmentValue,
     MotorArrangementValue,
     NeutralModeValue,
+    ExternalFeedbackSensorSourceValue
 )
 from wpimath import units
 
@@ -60,11 +61,12 @@ class Intake:
 
         self.arm_motor_config.current_limits.stator_current_limit = self.arm_amps
         self.arm_motor_config.current_limits.stator_current_limit_enable = True
-        self.arm_motor_config.slot0 = self.profile.create_ctre_pid_controller()
 
         self.arm_motor_config.commutation.motor_arrangement = (
-            MotorArrangementValue.NEO550_JST
+            MotorArrangementValue.BRUSHED_DC
         )
+        self.arm_motor_config.external_feedback.external_feedback_sensor_source = ExternalFeedbackSensorSourceValue.QUADRATURE
+        self.arm_motor_config.external_feedback.quadrature_edges_per_rotation = 2048 
 
         self.left_motor.configurator.apply(self.arm_motor_config)
         self.right_motor.configurator.apply(self.arm_motor_config)
