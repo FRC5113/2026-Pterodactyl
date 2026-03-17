@@ -130,8 +130,8 @@ class MyRobot(LemonRobot):
         # BRUSHED = SparkMax.MotorType.kBrushed
 
         self.intake_spin_motor = TalonFX(51)
-        # self.intake_left_motor = SparkMax(52, BRUSHED)
-        # self.intake_right_motor = SparkMax(53, BRUSHED)
+        self.intake_left_motor = TalonFXS(52)
+        self.intake_right_motor = TalonFXS(53)
         # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
         # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
