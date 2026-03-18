@@ -49,7 +49,7 @@ class ShooterController(StateMachine):
     min_confidence = SmartPreference(40.0)
 
     def setup(self):
-        self.distance_lookup = [1.347, 2.347, 3.347, 4.347]  # TODO Tune these values
+        self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
 
         # RPS
         self.speed_lookup = [41.95, 45.8, 48.9, 53.0]  # TODO Tune these values
@@ -89,7 +89,7 @@ class ShooterController(StateMachine):
         # Tuning constants
         self.idle_speed_scalar = 0.5
         self.kicker_volts = 8  # Volts
-        self.conveyor_volts = 6  # Volts
+        self.conveyor_volts = -8  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.05  # 5 %
 

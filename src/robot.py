@@ -6,7 +6,7 @@ from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
-from phoenix6.hardware import TalonFX, TalonFXS
+from phoenix6.hardware import TalonFX, TalonFXS, CANcoder
 from wpilib import (
     DriverStation,
     Field2d,
@@ -134,11 +134,11 @@ class MyRobot(LemonRobot):
         self.intake_spin_motor = TalonFX(51)
         self.intake_left_motor = TalonFXS(52)
         self.intake_right_motor = TalonFXS(53)
-        # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
-        # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
+        # self.intake_encoder = CANcoder(54)
+        self.intake_encoder_offset = 0.0
 
-        self.intake_spin_amps: units.amperes = 40.0
-        self.intake_arm_amps: units.amperes = 20.0
+        self.intake_spin_amps: units.amperes = 60.0
+        self.intake_arm_amps: units.amperes = 24.0
 
         self.intake_profile = SmartProfile(
             "intake",
@@ -174,7 +174,7 @@ class MyRobot(LemonRobot):
                 "kD": 0.0,
                 "kS": 0.0,
                 "kV": 0.11137,
-                "kA": 0.29663,
+                "kA": 0.0,  # 0.29663,
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
@@ -343,7 +343,7 @@ class MyRobot(LemonRobot):
                 self.drive_control.drive_manual(
                     -vx,
                     -vy,
-                    omega,
+                    -omega,
                     not primary.getCreateButton(),  # temporary
                 )
 
@@ -374,14 +374,14 @@ class MyRobot(LemonRobot):
                 self.intake.set_bypass_limits()
 
             if secondary.getLeftTriggerAxis() >= 0.8:
-                self.intake.set_voltage(8.0)
+                self.intake.set_voltage(-10.0)
             elif secondary_left_bumper:
-                self.intake.set_voltage(-8.0)
+                self.intake.set_voltage(10.0)
 
             if secondary.getXButton():
-                self.intake.set_arm_voltage(-8)
+                self.intake.set_arm_voltage(10)
             elif secondary.getBButton():
-                self.intake.set_arm_voltage(8)
+                self.intake.set_arm_voltage(-4)
 
         """
         SHOOTER
@@ -397,7 +397,8 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_unjam()
 
             elif secondary.getAButton():
-                self.shooter_controller.request_force_shoot(47.5)
+                # self.shooter_controller.request_force_shoot(47.5)
+                self.shooter_controller.request_force_shoot(40)
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()

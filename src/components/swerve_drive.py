@@ -103,7 +103,7 @@ class SwerveDrive(Sendable):
             .with_rotational_deadband(0.0)
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
-            .with_heading_pid(7.0, 0.0, 0.0)
+            .with_heading_pid(3.0, 0.0, 0.0)
         )
         # Field-absolute version (no operator-perspective rotation) — used by
         # the shooter controller whose target_angle is already in field coords.

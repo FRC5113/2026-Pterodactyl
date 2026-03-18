@@ -5,8 +5,9 @@ from phoenix6 import controls
 from phoenix6.configs import (
     TalonFXConfiguration,
     TalonFXSConfiguration,
+    CANcoderConfiguration,
 )
-from phoenix6.hardware import TalonFX, TalonFXS
+from phoenix6.hardware import TalonFX, TalonFXS, CANcoder
 from phoenix6.signals import (
     ExternalFeedbackSensorSourceValue,
     MotorAlignmentValue,
@@ -33,10 +34,14 @@ class Intake:
     left_motor: TalonFXS
     right_motor: TalonFXS
 
+    # encoder: CANcoder
+
     profile: SmartProfile
 
     spin_amps: units.amperes
     arm_amps: units.amperes
+
+    encoder_offset: float
 
     tuning_enabled: bool
 
@@ -55,6 +60,7 @@ class Intake:
     def setup(self):
         self._cached_angle = 0.0
 
+        self._config_cancoder()
         self._config_spin_motor()
         self._config_arm_motors()
 
@@ -63,7 +69,7 @@ class Intake:
         self.arm_voltage_control = controls.VoltageOut(0)
         self.arm_position_control = controls.PositionVoltage(0).with_slot(0)
         self.arm_follower = controls.Follower(
-            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
+            self.right_motor.device_id, MotorAlignmentValue.ALIGNED
         )
         self.coast_control = controls.CoastOut()
 
@@ -87,6 +93,11 @@ class Intake:
 
         self.component_enabled = True
 
+    def _config_cancoder(self):
+        encoder_config = CANcoderConfiguration()
+        encoder_config.magnet_sensor.absolute_sensor_discontinuity_point = 0.5
+        encoder_config.magnet_sensor.magnet_offset = self.encoder_offset
+
     def _config_spin_motor(self):
         # Configure motors
         spin_config = TalonFXConfiguration()
@@ -105,9 +116,12 @@ class Intake:
         self.arm_motor_config.commutation.motor_arrangement = (
             MotorArrangementValue.BRUSHED_DC
         )
-        self.arm_motor_config.external_feedback.external_feedback_sensor_source = (
-            ExternalFeedbackSensorSourceValue.PULSE_WIDTH
-        )
+        # self.arm_motor_config.external_feedback.external_feedback_sensor_source = (
+        #     ExternalFeedbackSensorSourceValue.REMOTE_CANCODER
+        # )
+        # self.arm_motor_config.external_feedback.feedback_remote_sensor_id = self.encoder.device_id
+
+        self.arm_motor_config.closed_loop_general.continuous_wrap = True
 
         self.arm_motor_config.software_limit_switch.forward_soft_limit_threshold = (
             self.HARDUP
@@ -115,8 +129,8 @@ class Intake:
         self.arm_motor_config.software_limit_switch.reverse_soft_limit_threshold = (
             self.HARDDOWN
         )
-        self.arm_motor_config.software_limit_switch.forward_soft_limit_enable = True
-        self.arm_motor_config.software_limit_switch.reverse_soft_limit_enable = True
+        self.arm_motor_config.software_limit_switch.forward_soft_limit_enable = False
+        self.arm_motor_config.software_limit_switch.reverse_soft_limit_enable = False
 
         self.arm_motor_config.slot0 = self.profile.create_ctre_arm_controller()
 
@@ -194,7 +208,11 @@ class Intake:
             )
             self.hinge_alert.enable()
 
-        if not self.arm_manual_control and self.arm_angle != self.prev_arm_voltage:
+        if (
+            not self.arm_manual_control
+            and self.arm_angle != self.prev_arm_voltage
+            and False
+        ):
             self.prev_arm_voltage = self.arm_angle
             self.right_motor.set_control(
                 self.arm_position_control.with_position(
