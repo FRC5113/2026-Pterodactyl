@@ -4,6 +4,7 @@
 import math
 
 import wpilib
+from wpilib import SendableChooser, SmartDashboard
 from magicbot import feedback
 from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
@@ -18,7 +19,7 @@ from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
-from autonomous.auto import AutoContext, AutoRunner, SwerveDriveAuto
+from autonomous.auto import *
 from components.swerve_drive import SwerveDrive
 from components.drive_control import DriveControl
 from components.intake import Intake
@@ -59,8 +60,8 @@ class MyRobot(LemonRobot):
     firstRun = True
 
     # flywheel_speed = SmartPreference(30.0)
-    auto_ctx: AutoContext
-    auto_routines: dict[str, list[AutoRunner]]
+    _auto_ctx: AutoContext
+    _auto_routines: dict[str, AutoRunner]
     def createObjects(self):
 
         """This method is where all attributes to be injected are
@@ -260,19 +261,48 @@ class MyRobot(LemonRobot):
         else:
             self.alliance = False
 
-        self.auto_ctx = AutoContext(self.swerve_drive, self.shooter, self.intake, self.shooter_controller)
-        self.auto_routines["move_back"] = AutoRunner(
-            [
-                SwerveDriveAuto()
-            ]
-        )
+
+        self.auto_choser = SendableChooser()
+        self.auto_choser.setDefaultOption("move_back", "move_back")
+        self.auto_choser.addOption("move_foward", "move_foward")
+        self.auto_choser.addOption("turn_and_move_left", "turn_and_move_left")
+        self.auto_choser.addOption("turn_and_move_right", "turn_and_move_right")
+        SmartDashboard.putData("Auto Selector", self.auto_choser)
     def enabledperiodic(self):
         self.drive_control.engage()
         self.shooter_controller.engage()
 
     def autonomousInit(self):
-        pass
-
+        self._auto_ctx = AutoContext(self.drive_control, self.shooter, self.intake, self.shooter_controller)
+        self._auto_routines["move_back"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(-5, 0, 0)
+            ]
+        )
+        self._auto_routines["move_foward"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["turn_and_move_left"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(0, 0, 90),
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["turn_and_move_right"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(0, 0, -90),
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["STILL"] = AutoRunner([])
+        sel_auto_key = self.auto_choser.getSelected()
+        if not sel_auto_key in self.auto_choser:
+            AlertManager.instant_alert(f"[ERROR] Auto {sel_auto_key} does not exist. Standing Still.", AlertType.ERROR, 10)
+            sel_auto_key = "STILL"
+        self._curr_auto = self._auto_routines[sel_auto_key]
+        
     def robotPeriodic(self) -> None:
         if self.tuning_enabled:
             watchdog = self.watchdog
@@ -282,7 +312,7 @@ class MyRobot(LemonRobot):
             watchdog.addEpoch("LiveWindow")
 
     def autonomousPeriodic(self):
-        pass
+        self._curr_auto.run(self._auto_ctx)
     def teleopInit(self):
         # globalProfiler.enable()
         # initialize HIDs here in case they are changed after robot initializes

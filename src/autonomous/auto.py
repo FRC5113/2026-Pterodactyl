@@ -1,13 +1,13 @@
 from enum import Enum
-from typing import List
+from typing import Sequence, cast
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.units import meters, degrees, milliseconds
-from components.swerve_drive import SwerveDrive
+from components.drive_control import DriveControl
 from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
-from magicbot import StateMachine
 import time
+import math
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
@@ -15,13 +15,13 @@ class StepStatus(Enum):
 
 
 class AutoContext:
-    sd: SwerveDrive
+    dc: DriveControl
     sh: Shooter
     it: Intake
     sc: ShooterController
 
-    def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: ShooterController):
-        self.sd = sd
+    def __init__(self, dc: DriveControl, sh: Shooter, it: Intake, sc: ShooterController):
+        self.dc = dc
         self.sh = sh
         self.it = it
         self.sc = sc
@@ -34,9 +34,9 @@ class AutoStep:
 
 
 class AutoRunner:
-    def __init__(self, steps: List[AutoStep]):
+    def __init__(self, steps: Sequence[AutoStep]):
         self.steps = steps
-        self.ctx = AutoContext(SwerveDrive(), Shooter(), Intake(), ShooterController()) # Placeholder
+        self.ctx = AutoContext(cast(DriveControl, DriveControl()), Shooter(), Intake(), cast(ShooterController, ShooterController())) # Placeholder
         self.index = 0
 
     def reset(self):
@@ -100,9 +100,9 @@ class SwerveDriveAuto(AutoStep):
             self.target_pose = Pose2d(
                 self.x, self.y, Rotation2d.fromDegrees(self.heading_deg)
             )
-            ctx.sd.set_desired_pose(self.target_pose)
+            ctx.dc.request_pose(self.target_pose)
 
-        distance = ctx.sd.get_distance_from_pose(self.target_pose)
+        distance = ctx.dc.get_distance_from_target_pose()
         if distance <= self.POSITION_TOLERANCE:
             return StepStatus.DONE
         return StepStatus.RUNNING
@@ -114,7 +114,18 @@ class SwerveDriveBotRelativeAuto(AutoStep):
         self.heading = heading
         self.target_pose = None
     def execute(self, ctx: AutoContext) -> StepStatus:
-        if 
+        if self.target_pose is None:
+            est = ctx.dc.get_estimated_pose()
+            est.rotateBy(Rotation2d((self.heading * math.pi) / 180))
+            new = Pose2d(est.x + self.x, est.y + self.y, est.rotation())
+            ctx.dc.request_pose(new)
+            return StepStatus.RUNNING
+        else:
+            DISTANCE_TOLLERANCE = meters(0.01)
+            if ctx.dc.get_distance_from_target_pose() > DISTANCE_TOLLERANCE:
+                return StepStatus.RUNNING
+            else:
+                return StepStatus.DONE
 class IntakeAuto(AutoStep):
     """Lets you turn on or off the intake with the boolean parameter"""
 
@@ -131,8 +142,7 @@ class IntakeAuto(AutoStep):
 
 class ShootAuto(AutoStep):
     STATIC_ANGLE = 78  # Not sure this is right
-
-    def __init__(self):
+    def __init__(self, durration: milliseconds):
         self.started = False
         self.durration = durration
     def execute(self, ctx: AutoContext) -> StepStatus:
@@ -142,43 +152,3 @@ class ShootAuto(AutoStep):
             return StepStatus.DONE
         ctx.sc.request_shoot()
         return StepStatus.RUNNING
-
-
-# THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
-tempAutoRoutine = AutoRunner(
-    [
-        SwerveDriveAuto(0.63, 0.04, -213.81),
-        SwerveDriveAuto(0.76, 0.04, 0.47),
-        SwerveDriveAuto(0.82, 0.04, 0.18),
-        SwerveDriveAuto(0.82, 0.04, 0.00),
-        SwerveDriveAuto(0.76, 0.04, -0.18),
-        SwerveDriveAuto(0.63, 0.04, 182.00),
-        IntakeAuto(True),
-        SwerveDriveAuto(0.22, -0.00, -178.70),
-        SwerveDriveAuto(0.25, 0.01, -1.33),
-        SwerveDriveAuto(0.27, 0.01, -0.53),
-        SwerveDriveAuto(0.27, 0.01, -0.00),
-        SwerveDriveAuto(0.25, 0.01, 0.53),
-        SwerveDriveAuto(0.22, -0.00, 85.71),
-        SwerveDriveAuto(0.01, -0.26, 3.38),
-        SwerveDriveAuto(0.01, -0.31, 0.00),
-        SwerveDriveAuto(0.01, -0.33, 0.00),
-        SwerveDriveAuto(0.01, -0.33, -0.00),
-        SwerveDriveAuto(0.01, -0.31, 0.00),
-        SwerveDriveAuto(0.01, -0.26, -99.82),
-        SwerveDriveAuto(-0.20, 0.01, -165.52),
-        SwerveDriveAuto(-0.24, 0.01, -0.52),
-        SwerveDriveAuto(-0.25, 0.01, 0.09),
-        SwerveDriveAuto(-0.26, 0.01, 0.57),
-        SwerveDriveAuto(-0.24, 0.02, 1.16),
-        SwerveDriveAuto(-0.21, 0.02, 139.84),
-        IntakeAuto(False),
-        SwerveDriveAuto(-0.62, 0.34, -114.70),
-        SwerveDriveAuto(-0.89, 0.21, -15.44),
-        SwerveDriveAuto(-1.03, 0.09, -8.34),
-        SwerveDriveAuto(-1.03, -0.02, 353.79),
-        SwerveDriveAuto(-0.91, -0.12, -6.56),
-        SwerveDriveAuto(-0.65, -0.21, -24.36),
-        ShootAuto(),
-    ],
-)

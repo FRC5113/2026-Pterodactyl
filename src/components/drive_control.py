@@ -91,7 +91,10 @@ class DriveControl(StateMachine):
         self.translationY = vy
         self.point_to_target = True
         self.point_target = angle
-
+    def get_distance_from_target_pose(self) -> units.meters:
+        return self.swerve_drive.get_distance_from_desired_pose()
+    def get_estimated_pose(self) -> Pose2d:
+        return self.swerve_drive.get_estimated_pose()
     def drive_point_joy(
         self,
         vx: units.meters_per_second,
