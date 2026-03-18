@@ -11,55 +11,31 @@ class Odometry:
     camera_front_right: LemonCamera
     camera_back_left: LemonCamera
     camera_back_right: LemonCamera
+
     field_layout: AprilTagFieldLayout
     swerve_drive: SwerveDrive
     estimated_field: Field2d
 
     def setup(self):
-        self.camera_pose_estimator_front_left = PhotonPoseEstimator(
-            self.field_layout,
-            self.camera_front_left.camera_to_bot,
+        cameras = (
+            self.camera_front_left,
+            self.camera_front_right,
+            self.camera_back_left,
+            self.camera_back_right,
         )
-        self.camera_pose_estimator_front_right = PhotonPoseEstimator(
-            self.field_layout,
-            self.camera_front_right.camera_to_bot,
+        self._camera_estimator_pairs = tuple(
+            (cam, PhotonPoseEstimator(self.field_layout, cam.camera_to_bot))
+            for cam in cameras
         )
-        self.camera_pose_estimator_back_left = PhotonPoseEstimator(
-            self.field_layout,
-            self.camera_back_left.camera_to_bot,
-        )
-        self.camera_pose_estimator_back_right = PhotonPoseEstimator(
-            self.field_layout,
-            self.camera_back_right.camera_to_bot,
-        )
-
         SmartDashboard.putData("Estimated Field", self.estimated_field)
 
     def execute(self):
-        self._process_latest_result(
-            self.camera_front_left, self.camera_pose_estimator_front_left
-        )
-        self._process_latest_result(
-            self.camera_front_right, self.camera_pose_estimator_front_right
-        )
-        self._process_latest_result(
-            self.camera_back_left, self.camera_pose_estimator_back_left
-        )
-        self._process_latest_result(
-            self.camera_back_right, self.camera_pose_estimator_back_right
-        )
+        add = self.swerve_drive.addVisionPoseEstimate
+        for cam, estimator in self._camera_estimator_pairs:
+            results = cam.getAllUnreadResults()
+            if not results:
+                continue
+            pose = estimator.estimateCoprocMultiTagPose(results[-1])
+            if pose is not None:
+                add(pose.estimatedPose, pose.timestampSeconds)
         self.estimated_field.setRobotPose(self.swerve_drive.get_estimated_pose())
-
-    def _process_latest_result(
-        self, camera: LemonCamera, estimator: PhotonPoseEstimator
-    ):
-        results = camera.getAllUnreadResults()
-        if not results:
-            return
-        result = results[-1]
-        camEstPose = estimator.estimateCoprocMultiTagPose(result)
-        if camEstPose is None:
-            return
-        self.swerve_drive.addVisionPoseEstimate(
-            camEstPose.estimatedPose, camEstPose.timestampSeconds
-        )

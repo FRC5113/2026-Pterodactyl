@@ -107,7 +107,14 @@ class SwerveDriveAuto(AutoStep):
             return StepStatus.DONE
         return StepStatus.RUNNING
 
-
+class SwerveDriveBotRelativeAuto(AutoStep):
+    def __init__(self, x: meters, y: meters, heading: degrees):
+        self.x = x
+        self.y = y
+        self.heading = heading
+        self.target_pose = None
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        if 
 class IntakeAuto(AutoStep):
     """Lets you turn on or off the intake with the boolean parameter"""
 
