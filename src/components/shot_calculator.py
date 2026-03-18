@@ -128,6 +128,7 @@ class ShotConfig:
     # Heading tolerance tightens with speed: base / (1 + scalar * speed)
     heading_speed_scalar: float = 1.0
     # Heading tolerance scales with distance (reference point)
+    # Farther = tighter because the same angle error produces a larger miss at long range.
     heading_reference_distance: float = 2.5  # metres
 
     # Suppress firing when pitch or roll exceeds this (degrees)
@@ -369,7 +370,7 @@ class ShotCalculator:
         ):
             return INVALID
 
-        # Transform robot centre → launcher position
+        # Transform robot centre > launcher position
         cos_h = math.cos(heading)
         sin_h = math.sin(heading)
         launcher_x = (
@@ -390,7 +391,7 @@ class ShotCalculator:
         vx = field_vel.vx + (-launcher_field_off_y) * omega
         vy = field_vel.vy + launcher_field_off_x * omega
 
-        # Displacement launcher → hub
+        # Displacement launcher > hub
         rx = hub_x - launcher_x
         ry = hub_y - launcher_y
         distance = math.hypot(rx, ry)
@@ -432,7 +433,10 @@ class ShotCalculator:
             for i in range(max_iter):
                 prev_tof = tof
 
-                drift_tof = self._drag_compensated_tof(tof)
+                c = self.config.sotm_drag_coeff
+                drag_exp = 1.0 if c < 1e-6 else math.exp(-c * tof)
+                drift_tof = tof if c < 1e-6 else (1.0 - drag_exp) / c
+
                 prx = rx - vx * drift_tof
                 pry = ry - vy * drift_tof
                 proj_dist = _hypot(prx, pry)
@@ -445,8 +449,8 @@ class ShotCalculator:
 
                 lookup_tof = self.effective_tof(proj_dist)
 
-                # Derivative for Newton step
-                d_prime = -(prx * vx + pry * vy) / proj_dist
+                # Derivative for Newton step (chain rule: d/dt of dragCompensatedTOF = e^(-ct))
+                d_prime = -drag_exp * (prx * vx + pry * vy) / proj_dist
                 g_prime = self._tof_map_derivative(proj_dist)
                 f = lookup_tof - tof
                 f_prime = g_prime * d_prime - 1.0
@@ -511,7 +515,7 @@ class ShotCalculator:
         # Angular velocity feedforward
         drive_angular_velocity = 0.0
         if not velocity_filtered and distance > 0.1:
-            tangential_vel = (-ry * vx + rx * vy) / distance
+            tangential_vel = (ry * vx - rx * vy) / distance
             drive_angular_velocity = tangential_vel / distance
 
         # Solver convergence quality

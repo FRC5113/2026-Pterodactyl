@@ -130,10 +130,10 @@ def test_fuzz(control: TestController, station: str) -> None:
         control.step_timing(seconds=0.2, autonomous=False, enabled=True)
 
         # Teleop
-        for _ in range(20):
+        for _ in range(30):
             things.fuzz()
             hids.fuzz()
-            control.step_timing(seconds=0.1, autonomous=False, enabled=True)
+            control.step_timing(seconds=1, autonomous=False, enabled=True)
 
         DriverStationSim.setAllianceStationId(hal.AllianceStationID.kUnknown)
 
@@ -143,11 +143,11 @@ def test_fuzz_test(control: TestController) -> None:
         hids = DSInputs()
 
         # Start the robot in disabled mode for a short period
-        control.step_timing(seconds=0.5, autonomous=False, enabled=False)
+        control.step_timing(seconds=0.6, autonomous=False, enabled=False)
 
         # ... in disabled test mode too
         DriverStationSim.setTest(True)
-        control.step_timing(seconds=0.5, autonomous=False, enabled=False)
+        control.step_timing(seconds=0.6, autonomous=False, enabled=False)
 
         DriverStationSim.setEnabled(True)
 

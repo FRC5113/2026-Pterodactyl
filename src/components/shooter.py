@@ -3,13 +3,11 @@ from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
     TalonFXConfiguration,
-    TalonFXSConfiguration,
 )
-from phoenix6.hardware import TalonFX, TalonFXS
+from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
     FeedbackSensorSourceValue,
     MotorAlignmentValue,
-    MotorArrangementValue,
     NeutralModeValue,
 )
 from wpimath import units
@@ -22,26 +20,38 @@ class Shooter:
 
     right_motor: TalonFX
     left_motor: TalonFX
-    left_kicker_motor: TalonFXS
-    right_kicker_motor: TalonFXS
-    conveyor_motor: TalonFXS
 
     shooter_profile: SmartProfile
     shooter_gear_ratio: float
     shooter_amps: units.amperes
-    shooter_conveyor_amps: units.amperes
     tuning_enabled: bool
 
     shooter_velocity = will_reset_to(0.0)
     shooter_voltage = will_reset_to(0.0)
-    kicker_duty = will_reset_to(0.0)
-    conveyor_volt = will_reset_to(0.0)
+
     manual_control = will_reset_to(False)
 
     def setup(self):
         self._cached_velocity = 0.0
-        self._kicker_follower_set = False
         self._shooter_follower_set = False
+
+        self._configure_motors()
+
+        self.shooter_control = (
+            controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
+        )
+        self.shooter_follower = controls.Follower(
+            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
+        )
+
+        self.voltage_control = controls.VoltageOut(0)
+        self.coast_control = controls.CoastOut()
+
+        self.prev_shooter_control = 0.0
+
+        self.component_enabled = True
+
+    def _configure_motors(self):
         self.shooter_motors_config = TalonFXConfiguration()
         self.shooter_motors_config.motor_output.neutral_mode = NeutralModeValue.COAST
         self.shooter_motors_config.feedback = (
@@ -61,43 +71,6 @@ class Shooter:
 
         self.left_motor.configurator.apply(self.shooter_motors_config)
         self.right_motor.configurator.apply(self.shooter_motors_config)
-
-        self.shooter_control = (
-            controls.VelocityVoltage(0).with_slot(0).with_enable_foc(True)
-        )
-        self.shooter_follower = controls.Follower(
-            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
-        )
-
-        self.kicker_motor_configs = TalonFXSConfiguration()
-        self.kicker_motor_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
-        self.kicker_motor_configs.commutation.motor_arrangement = (
-            MotorArrangementValue.NEO550_JST
-        )
-
-        self.left_kicker_motor.configurator.apply(self.kicker_motor_configs)
-        self.right_kicker_motor.configurator.apply(self.kicker_motor_configs)
-
-        self.conveyor_motor_configs = TalonFXSConfiguration()
-        self.conveyor_motor_configs.motor_output.neutral_mode = NeutralModeValue.COAST
-        self.conveyor_motor_configs.commutation.motor_arrangement = (
-            MotorArrangementValue.NEO550_JST
-        )
-        self.conveyor_motor_configs.current_limits.supply_current_limit = 30
-
-        self.conveyor_motor.configurator.apply(self.conveyor_motor_configs)
-
-        self.voltage_control = controls.VoltageOut(0)
-        self.duty_control = controls.DutyCycleOut(0)
-        self.kicker_follower = controls.Follower(
-            self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
-        )
-        self.coast_control = controls.CoastOut()
-
-        self.prev_kicker_control = 0.0
-        self.prev_shooter_control = 0.0
-
-        self.component_enabled = True
 
     def on_enable(self):
         if self.tuning_enabled:
@@ -123,10 +96,6 @@ class Shooter:
         self.manual_control = True
         self.shooter_voltage = volts
 
-    def set_kicker(self, value: float):
-        self.kicker_duty = value  # ha duty thats funny right there
-        self.conveyor_volt = 8
-
     def turn_off_component(self):
         self.component_enabled = False
 
@@ -150,25 +119,10 @@ class Shooter:
         if not self.component_enabled:
             self.right_motor.set_control(self.coast_control)
             self.left_motor.set_control(self.coast_control)
-            self.right_kicker_motor.set_control(self.coast_control)
-            self.left_kicker_motor.set_control(self.coast_control)
-            self.conveyor_motor.set_control(self.coast_control)
             return
 
         # Cache velocity once per cycle for feedback and shooter_controller use
         self._cached_velocity = self.left_motor.get_velocity().value
-
-        kicker_duty = self.kicker_duty
-        if kicker_duty != self.prev_kicker_control:
-            self.prev_kicker_control = kicker_duty
-            self._kicker_follower_set = False
-            self.right_kicker_motor.set_control(
-                self.voltage_control.with_output(kicker_duty)
-            )
-            self.left_kicker_motor.set_control(self.kicker_follower)
-            self.conveyor_motor.set_control(
-                self.voltage_control.with_output(self.conveyor_volt)
-            )
 
         if self.manual_control:
             shooter_voltage = self.shooter_voltage

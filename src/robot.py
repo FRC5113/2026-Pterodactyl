@@ -17,6 +17,7 @@ from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
+from components.indexer import Indexer
 from components.intake import Intake
 from components.odometry import Odometry
 from components.shooter import Shooter
@@ -40,9 +41,10 @@ class MyRobot(LemonRobot):
 
     drive_control: DriveControl
     odometry: Odometry
-
     swerve_drive: SwerveDrive
+
     shooter: Shooter
+    indexer: Indexer
     intake: Intake
 
     # greatest speed that chassis should move (not greatest possible speed)
@@ -135,7 +137,7 @@ class MyRobot(LemonRobot):
         # self.intake_left_encoder = self.intake_left_motor.getAbsoluteEncoder()
         # self.intake_right_encoder = self.intake_right_motor.getAbsoluteEncoder()
 
-        self.intake_spin_amps: units.amperes = 20.0
+        self.intake_spin_amps: units.amperes = 40.0
         self.intake_arm_amps: units.amperes = 20.0
 
         self.intake_profile = SmartProfile(
@@ -160,7 +162,7 @@ class MyRobot(LemonRobot):
         self.shooter_right_motor = TalonFX(3)
 
         self.shooter_gear_ratio = 1.0
-        self.shooter_amps: units.amperes = 40.0
+        self.shooter_amps: units.amperes = 120.0
 
         self.shooter_angle = 23  # degrees
 
@@ -180,11 +182,11 @@ class MyRobot(LemonRobot):
         """
         INDEXER
         """
-        self.shooter_left_kicker_motor = TalonFXS(4)
-        self.shooter_right_kicker_motor = TalonFXS(5)
-        self.shooter_conveyor_motor = TalonFXS(6)
-        self.shooter_kicker_amps: units.amperes = 20.0
-        self.shooter_conveyor_amps: units.amperes = 10.0
+        self.indexer_left_kicker_motor = TalonFXS(4)
+        self.indexer_right_kicker_motor = TalonFXS(5)
+        self.indexer_conveyor_motor = TalonFXS(6)
+        self.indexer_kicker_amps: units.amperes = 40.0
+        self.indexer_conveyor_amps: units.amperes = 30.0
         """
         ODOMETRY
         """
@@ -322,13 +324,13 @@ class MyRobot(LemonRobot):
             if abs(primary_lx) < 0.1:
                 vy = 0.0
             else:
-                vy = self.omega_filter.calculate(sammi(primary_lx) * mult * top_speed)
+                vy = self.y_filter.calculate(sammi(primary_lx) * mult * top_speed)
 
             # if self.primary.getLeftBumper():
             if abs(primary_rx) <= 0.0:
                 omega = 0.0
             else:
-                omega = self.y_filter.calculate(sammi(primary_rx) * self.top_omega)
+                omega = self.omega_filter.calculate(sammi(primary_rx) * self.top_omega)
 
             if primary.getTriangleButton():
                 self.drive_control.drive_point(-vx, -vy, 0.0)
@@ -376,11 +378,10 @@ class MyRobot(LemonRobot):
             elif secondary_left_bumper:
                 self.intake.set_voltage(-8.0)
 
-            # if secondary.getRightTriggerAxis() >= 0.8:
-            #     self.intake.set_arm_voltage(8)
-
-            if secondary_right_bumper:
+            if secondary.getXButton():
                 self.intake.set_arm_voltage(-8)
+            elif secondary.getBButton():
+                self.intake.set_arm_voltage(8)
 
         """
         SHOOTER
@@ -389,13 +390,13 @@ class MyRobot(LemonRobot):
             if secondary.getRightTriggerAxis() >= 0.8:
                 self.shooter_controller.request_shoot()
 
-            if secondary.getStartButton():
+            elif secondary.getStartButton():
                 self.shooter_controller.request_force_shoot(15.0)
 
-            if secondary.getYButton():
+            elif secondary.getYButton():
                 self.shooter_controller.request_unjam()
 
-            if secondary.getAButton():
+            elif secondary.getAButton():
                 self.shooter_controller.request_force_shoot(47.5)
 
     def _display_auto_trajectory(self) -> None:

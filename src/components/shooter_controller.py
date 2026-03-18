@@ -2,10 +2,11 @@ import math
 
 from magicbot import StateMachine, feedback, state, will_reset_to
 from wpilib import DriverStation, Field2d
-from wpimath.geometry import Pose2d, Rotation2d, Translation2d
+from wpimath.geometry import Translation2d
 from wpimath.kinematics import ChassisSpeeds
 
 from components.drive_control import DriveControl
+from components.indexer import Indexer
 from components.shooter import Shooter
 from components.shot_calculator import (
     INVALID,
@@ -29,6 +30,7 @@ _BLUE_HUB_FORWARD = Translation2d(1.0, 0.0)
 class ShooterController(StateMachine):
     drive_control: DriveControl
     shooter: Shooter
+    indexer: Indexer
     swerve_drive: SwerveDrive
 
     estimated_field: Field2d
@@ -47,7 +49,7 @@ class ShooterController(StateMachine):
     min_confidence = SmartPreference(40.0)
 
     def setup(self):
-        self.distance_lookup = [1.597, 2.597, 3.597, 4.597]  # TODO Tune these values
+        self.distance_lookup = [1.347, 2.347, 3.347, 4.347]  # TODO Tune these values
 
         # RPS
         self.speed_lookup = [41.95, 45.8, 48.9, 53.0]  # TODO Tune these values
@@ -60,7 +62,7 @@ class ShooterController(StateMachine):
         max_d = self.distance_lookup[-1]
 
         config = ShotConfig(
-            launcher_offset_x=0.25,
+            launcher_offset_x=0.0,
             launcher_offset_y=0.0,
             min_scoring_distance=min_d,
             max_scoring_distance=max_d,
@@ -86,7 +88,8 @@ class ShooterController(StateMachine):
 
         # Tuning constants
         self.idle_speed_scalar = 0.5
-        self.kicker_duty = 8  # Volts
+        self.kicker_volts = 8  # Volts
+        self.conveyor_volts = 6  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.05  # 5 %
 
@@ -204,8 +207,9 @@ class ShooterController(StateMachine):
 
     @state
     def unjam(self):
-        self.shooter.set_kicker(-self.kicker_duty)
-        self.shooter.set_voltage(-self.kicker_duty)
+        self.indexer.set_kicker(-self.kicker_volts)
+        self.indexer.set_conveyor(-self.conveyor_volts)
+        self.shooter.set_voltage(-self.kicker_volts)
         if not self.unjamming:
             self.next_state("idle")
 
@@ -218,7 +222,8 @@ class ShooterController(StateMachine):
         )
         if speed_ready:
             self.forceshoottolgood = True
-            self.shooter.set_kicker(self.kicker_duty)
+            self.indexer.set_kicker(self.kicker_volts)
+            self.indexer.set_conveyor(self.conveyor_volts)
         if not self.force_shoot_req:
             self.next_state("idle")
 
@@ -269,4 +274,5 @@ class ShooterController(StateMachine):
             # updates the aim, so small heading errors are compensated.
             self.next_state("spin_up")
         elif self.at_speed:
-            self.shooter.set_kicker(self.kicker_duty)
+            self.indexer.set_kicker(self.kicker_volts)
+            self.indexer.set_conveyor(self.conveyor_volts)
