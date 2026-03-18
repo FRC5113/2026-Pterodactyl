@@ -1,13 +1,13 @@
 from enum import Enum
 from typing import List
 from wpimath.geometry import Pose2d, Rotation2d
-from wpimath.units import meters, degrees
+from wpimath.units import meters, degrees, milliseconds
 from components.swerve_drive import SwerveDrive
 from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
 from magicbot import StateMachine
-
+import time
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
@@ -18,7 +18,7 @@ class AutoContext:
     sd: SwerveDrive
     sh: Shooter
     it: Intake
-    sc: StateMachine
+    sc: ShooterController
 
     def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: ShooterController):
         self.sd = sd
@@ -134,15 +134,13 @@ class ShootAuto(AutoStep):
 
     def __init__(self):
         self.started = False
-
+        self.durration = durration
     def execute(self, ctx: AutoContext) -> StepStatus:
-        if not self.started:
-            ctx.sc.request_shoot()
-            self.started = True
-
-        # Check if shooter is at speed and ready
-        if ctx.sc.at_speed:
+        if self.start == 0:
+            self.start = time.perf_counter()
+        if time.perf_counter() - self.start > self.durration:
             return StepStatus.DONE
+        ctx.sc.request_shoot()
         return StepStatus.RUNNING
 
 
