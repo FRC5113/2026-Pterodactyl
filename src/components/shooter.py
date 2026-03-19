@@ -4,6 +4,7 @@ from phoenix6.configs import (
     FeedbackConfigs,
     TalonFXConfiguration,
     TorqueCurrentConfigs,
+    Slot1Configs,
 )
 from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
@@ -32,6 +33,7 @@ class Shooter:
     shooter_velocity = will_reset_to(0.0)
     shooter_voltage = will_reset_to(0.0)
     shooter_acceleration = will_reset_to(0.0)
+    shooter_slot = will_reset_to(0)
 
     manual_control = will_reset_to(False)
 
@@ -59,6 +61,9 @@ class Shooter:
         self.component_enabled = True
 
     def _configure_motors(self):
+        self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
+        self.slot1 = Slot1Configs().with_k_p(slot0.k_p + 0.1).with_k_v(slot0.k_v).with_k_a(slot0.k_a)
+        
         config = TalonFXConfiguration()
 
         config.motor_output.neutral_mode = NeutralModeValue.COAST
@@ -79,7 +84,8 @@ class Shooter:
         config.torque_current.peak_forward_torque_current = self.shooter_peak_amps
         config.torque_current.peak_reverse_torque_current = -self.shooter_peak_amps
 
-        config.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
+        config.slot0 = self.slot0
+        config.slot1 = self.slot1
 
         mm = config.motion_magic
         mm.motion_magic_acceleration = 1000
@@ -92,12 +98,15 @@ class Shooter:
 
     def on_enable(self):
         if self.tuning_enabled:
-            controller = self.shooter_profile.create_ctre_flywheel_controller()
+            self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
+            self.slot1 = Slot1Configs().with_k_p(slot0.k_p + 0.1).with_k_v(slot0.k_v).with_k_a(slot0.k_a)
 
+            self._base_config.slot0 = self.slot0
+            self._base_config.slot1 = self.slot1
             self.right_motor.configurator.apply(
-                self._base_config.with_slot0(controller)
+                self._base_config
             )
-            self.left_motor.configurator.apply(self._base_config.with_slot0(controller))
+            self.left_motor.configurator.apply(self._base_config)
 
     """
     CONTROL METHODS
@@ -146,25 +155,10 @@ class Shooter:
             self._boost_timer = 10  # ~200ms boost
 
         self._last_velocity = velocity
-
-        # Dynamic torque boost
         if self._boost_timer > 0:
             self._boost_timer -= 1
-            boosted_torque = TorqueCurrentConfigs()
-            boosted_torque.peak_forward_torque_current = self.shooter_peak_amps + 20
-            boosted_torque.peak_reverse_torque_current = -(self.shooter_peak_amps + 20)
-
-            self.right_motor.configurator.apply(
-                self._base_config.with_torque_current(boosted_torque)
-            )
-        else:
-            normal_torque = TorqueCurrentConfigs()
-            normal_torque.peak_forward_torque_current = self.shooter_peak_amps
-            normal_torque.peak_reverse_torque_current = -self.shooter_peak_amps
-
-            self.right_motor.configurator.apply(
-                self._base_config.with_torque_current(normal_torque)
-            )
+            self.shooter_slot = 1
+            
 
         if self.manual_control:
             if self.shooter_voltage != self.prev_shooter_control:
@@ -178,5 +172,5 @@ class Shooter:
                 self.right_motor.set_control(
                     self.shooter_control.with_velocity(
                         self.shooter_velocity
-                    ).with_acceleration(self.shooter_acceleration)
+                    ).with_acceleration(self.shooter_acceleration).with_slot(self.shooter_slot)
                 )
