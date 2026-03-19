@@ -92,6 +92,7 @@ class ShooterController(StateMachine):
         self.conveyor_volts = -8  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.05  # 5 %
+        self.idle_accerlation = 300.0  # RPS
 
     """
     CONTROL METHODS
@@ -190,6 +191,7 @@ class ShooterController(StateMachine):
     def idle(self):
         self._update_target()
         self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
+        self.shooter.set_acceleration(self.idle_accerlation)
 
         if self.unjamming:
             self.next_state("unjam")

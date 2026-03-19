@@ -3,13 +3,12 @@ import enum
 from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
+    CANcoderConfiguration,
     TalonFXConfiguration,
     TalonFXSConfiguration,
-    CANcoderConfiguration,
 )
-from phoenix6.hardware import TalonFX, TalonFXS, CANcoder
+from phoenix6.hardware import TalonFX, TalonFXS
 from phoenix6.signals import (
-    ExternalFeedbackSensorSourceValue,
     MotorAlignmentValue,
     MotorArrangementValue,
     NeutralModeValue,
@@ -40,6 +39,7 @@ class Intake:
 
     spin_amps: units.amperes
     arm_amps: units.amperes
+    hard_stop_amps: units.amperes
 
     encoder_offset: float
 
@@ -49,6 +49,9 @@ class Intake:
     arm_voltage = will_reset_to(0.0)
     arm_manual_control = will_reset_to(False)
     arm_angle = will_reset_to(IntakeAngle.UP.value)
+
+    rev_lim = will_reset_to(False)
+    fwd_lim = will_reset_to(False)
 
     bypass_limits = will_reset_to(False)
 
@@ -184,6 +187,19 @@ class Intake:
     def turn_on_component(self):
         self.component_enabled = True
 
+    """
+    INFORMATIONAL METHODS
+    """
+
+    def get_left_current(self):
+        return self.left_motor.get_stator_current()
+
+    def get_right_current(self):
+        return self.right_motor.get_stator_current()
+
+    def get_avg_current(self):
+        return (self.get_left_current().value + self.get_right_current().value) / 2
+
     def execute(self):
         # thing so that if batt low we can turn off to save energy
         if not self.component_enabled:
@@ -221,11 +237,17 @@ class Intake:
             )
             self.left_motor.set_control(self.arm_follower)
 
+        if self.get_avg_current() > self.hard_stop_amps and self.arm_voltage != 0.0:
+            if self.arm_voltage > 0.0:
+                self.fwd_lim = True
+            else:
+                self.rev_lim = True
+
         if self.arm_manual_control and self.arm_voltage != self.prev_arm_voltage:
             self.prev_arm_voltage = self.arm_voltage
             self.right_motor.set_control(
-                self.arm_voltage_control.with_output(
-                    self.arm_voltage
-                ).with_ignore_software_limits(self.bypass_limits)
+                self.arm_voltage_control.with_output(self.arm_voltage)
+                .with_limit_forward_motion(self.fwd_lim)
+                .with_limit_reverse_motion(self.rev_lim)
             )
             self.left_motor.set_control(self.arm_follower)

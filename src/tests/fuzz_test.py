@@ -143,7 +143,7 @@ def test_fuzz_test(control: TestController) -> None:
         hids = DSInputs()
 
         # Start the robot in disabled mode for a short period
-        control.step_timing(seconds=0.6, autonomous=False, enabled=False)
+        control.step_timing(seconds=0.1, autonomous=False, enabled=False)
 
         # ... in disabled test mode too
         DriverStationSim.setTest(True)

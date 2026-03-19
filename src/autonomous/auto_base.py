@@ -185,12 +185,6 @@ class AutoBase(AutonomousStateMachine):
         """Placeholder for shooting state."""
         self.shooter_controller.request_shoot()
 
-    @state
-    def climb(self):
-        """Placeholder for climbing state."""
-        print("Climbing State Placeholder")
-        self.next_state("next_step")
-
     @timed_state(duration=3.0, next_state="next_step")
     def go_forward_and_intake(self):
         self.drive_control.drive_auto_manual(1, 0.0, 0.0, False)

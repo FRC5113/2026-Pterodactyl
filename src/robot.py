@@ -6,7 +6,7 @@ from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
-from phoenix6.hardware import TalonFX, TalonFXS, CANcoder
+from phoenix6.hardware import TalonFX, TalonFXS
 from wpilib import (
     DriverStation,
     Field2d,
@@ -140,6 +140,8 @@ class MyRobot(LemonRobot):
         self.intake_spin_amps: units.amperes = 60.0
         self.intake_arm_amps: units.amperes = 24.0
 
+        self.intake_hard_stop_amps: units.amperes = 10.0
+
         self.intake_profile = SmartProfile(
             "intake",
             {
@@ -162,7 +164,9 @@ class MyRobot(LemonRobot):
         self.shooter_right_motor = TalonFX(3)
 
         self.shooter_gear_ratio = 1.0
-        self.shooter_amps: units.amperes = 120.0
+        self.shooter_stator_amps: units.amperes = 120.0
+        self.shooter_supply_amps: units.amperes = 70.0
+        self.shooter_peak_amps: units.amperes = 140.0
 
         self.shooter_angle = 23  # degrees
 
@@ -187,6 +191,7 @@ class MyRobot(LemonRobot):
         self.indexer_conveyor_motor = TalonFXS(6)
         self.indexer_kicker_amps: units.amperes = 40.0
         self.indexer_conveyor_amps: units.amperes = 30.0
+
         """
         ODOMETRY
         """
@@ -397,8 +402,7 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_unjam()
 
             elif secondary.getAButton():
-                # self.shooter_controller.request_force_shoot(47.5)
-                self.shooter_controller.request_force_shoot(40)
+                self.shooter_controller.request_force_shoot(47.5)
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()

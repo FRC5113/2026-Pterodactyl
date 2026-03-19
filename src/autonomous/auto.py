@@ -7,17 +7,20 @@ from components.shooter_controller import ShooterController
 
 """
 Trajectories: (start with trajectory:)
-- hub_climb
 - outpost_shoot
-- hub_outpost
-- shoot_climb
 - hub_shoot
+- lt_intake
+- rt_intake
+- end_of_lt_intake_to_shoot
+- end_of_rt_intake_to_shoot
+- lt_outpost
+- rt_outpost
+- auto_test
 """
 
 """
 States: (start with state:)
 - shoot
-- climb
 - outpost_wait
 """
 
@@ -50,36 +53,19 @@ class hard_code_shoot(AutoBase):
         self.intake.set_arm_voltage(1)
 
 
-class hard_code_spin_shoot(AutoBase):
-    MODE_NAME = "Hard Code Spin Shoot"
+class auto_test(AutoBase):
+    MODE_NAME = "Auto Test"
 
     drive_control: DriveControl
-    shooter_controller: ShooterController
 
     def __init__(self):
         super().__init__(
             [
-                "state:move_back",
-                "state:spin",
+                "trajectory:auto_test",
+                "state:outpost_wait",
                 "state:shoot",
             ]
         )
-
-    @timed_state(duration=1.5, next_state="next_step")
-    def move_back(self):
-        self.drive_control.drive_auto_manual(
-            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
-        )
-
-    @timed_state(duration=5, next_state="next_step")
-    def spin(self):
-        self.drive_control.drive_auto_manual(
-            translationX=0.0, translationY=0.0, rotationX=12.0, field_relative=False
-        )
-
-    @timed_state(duration=5.0, next_state="next_step")
-    def shoot(self):
-        self.shooter_controller.request_shoot()
 
 
 class hub_outpost_shoot(AutoBase):
