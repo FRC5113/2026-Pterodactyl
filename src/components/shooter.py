@@ -62,7 +62,7 @@ class Shooter:
 
     def _configure_motors(self):
         self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
-        self.slot1 = Slot1Configs().with_k_p(slot0.k_p + 0.1).with_k_v(slot0.k_v).with_k_a(slot0.k_a)
+        self.slot1 = Slot1Configs().with_k_p(self.slot0.k_p + 0.1).with_k_v(self.slot0.k_v).with_k_a(self.slot0.k_a)
         
         config = TalonFXConfiguration()
 
@@ -99,7 +99,7 @@ class Shooter:
     def on_enable(self):
         if self.tuning_enabled:
             self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
-            self.slot1 = Slot1Configs().with_k_p(slot0.k_p + 0.1).with_k_v(slot0.k_v).with_k_a(slot0.k_a)
+            self.slot1 = Slot1Configs().with_k_p(self.slot0.k_p + 0.1).with_k_v(self.slot0.k_v).with_k_a(self.slot0.k_a)
 
             self._base_config.slot0 = self.slot0
             self._base_config.slot1 = self.slot1
