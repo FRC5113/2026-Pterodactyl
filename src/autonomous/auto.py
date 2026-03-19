@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Sequence, cast
+from typing import Sequence
 from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.units import meters, degrees, milliseconds
 from components.drive_control import DriveControl
@@ -8,6 +8,9 @@ from components.intake import Intake
 from components.shooter_controller import ShooterController
 import time
 import math
+from magicbot import AutonomousStateMachine
+from wpilib import SendableChooser, SmartDashboard
+from lemonlib.util import AlertManager
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
@@ -36,7 +39,6 @@ class AutoStep:
 class AutoRunner:
     def __init__(self, steps: Sequence[AutoStep]):
         self.steps = steps
-        self.ctx = AutoContext(cast(DriveControl, DriveControl()), Shooter(), Intake(), cast(ShooterController, ShooterController())) # Placeholder
         self.index = 0
 
     def reset(self):
@@ -46,7 +48,7 @@ class AutoRunner:
         if self.index >= len(self.steps):
             return
 
-        status = self.steps[self.index].execute(self.ctx)
+        status = self.steps[self.index].execute(ctx)
 
         if status == StepStatus.DONE:
             self.index += 1
@@ -134,9 +136,7 @@ class IntakeAuto(AutoStep):
         self.applied = False
 
     def execute(self, ctx: AutoContext) -> StepStatus:
-        if not self.applied:
-            ctx.it.set_voltage(12 if self.is_on else 0)
-            self.applied = True
+        ctx.it.set_voltage(12 if self.is_on else 0)
         return StepStatus.DONE
 
 
@@ -152,3 +152,66 @@ class ShootAuto(AutoStep):
             return StepStatus.DONE
         ctx.sc.request_shoot()
         return StepStatus.RUNNING
+    
+class MagicBotSucks(AutonomousStateMachine):
+    drive_control: DriveControl
+    intake: Intake
+    shooter_controler: ShooterController
+    def on_enable(self):
+        self._auto_ctx = AutoContext(self.drive_control, self.shooter, self.intake, self.shooter_controller)
+        self._auto_routines["move_back"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(-5, 0, 0)
+            ]
+        )
+        self._auto_routines["move_foward"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["turn_and_move_left"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(0, 0, 90),
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["turn_and_move_right"] = AutoRunner(
+            [
+                SwerveDriveBotRelativeAuto(0, 0, -90),
+                SwerveDriveBotRelativeAuto(5, 0, 0)
+            ]
+        )
+        self._auto_routines["foward_intake_back_shoot"] = AutoRunner(
+            [
+                ParallelStep(
+                    SwerveDriveBotRelativeAuto(2, 0, 0),
+                    IntakeAuto(True)
+                ),
+                SwerveDriveBotRelativeAuto(-2, 0, 0),
+                ShootAuto(3000) #3s
+            ]
+        )
+        self._auto_routines["STILL"] = AutoRunner([])
+
+
+        self.auto_choser = SendableChooser()
+        self.auto_choser.setDefaultOption("move_back", "move_back")
+        self.auto_choser.addOption("move_foward", "move_foward")
+        self.auto_choser.addOption("turn_and_move_left", "turn_and_move_left")
+        self.auto_choser.addOption("turn_and_move_right", "turn_and_move_right")
+        self.auto_choser.addOption("foward_intake_back_shoot", "foward_intake_back_shoot")
+        SmartDashboard.putData("Auto Selector", self.auto_choser)
+    def on_disable(self):
+        pass
+    def on_iteration(self, tm: meters) -> None:
+        sel_auto_key = self.auto_choser.getSelected()
+        if not sel_auto_key in self._auto_routines:
+            AlertManager.instant_alert(f"[ERROR] Auto {sel_auto_key} does not exist. Standing Still.", AlertType.ERROR, 10)
+            sel_auto_key = "STILL"
+        self._curr_auto = self._auto_routines[sel_auto_key]
+        RESET = '\033[0m'
+        RED = '\033[31m'
+        print(RED)
+        print(self._curr_auto)
+        print(RESET)
+        self._curr_auto.run(self._auto_ctx)
