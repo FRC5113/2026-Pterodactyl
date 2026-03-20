@@ -41,7 +41,7 @@ class TunerConstants:
     _steer_closed_loop_output = swerve.ClosedLoopOutputType.VOLTAGE
     # The closed-loop output type to use for the drive motors;
     # This affects the PID/FF gains for the drive motors
-    _drive_closed_loop_output = swerve.ClosedLoopOutputType.VOLTAGE
+    _drive_closed_loop_output = swerve.ClosedLoopOutputType.TORQUE_CURRENT_FOC
 
     # The type of motor used for the drive motor
     _drive_motor_type = swerve.DriveMotorArrangement.TALON_FX_INTEGRATED
@@ -63,7 +63,8 @@ class TunerConstants:
         configs.CurrentLimitsConfigs()
         # Swerve azimuth does not require much torque output, so we can set a relatively low
         # stator current limit to help avoid brownouts without impacting performance.
-        .with_stator_current_limit(60.0).with_stator_current_limit_enable(True)
+        .with_stator_current_limit(60.0)
+        .with_stator_current_limit_enable(True)
     )
     _encoder_initial_configs = configs.CANcoderConfiguration()
     # Configs for the Pigeon 2; leave this None to skip applying Pigeon 2 configs
@@ -99,8 +100,8 @@ class TunerConstants:
     _steer_inertia: units.kilogram_square_meter = 0.01
     _drive_inertia: units.kilogram_square_meter = 0.01
     # Simulated voltage necessary to overcome friction
-    _steer_friction_voltage: units.volt = 0.2
-    _drive_friction_voltage: units.volt = 0.2
+    _steer_friction_voltage: units.volt = 0.0
+    _drive_friction_voltage: units.volt = 0.0
 
     drivetrain_constants = (
         swerve.SwerveDrivetrainConstants()

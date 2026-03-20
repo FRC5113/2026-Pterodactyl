@@ -2,9 +2,8 @@ from magicbot import feedback, will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
     FeedbackConfigs,
-    TalonFXConfiguration,
-    TorqueCurrentConfigs,
     Slot1Configs,
+    TalonFXConfiguration,
 )
 from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
@@ -62,8 +61,13 @@ class Shooter:
 
     def _configure_motors(self):
         self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
-        self.slot1 = Slot1Configs().with_k_p(self.slot0.k_p + 0.1).with_k_v(self.slot0.k_v).with_k_a(self.slot0.k_a)
-        
+        self.slot1 = (
+            Slot1Configs()
+            .with_k_p(self.slot0.k_p + 0.1)
+            .with_k_v(self.slot0.k_v)
+            .with_k_a(self.slot0.k_a)
+        )
+
         config = TalonFXConfiguration()
 
         config.motor_output.neutral_mode = NeutralModeValue.COAST
@@ -99,13 +103,16 @@ class Shooter:
     def on_enable(self):
         if self.tuning_enabled:
             self.slot0 = self.shooter_profile.create_ctre_flywheel_controller()
-            self.slot1 = Slot1Configs().with_k_p(self.slot0.k_p + 0.1).with_k_v(self.slot0.k_v).with_k_a(self.slot0.k_a)
+            self.slot1 = (
+                Slot1Configs()
+                .with_k_p(self.slot0.k_p + 0.1)
+                .with_k_v(self.slot0.k_v)
+                .with_k_a(self.slot0.k_a)
+            )
 
             self._base_config.slot0 = self.slot0
             self._base_config.slot1 = self.slot1
-            self.right_motor.configurator.apply(
-                self._base_config
-            )
+            self.right_motor.configurator.apply(self._base_config)
             self.left_motor.configurator.apply(self._base_config)
 
     """
@@ -158,19 +165,14 @@ class Shooter:
         if self._boost_timer > 0:
             self._boost_timer -= 1
             self.shooter_slot = 1
-            
 
         if self.manual_control:
-            if self.shooter_voltage != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_voltage
-                self.right_motor.set_control(
-                    self.voltage_control.with_output(self.shooter_voltage)
-                )
+            self.right_motor.set_control(
+                self.voltage_control.with_output(self.shooter_voltage)
+            )
         else:
-            if self.shooter_velocity != self.prev_shooter_control:
-                self.prev_shooter_control = self.shooter_velocity
-                self.right_motor.set_control(
-                    self.shooter_control.with_velocity(
-                        self.shooter_velocity
-                    ).with_acceleration(self.shooter_acceleration).with_slot(self.shooter_slot)
-                )
+            self.right_motor.set_control(
+                self.shooter_control.with_velocity(self.shooter_velocity)
+                .with_acceleration(self.shooter_acceleration)
+                .with_slot(self.shooter_slot)
+            )

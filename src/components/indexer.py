@@ -90,15 +90,11 @@ class Indexer:
             self.conveyor_motor.set_control(self.coast_control)
             return
 
-        if self.kicker_duty != self.prev_kicker_control:
-            self.prev_kicker_control = self.kicker_duty
-            self.right_kicker_motor.set_control(
-                self.voltage_control.with_output(self.kicker_duty)
-            )
-            self.left_kicker_motor.set_control(self.kicker_follower)
+        self.right_kicker_motor.set_control(
+            self.voltage_control.with_output(self.kicker_duty)
+        )
+        self.left_kicker_motor.set_control(self.kicker_follower)
 
-        if self.conveyor_volt != self.prev_conveyor_control:
-            self.prev_conveyor_control = self.conveyor_volt
-            self.conveyor_motor.set_control(
-                self.voltage_control.with_output(self.conveyor_volt)
-            )
+        self.conveyor_motor.set_control(
+            self.voltage_control.with_output(self.conveyor_volt)
+        )

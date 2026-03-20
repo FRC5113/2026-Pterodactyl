@@ -133,7 +133,7 @@ def test_fuzz(control: TestController, station: str) -> None:
         for _ in range(30):
             things.fuzz()
             hids.fuzz()
-            control.step_timing(seconds=1, autonomous=False, enabled=True)
+            control.step_timing(seconds=0.1, autonomous=False, enabled=True)
 
         DriverStationSim.setAllianceStationId(hal.AllianceStationID.kUnknown)
 
@@ -143,7 +143,7 @@ def test_fuzz_test(control: TestController) -> None:
         hids = DSInputs()
 
         # Start the robot in disabled mode for a short period
-        control.step_timing(seconds=0.1, autonomous=False, enabled=False)
+        control.step_timing(seconds=0.5, autonomous=False, enabled=False)
 
         # ... in disabled test mode too
         DriverStationSim.setTest(True)
@@ -151,7 +151,10 @@ def test_fuzz_test(control: TestController) -> None:
 
         DriverStationSim.setEnabled(True)
 
+        assert control.robot_is_alive
+
         for _ in range(20):
             hids.fuzz()
             DriverStationSim.notifyNewData()
             wpilib.simulation.stepTiming(0.2)
+            assert control.robot_is_alive

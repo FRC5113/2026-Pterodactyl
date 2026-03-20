@@ -224,11 +224,7 @@ class Intake:
             )
             self.hinge_alert.enable()
 
-        if (
-            not self.arm_manual_control
-            and self.arm_angle != self.prev_arm_voltage
-            and False
-        ):
+        if not self.arm_manual_control and False:
             self.prev_arm_voltage = self.arm_angle
             self.right_motor.set_control(
                 self.arm_position_control.with_position(
@@ -243,8 +239,7 @@ class Intake:
             else:
                 self.rev_lim = True
 
-        if self.arm_manual_control and self.arm_voltage != self.prev_arm_voltage:
-            self.prev_arm_voltage = self.arm_voltage
+        if self.arm_manual_control:
             self.right_motor.set_control(
                 self.arm_voltage_control.with_output(self.arm_voltage)
                 .with_limit_forward_motion(self.fwd_lim)

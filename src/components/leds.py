@@ -6,6 +6,7 @@ from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
+from magicbot import feedback
 
 
 class LEDStrip:
@@ -41,7 +42,7 @@ class LEDStrip:
     INFORMATIONAL METHODS
     """
 
-    # @feedback
+    @feedback
     def get_colors(self) -> list[str]:
         """Returns LED colors in list of hex strings"""
         return [Color(led.r, led.g, led.b).hexString() for led in self.leds.buffer]

@@ -214,31 +214,31 @@
  "config":{
   "frontLeft":{
    "x":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    },
    "y":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    }
   },
   "backLeft":{
    "x":{
-    "exp":"-13 in",
-    "val":-0.3302
+    "exp":"-13.75 in",
+    "val":-0.34925
    },
    "y":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    }
   },
   "mass":{
-   "exp":"115 lbs",
-   "val":52.16312255
+   "exp":"150 lbs",
+   "val":68.0388555
   },
   "inertia":{
-   "exp":"4 kg m ^ 2",
-   "val":4.0
+   "exp":"6 kg m ^ 2",
+   "val":6.0
   },
   "gearing":{
    "exp":"6.75",

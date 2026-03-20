@@ -190,7 +190,7 @@ class MyRobot(LemonRobot):
         self.indexer_right_kicker_motor = TalonFXS(5)
         self.indexer_conveyor_motor = TalonFXS(6)
         self.indexer_kicker_amps: units.amperes = 40.0
-        self.indexer_conveyor_amps: units.amperes = 30.0
+        self.indexer_conveyor_amps: units.amperes = 20.0
 
         """
         ODOMETRY
