@@ -10,6 +10,7 @@ from phoenix6.signals import (
     FeedbackSensorSourceValue,
     MotorAlignmentValue,
     NeutralModeValue,
+    InvertedValue
 )
 from wpimath import units
 
@@ -43,15 +44,15 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.MotionMagicVelocityTorqueCurrentFOC(
+        self.shooter_control = controls.VelocityVoltage(
             0
         ).with_slot(0)
 
         # follower (set once)
         self.shooter_follower = controls.Follower(
-            self.right_motor.device_id, MotorAlignmentValue.OPPOSED
+            self.left_motor.device_id, MotorAlignmentValue.OPPOSED
         )
-        self.left_motor.set_control(self.shooter_follower)
+        self.right_motor.set_control(self.shooter_follower)
 
         self.voltage_control = controls.VoltageOut(0)
         self.coast_control = controls.CoastOut()
@@ -71,6 +72,7 @@ class Shooter:
         config = TalonFXConfiguration()
 
         config.motor_output.neutral_mode = NeutralModeValue.COAST
+        config.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE
 
         config.feedback = (
             FeedbackConfigs()
@@ -91,9 +93,9 @@ class Shooter:
         config.slot0 = self.slot0
         config.slot1 = self.slot1
 
-        mm = config.motion_magic
-        mm.motion_magic_acceleration = 1000
-        mm.motion_magic_jerk = 15000
+        # mm = config.motion_magic
+        # mm.motion_magic_acceleration = 1000
+        # mm.motion_magic_jerk = 15000
 
         self.right_motor.configurator.apply(config)
         self.left_motor.configurator.apply(config)
@@ -154,25 +156,23 @@ class Shooter:
             return
 
         # cache velocity
-        self._cached_velocity = self.right_motor.get_velocity().value
-        velocity = self._cached_velocity
+        self._cached_velocity = self.left_motor.get_velocity().value
+        # velocity = self._cached_velocity
 
-        # Shot detection (velocity drop)
-        if velocity < self._last_velocity - 5:  # tune threshold
-            self._boost_timer = 10  # ~200ms boost
+        # # Shot detection (velocity drop)
+        # if velocity < self._last_velocity - 5:  # tune threshold
+        #     self._boost_timer = 10  # ~200ms boost
 
-        self._last_velocity = velocity
-        if self._boost_timer > 0:
-            self._boost_timer -= 1
-            self.shooter_slot = 1
+        # self._last_velocity = velocity
+        # if self._boost_timer > 0:
+        #     self._boost_timer -= 1
+        #     self.shooter_slot = 1
 
         if self.manual_control:
-            self.right_motor.set_control(
+            self.left_motor.set_control(
                 self.voltage_control.with_output(self.shooter_voltage)
             )
         else:
-            self.right_motor.set_control(
+            self.left_motor.set_control(
                 self.shooter_control.with_velocity(self.shooter_velocity)
-                .with_acceleration(self.shooter_acceleration)
-                .with_slot(self.shooter_slot)
             )

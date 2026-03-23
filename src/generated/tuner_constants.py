@@ -41,7 +41,7 @@ class TunerConstants:
     _steer_closed_loop_output = swerve.ClosedLoopOutputType.VOLTAGE
     # The closed-loop output type to use for the drive motors;
     # This affects the PID/FF gains for the drive motors
-    _drive_closed_loop_output = swerve.ClosedLoopOutputType.TORQUE_CURRENT_FOC
+    _drive_closed_loop_output = swerve.ClosedLoopOutputType.VOLTAGE
 
     # The type of motor used for the drive motor
     _drive_motor_type = swerve.DriveMotorArrangement.TALON_FX_INTEGRATED
@@ -77,7 +77,8 @@ class TunerConstants:
 
     # CAN bus that the devices are located on;
     # All swerve devices must share the same CAN bus
-    canbus = CANBus("can_s5")
+    # canbus = CANBus("can_s5")
+    canbus = CANBus.roborio()
 
     # Theoretical free speed (m/s) at 12 V applied output;
     # This needs to be tuned to your individual robot
@@ -164,7 +165,7 @@ class TunerConstants:
     _back_left_drive_motor_id = 31
     _back_left_steer_motor_id = 32
     _back_left_encoder_id = 33
-    _back_left_encoder_offset: units.rotation = 0.331787109375
+    _back_left_encoder_offset: units.rotation = 0.326904296875
     _back_left_steer_motor_inverted = True
     _back_left_encoder_inverted = False
 

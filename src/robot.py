@@ -196,13 +196,13 @@ class MyRobot(LemonRobot):
         ODOMETRY
         """
         # Custom apriltag field layout
-        self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
-            str(Path(__file__).parent.resolve() / "2026_test_field.json")
-        )
-
-        # self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-        #     robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        # self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
+        #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
         # )
+
+        self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
+            robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        )
 
         # Robot to Camera Transforms
         ox = 0.298
@@ -396,7 +396,7 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_shoot()
 
             elif secondary.getStartButton():
-                self.shooter_controller.request_force_shoot(15.0)
+                self.shooter_controller.request_force_shoot(14.0)
 
             elif secondary.getYButton():
                 self.shooter_controller.request_unjam()

@@ -22,11 +22,43 @@ Trajectories: (start with trajectory:)
 States: (start with state:)
 - shoot
 - outpost_wait
+- intake_down
 """
 
 
 class hard_code_shoot(AutoBase):
     MODE_NAME = "Hard Code Shoot"
+
+    drive_control: DriveControl
+    shooter_controller: ShooterController
+    intake: Intake
+
+    def __init__(self):
+        super().__init__(
+            [
+                "state:move_back",
+                "state:intake_out",
+                "state:hard_shoot",
+            ]
+        )
+
+    @timed_state(duration=1.5, next_state="next_step")
+    def move_back(self):
+        self.drive_control.drive_auto_manual(
+            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
+        )
+
+    @timed_state(duration=16.5, next_state="next_step")
+    def hard_shoot(self):
+        self.shooter_controller.request_force_shoot(45.5)
+        self.intake.set_voltage(-10)
+
+    @timed_state(duration=2, next_state="next_step")
+    def intake_out(self):
+        self.intake.set_arm_voltage(-8)
+
+class hard_code_shoot_angled(AutoBase):
+    MODE_NAME = "Hard Code Shoot angled"
     DEFAULT = True
 
     drive_control: DriveControl
@@ -38,7 +70,7 @@ class hard_code_shoot(AutoBase):
             [
                 "state:move_back",
                 "state:intake_out",
-                "state:shoot",
+                "state:hard_shoot",
             ]
         )
 
@@ -48,24 +80,29 @@ class hard_code_shoot(AutoBase):
             translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
         )
 
-    @timed_state(duration=1, next_state="next_step")
+    @timed_state(duration=16.5, next_state="next_step")
+    def hard_shoot(self):
+        self.shooter_controller.request_force_shoot(46)
+        self.intake.set_voltage(-10)
+
+    @timed_state(duration=2, next_state="next_step")
     def intake_out(self):
-        self.intake.set_arm_voltage(1)
+        self.intake.set_arm_voltage(-8)
 
 
-class auto_test(AutoBase):
-    MODE_NAME = "Auto Test"
+# class auto_test(AutoBase):
+#     MODE_NAME = "Auto Test"
 
-    drive_control: DriveControl
+#     drive_control: DriveControl
 
-    def __init__(self):
-        super().__init__(
-            [
-                "trajectory:auto_test",
-                "state:outpost_wait",
-                "state:shoot",
-            ]
-        )
+#     def __init__(self):
+#         super().__init__(
+#             [
+#                 "trajectory:auto_test",
+#                 "state:outpost_wait",
+#                 "state:shoot",
+#             ]
+#         )
 
 
 class hub_outpost_shoot(AutoBase):
@@ -74,6 +111,7 @@ class hub_outpost_shoot(AutoBase):
     def __init__(self):
         super().__init__(
             [
+                "state:intake_down",
                 "trajectory:hub_outpost",
                 "state:outpost_wait",
                 "trajectory:outpost_shoot",
@@ -88,6 +126,7 @@ class lt_intake_center_shoot(AutoBase):
     def __init__(self):
         super().__init__(
             [
+                "state:intake_down",
                 "trajectory:lt_intake",
                 "state:go_forward_and_intake",
                 "trajectory:end_of_lt_intake_to_shoot",
@@ -102,6 +141,7 @@ class rt_intake_center_shoot(AutoBase):
     def __init__(self):
         super().__init__(
             [
+                "state:intake_down",
                 "trajectory:rt_intake",
                 "state:go_forward_and_intake",
                 "trajectory:end_of_rt_intake_to_shoot",
@@ -116,6 +156,7 @@ class lt_outpost_shoot(AutoBase):
     def __init__(self):
         super().__init__(
             [
+                "state:intake_down",
                 "trajectory:lt_outpost",
                 "state:outpost_wait",
                 "trajectory:outpost_shoot",
@@ -130,6 +171,7 @@ class rt_outpost_shoot(AutoBase):
     def __init__(self):
         super().__init__(
             [
+                "state:intake_down",
                 "trajectory:rt_outpost",
                 "state:outpost_wait",
                 "trajectory:outpost_shoot",

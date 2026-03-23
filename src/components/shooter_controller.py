@@ -15,6 +15,7 @@ from components.shot_calculator import (
     ShotConfig,
     ShotInputs,
 )
+from components.intake import Intake
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
 from lemonlib.smart import SmartPreference
@@ -32,6 +33,7 @@ class ShooterController(StateMachine):
     shooter: Shooter
     indexer: Indexer
     swerve_drive: SwerveDrive
+    intake: Intake
 
     estimated_field: Field2d
 
@@ -89,7 +91,7 @@ class ShooterController(StateMachine):
         # Tuning constants
         self.idle_speed_scalar = 0.5
         self.kicker_volts = 8  # Volts
-        self.conveyor_volts = -8  # Volts
+        self.conveyor_volts = -9  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.05  # 5 %
         self.idle_accerlation = 300.0  # RPS
@@ -172,7 +174,7 @@ class ShooterController(StateMachine):
     def get_confidence(self):
         return self.shot_confidence
 
-    # @feedback
+    @feedback
     def is_at_speed(self):
         return self.at_speed
 
@@ -226,6 +228,7 @@ class ShooterController(StateMachine):
             self.forceshoottolgood = True
             self.indexer.set_kicker(self.kicker_volts)
             self.indexer.set_conveyor(self.conveyor_volts)
+            self.intake.set_voltage(-10)
         if not self.force_shoot_req:
             self.next_state("idle")
 
@@ -249,10 +252,10 @@ class ShooterController(StateMachine):
 
         self.at_speed = speed_ready and confident
 
-        if not self.shooting:
-            self.next_state("idle")
-        elif self.at_speed:
+        if self.at_speed:
             self.next_state("shoot")
+        else:
+            self.next_state("idle")
 
     @state
     def shoot(self):

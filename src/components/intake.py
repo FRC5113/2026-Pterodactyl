@@ -63,7 +63,7 @@ class Intake:
     def setup(self):
         self._cached_angle = 0.0
 
-        self._config_cancoder()
+        # self._config_cancoder()
         self._config_spin_motor()
         self._config_arm_motors()
 
@@ -96,10 +96,10 @@ class Intake:
 
         self.component_enabled = True
 
-    def _config_cancoder(self):
-        encoder_config = CANcoderConfiguration()
-        encoder_config.magnet_sensor.absolute_sensor_discontinuity_point = 0.5
-        encoder_config.magnet_sensor.magnet_offset = self.encoder_offset
+    # def _config_cancoder(self):
+    #     encoder_config = CANcoderConfiguration()
+    #     encoder_config.magnet_sensor.absolute_sensor_discontinuity_point = 0.5
+    #     encoder_config.magnet_sensor.magnet_offset = self.encoder_offset
 
     def _config_spin_motor(self):
         # Configure motors
@@ -111,10 +111,10 @@ class Intake:
 
     def _config_arm_motors(self):
         self.arm_motor_config = TalonFXSConfiguration()
-        self.arm_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
+        # self.arm_motor_config.motor_output.neutral_mode = NeutralModeValue.BRAKE
 
         self.arm_motor_config.current_limits.stator_current_limit = self.arm_amps
-        self.arm_motor_config.current_limits.stator_current_limit_enable = True
+        # self.arm_motor_config.current_limits.stator_current_limit_enable = True
 
         self.arm_motor_config.commutation.motor_arrangement = (
             MotorArrangementValue.BRUSHED_DC
@@ -124,16 +124,16 @@ class Intake:
         # )
         # self.arm_motor_config.external_feedback.feedback_remote_sensor_id = self.encoder.device_id
 
-        self.arm_motor_config.closed_loop_general.continuous_wrap = True
+        # self.arm_motor_config.closed_loop_general.continuous_wrap = True
 
-        self.arm_motor_config.software_limit_switch.forward_soft_limit_threshold = (
-            self.HARDUP
-        )
-        self.arm_motor_config.software_limit_switch.reverse_soft_limit_threshold = (
-            self.HARDDOWN
-        )
-        self.arm_motor_config.software_limit_switch.forward_soft_limit_enable = False
-        self.arm_motor_config.software_limit_switch.reverse_soft_limit_enable = False
+        # self.arm_motor_config.software_limit_switch.forward_soft_limit_threshold = (
+        #     self.HARDUP
+        # )
+        # self.arm_motor_config.software_limit_switch.reverse_soft_limit_threshold = (
+        #     self.HARDDOWN
+        # )
+        # self.arm_motor_config.software_limit_switch.forward_soft_limit_enable = False
+        # self.arm_motor_config.software_limit_switch.reverse_soft_limit_enable = False
 
         self.arm_motor_config.slot0 = self.profile.create_ctre_arm_controller()
 
@@ -141,6 +141,7 @@ class Intake:
         self.right_motor.configurator.apply(self.arm_motor_config)
 
     def on_enable(self):
+        self.left_motor.set_control(self.arm_follower)
         if self.tuning_enabled:
             self.arm_motor_config.slot0 = self.profile.create_ctre_arm_controller()
             self.left_motor.configurator.apply(self.arm_motor_config)
@@ -191,22 +192,22 @@ class Intake:
     INFORMATIONAL METHODS
     """
 
-    def get_left_current(self):
-        return self.left_motor.get_stator_current()
+    # def get_left_current(self):
+    #     return self.left_motor.get_stator_current()
 
-    def get_right_current(self):
-        return self.right_motor.get_stator_current()
+    # def get_right_current(self):
+    #     return self.right_motor.get_stator_current()
 
     def get_avg_current(self):
         return (self.get_left_current().value + self.get_right_current().value) / 2
 
     def execute(self):
         # thing so that if batt low we can turn off to save energy
-        if not self.component_enabled:
-            self.spin_motor.set_control(self.coast_control)
-            self.right_motor.set_control(self.coast_control)
-            self.left_motor.set_control(self.coast_control)
-            return
+        # if not self.component_enabled:
+        #     self.spin_motor.set_control(self.coast_control)
+        #     self.right_motor.set_control(self.coast_control)
+        #     self.left_motor.set_control(self.coast_control)
+        #     return
 
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage
@@ -215,34 +216,28 @@ class Intake:
             )
 
         # making sure we don't try to move the arm past its limits or break
-        if (
-            self.right_motor.get_fault_forward_soft_limit()
-            or self.right_motor.get_fault_reverse_soft_limit()
-        ):
-            self.hinge_alert.set_text(
-                f"Intake hinge has rotated too far! Position: {self.get_position():.2f}"
-            )
-            self.hinge_alert.enable()
+        # if (
+        #     self.right_motor.get_fault_forward_soft_limit()
+        #     or self.right_motor.get_fault_reverse_soft_limit()
+        # ):
+        #     self.hinge_alert.set_text(
+        #         f"Intake hinge has rotated too far! Position: {self.get_position():.2f}"
+        #     )
+        #     self.hinge_alert.enable()
 
-        if not self.arm_manual_control and False:
-            self.prev_arm_voltage = self.arm_angle
-            self.right_motor.set_control(
-                self.arm_position_control.with_position(
-                    self.arm_angle
-                ).with_ignore_software_limits(self.bypass_limits)
-            )
-            self.left_motor.set_control(self.arm_follower)
+        # if not self.arm_manual_control and False:
+        #     self.prev_arm_voltage = self.arm_angle
+        #     self.right_motor.set_control(
+        #         self.arm_position_control.with_position(
+        #             self.arm_angle
+        #         ).with_ignore_software_limits(self.bypass_limits)
+        #     )
+        #     self.left_motor.set_control(self.arm_follower)
 
-        if self.get_avg_current() > self.hard_stop_amps and self.arm_voltage != 0.0:
-            if self.arm_voltage > 0.0:
-                self.fwd_lim = True
-            else:
-                self.rev_lim = True
 
-        if self.arm_manual_control:
-            self.right_motor.set_control(
-                self.arm_voltage_control.with_output(self.arm_voltage)
-                .with_limit_forward_motion(self.fwd_lim)
-                .with_limit_reverse_motion(self.rev_lim)
-            )
-            self.left_motor.set_control(self.arm_follower)
+        # if self.arm_manual_control:
+        self.right_motor.set_control(
+            self.arm_voltage_control.with_output(self.arm_voltage)
+        )
+        self.arm_voltage = 0.0
+            
