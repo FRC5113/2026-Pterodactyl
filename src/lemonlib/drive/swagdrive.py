@@ -1,4 +1,4 @@
-from wpilib.drive import DifferentialDrive
+from wpilib import DifferentialDrive
 from wpiutil import Sendable
 
 from lemonlib.smart.preference import SmartPreference

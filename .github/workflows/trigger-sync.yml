@@ -17,10 +17,11 @@ jobs:
         env:
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         with:
-          source_file: "src/lemonlib/"               # Folder to copy
-          destination_repo: "FRC5113/LemonLib"       # Target repo
-          destination_folder: "/"                    # Destination folder
-          destination_branch: ${{ github.ref_name }} # Deploy to same branch name as source
+          source_file: "src/lemonlib/"
+          destination_repo: "FRC5113/LemonLib"
+          destination_folder: "/"
+          destination_branch: ${{ github.ref_name }}
+          destination_branch_create: true
           user_email: "rradtke1208@gmail.com"
           user_name: "Ryanforce08"
           commit_message: ${{ github.event.head_commit.message }}

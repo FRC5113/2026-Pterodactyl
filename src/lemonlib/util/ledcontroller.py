@@ -19,7 +19,7 @@ class LEDController:
         self.buffer = [AddressableLED.LEDData(0, 0, 0) for _ in range(length)]
         self.led.setLength(length)
         self.led.setData(self.buffer)
-        self.led.start()
+        self.led.setStart(0)
         self.solid_color = None
         self._move_frame_initialized = False
         self._last_lit_indices: list[int] = []

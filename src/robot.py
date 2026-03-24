@@ -6,11 +6,9 @@ from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
+from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
-from wpilib import (
-    DriverStation,
-    Field2d,
-)
+from wpilib import DriverStation, DutyCycleEncoder, Field2d, SmartDashboard
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
@@ -19,13 +17,15 @@ from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
 from components.indexer import Indexer
 from components.intake import Intake
-from components.odometry import Odometry
+from components.leds import LEDStrip
+
+# from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from generated.tuner_constants import TunerConstants
-from lemonlib import LemonCamera, LemonInput, LemonRobot
+from lemonlib import LemonInput, LemonRobot  # ,LemonCamera
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import (
     AlertManager,
@@ -36,11 +36,11 @@ from lemonlib.util import (
 
 
 class MyRobot(LemonRobot):
-    # led_strip: LEDStrip
+    led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
-    odometry: Odometry
+    # odometry: Odometry
     swerve_drive: SwerveDrive
 
     shooter: Shooter
@@ -56,6 +56,8 @@ class MyRobot(LemonRobot):
     firstRun = True
 
     def createObjects(self):
+        encoder = DutyCycleEncoder(1)
+        SmartDashboard.putData("Intake Encoder", encoder)
         """This method is where all attributes to be injected are
         initialized. This is done here rather that inside the components
         themselves so that all constants and initialization parameters
@@ -63,6 +65,11 @@ class MyRobot(LemonRobot):
         components, such as the NavX, need only be created once.
         """
         self.tuning_enabled = False
+
+        self.swerve_bus = TunerConstants.canbus
+        self.intake_bus = CANBus("can_s0")
+        self.shooter_bus = CANBus("can_s1")
+        self.indexer_bus = CANBus("can_s2")
 
         """
         SWERVE
@@ -131,9 +138,9 @@ class MyRobot(LemonRobot):
 
         # BRUSHED = SparkMax.MotorType.kBrushed
 
-        self.intake_spin_motor = TalonFX(51)
-        self.intake_left_motor = TalonFXS(52)
-        self.intake_right_motor = TalonFXS(53)
+        self.intake_spin_motor = TalonFX(51, self.intake_bus)
+        self.intake_left_motor = TalonFXS(52, self.intake_bus)
+        self.intake_right_motor = TalonFXS(53, self.intake_bus)
         # self.intake_encoder = CANcoder(54)
         self.intake_encoder_offset = 0.0
 
@@ -160,8 +167,8 @@ class MyRobot(LemonRobot):
         """
         SHOOTER
         """
-        self.shooter_left_motor = TalonFX(2)
-        self.shooter_right_motor = TalonFX(3)
+        self.shooter_left_motor = TalonFX(2, self.shooter_bus)
+        self.shooter_right_motor = TalonFX(3, self.shooter_bus)
 
         self.shooter_gear_ratio = 1.0
         self.shooter_stator_amps: units.amperes = 120.0
@@ -186,9 +193,9 @@ class MyRobot(LemonRobot):
         """
         INDEXER
         """
-        self.indexer_left_kicker_motor = TalonFXS(4)
-        self.indexer_right_kicker_motor = TalonFXS(5)
-        self.indexer_conveyor_motor = TalonFXS(6)
+        self.indexer_left_kicker_motor = TalonFXS(4, self.indexer_bus)
+        self.indexer_right_kicker_motor = TalonFXS(5, self.indexer_bus)
+        self.indexer_conveyor_motor = TalonFXS(6, self.indexer_bus)
         self.indexer_kicker_amps: units.amperes = 40.0
         self.indexer_conveyor_amps: units.amperes = 20.0
 
@@ -199,10 +206,13 @@ class MyRobot(LemonRobot):
         # self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
         #     str(Path(__file__).parent.resolve() / "2026_test_field.json")
         # )
-
-        self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-            robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
+            str(Path(__file__).parent.resolve() / "2026-rebuilt-welded.json")
         )
+
+        # self.field_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
+        #     robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+        # )
 
         # Robot to Camera Transforms
         ox = 0.298
@@ -232,19 +242,19 @@ class MyRobot(LemonRobot):
             Rotation3d(0, units.degreesToRadians(-10), units.degreesToRadians(-135)),
         )
 
-        self.camera_front_left = LemonCamera(
-            "Front_Left", self.rtc_front_left, self.field_layout
-        )
-        self.camera_front_right = LemonCamera(
-            "Front_Right", self.rtc_front_right, self.field_layout
-        )
+        # self.camera_front_left = LemonCamera(
+        #     "Front_Left", self.rtc_front_left, self.field_layout
+        # )
+        # self.camera_front_right = LemonCamera(
+        #     "Front_Right", self.rtc_front_right, self.field_layout
+        # )
 
-        self.camera_back_left = LemonCamera(
-            "Back_Left", self.rtc_back_left, self.field_layout
-        )
-        self.camera_back_right = LemonCamera(
-            "Back_Right", self.rtc_back_right, self.field_layout
-        )
+        # self.camera_back_left = LemonCamera(
+        #     "Back_Left", self.rtc_back_left, self.field_layout
+        # )
+        # self.camera_back_right = LemonCamera(
+        #     "Back_Right", self.rtc_back_right, self.field_layout
+        # )
 
         """
         MISCELLANEOUS

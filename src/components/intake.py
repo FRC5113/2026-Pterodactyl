@@ -3,13 +3,11 @@ import enum
 from magicbot import will_reset_to
 from phoenix6 import controls
 from phoenix6.configs import (
-    CANcoderConfiguration,
     TalonFXConfiguration,
     TalonFXSConfiguration,
 )
 from phoenix6.hardware import TalonFX, TalonFXS
 from phoenix6.signals import (
-    MotorAlignmentValue,
     MotorArrangementValue,
     NeutralModeValue,
 )
@@ -71,9 +69,7 @@ class Intake:
         self.spin_control = controls.VoltageOut(0)
         self.arm_voltage_control = controls.VoltageOut(0)
         self.arm_position_control = controls.PositionVoltage(0).with_slot(0)
-        self.arm_follower = controls.Follower(
-            self.right_motor.device_id, MotorAlignmentValue.ALIGNED
-        )
+        self.arm_follower = controls.Follower(self.right_motor.device_id, False)
         self.coast_control = controls.CoastOut()
 
         # Alerts
@@ -203,41 +199,15 @@ class Intake:
 
     def execute(self):
         # thing so that if batt low we can turn off to save energy
-        # if not self.component_enabled:
-        #     self.spin_motor.set_control(self.coast_control)
-        #     self.right_motor.set_control(self.coast_control)
-        #     self.left_motor.set_control(self.coast_control)
-        #     return
+        if not self.component_enabled:
+            self.spin_motor.set_control(self.coast_control)
+            self.right_motor.set_control(self.coast_control)
+            self.left_motor.set_control(self.coast_control)
+            return
 
-        if self.spin_voltage != self.prev_spin_voltage:
-            self.prev_spin_voltage = self.spin_voltage
-            self.spin_motor.set_control(
-                self.spin_control.with_output(self.spin_voltage)
-            )
+        self.prev_spin_voltage = self.spin_voltage
+        self.spin_motor.set_control(self.spin_control.with_output(self.spin_voltage))
 
-        # making sure we don't try to move the arm past its limits or break
-        # if (
-        #     self.right_motor.get_fault_forward_soft_limit()
-        #     or self.right_motor.get_fault_reverse_soft_limit()
-        # ):
-        #     self.hinge_alert.set_text(
-        #         f"Intake hinge has rotated too far! Position: {self.get_position():.2f}"
-        #     )
-        #     self.hinge_alert.enable()
-
-        # if not self.arm_manual_control and False:
-        #     self.prev_arm_voltage = self.arm_angle
-        #     self.right_motor.set_control(
-        #         self.arm_position_control.with_position(
-        #             self.arm_angle
-        #         ).with_ignore_software_limits(self.bypass_limits)
-        #     )
-        #     self.left_motor.set_control(self.arm_follower)
-
-
-        # if self.arm_manual_control:
         self.right_motor.set_control(
             self.arm_voltage_control.with_output(self.arm_voltage)
         )
-        self.arm_voltage = 0.0
-            

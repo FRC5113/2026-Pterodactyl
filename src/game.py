@@ -2,6 +2,7 @@
 
 import dataclasses
 import typing
+from pathlib import Path
 
 import robotpy_apriltag
 import wpilib
@@ -16,8 +17,8 @@ from wpimath.geometry import (
 _Alliance = wpilib.DriverStation.Alliance
 _RED = _Alliance.kRed
 
-apriltag_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-    robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+apriltag_layout = robotpy_apriltag.AprilTagFieldLayout(
+    str(Path(__file__).parent.resolve() / "2026-rebuilt-welded.json")
 )
 
 TagId = typing.Literal[
