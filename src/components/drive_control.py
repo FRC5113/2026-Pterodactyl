@@ -35,6 +35,7 @@ class DriveControl(StateMachine):
     point_joy_target = will_reset_to(False)
     point_joy_x = will_reset_to(0.0)
     point_joy_y = will_reset_to(0.0)
+    point_to_field_bool = will_reset_to(False)
     sample = will_reset_to(None)  # Trajectory sample for autonomous path following
     xbrake_req = will_reset_to(False)  # Request to engage X-brake mode
 
@@ -78,6 +79,11 @@ class DriveControl(StateMachine):
     def point_to(self, angle: units.radians):
         """Request the robot to point towards a specific angle."""
         self.point_to_target = True
+        self.point_target = angle
+
+    def point_to_field(self, angle: units.radians):
+        """Request the robot to point towards a specific field coordinate."""
+        self.point_to_field_bool = True
         self.point_target = angle
 
     def point_to_joy(self, rightX: float, rightY: float):
@@ -170,6 +176,14 @@ class DriveControl(StateMachine):
 
         elif self.xbrake_req:
             self.next_state("x_brake_state")
+        elif self.point_to_field_bool:
+            # Drive-point this frame so there is no stutter on transition
+            self.swerve_drive.drive_point_field(
+                self.translationX,
+                self.translationY,
+                self.point_target,
+            )
+            self.next_state("drive_point_field")
 
         elif self.point_to_target:
             # Drive-point this frame so there is no stutter on transition
@@ -222,6 +236,21 @@ class DriveControl(StateMachine):
             self.point_target,
         )
         if not self.point_to_target:
+            self.next_state("free")
+
+    @state
+    def drive_point_field(self):
+        """
+        State to drive while pointing the robot towards a specific field coordinate.
+        Translation comes from manual input; rotation is PID-controlled to face the field angle.
+        Exits when target is no longer requested.
+        """
+        self.swerve_drive.drive_point_field(
+            self.translationX,
+            self.translationY,
+            self.point_target,
+        )
+        if not self.point_to_field_bool:
             self.next_state("free")
 
     @state
