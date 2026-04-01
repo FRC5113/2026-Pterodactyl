@@ -2,7 +2,7 @@ import math
 from enum import IntEnum
 
 from wpilib import DriverStation, RobotBase
-from wpilib.interfaces import GenericHID
+from wpilib import GenericHID
 
 RIGHT_RUMBLE = GenericHID.RumbleType.kRightRumble
 LEFT_RUMBLE = GenericHID.RumbleType.kLeftRumble
@@ -390,47 +390,3 @@ class LemonInput(GenericHID):
             float: The Y-axis value of the POV.
         """
         return self.__pov_xy()[1]
-
-    def initSendable(self, builder):
-        """
-        Initializes the sendable for the LemonInput class.
-
-        Args:
-            builder: The sendable builder.
-        """
-        builder.setSmartDashboardType("LemonInput")
-        builder.addStringProperty("Type", lambda: self.contype, lambda: None)
-        builder.addBooleanProperty(
-            "LeftBumper", lambda: self.getLeftBumper(), lambda: None
-        )
-        builder.addBooleanProperty(
-            "RightBumper", lambda: self.getRightBumper(), lambda: None
-        )
-        builder.addBooleanProperty(
-            "StartButton", lambda: self.getStartButton(), lambda: None
-        )
-        builder.addBooleanProperty(
-            "BackButton", lambda: self.getBackButton(), lambda: None
-        )
-        builder.addBooleanProperty("AButton", lambda: self.getAButton(), lambda: None)
-        builder.addBooleanProperty("BButton", lambda: self.getBButton(), lambda: None)
-        builder.addBooleanProperty("XButton", lambda: self.getXButton(), lambda: None)
-        builder.addBooleanProperty("YButton", lambda: self.getYButton(), lambda: None)
-        builder.addBooleanProperty(
-            "LStickButton", lambda: self.getLeftStickButton(), lambda: None
-        )
-        builder.addBooleanProperty(
-            "RStickButton", lambda: self.getRightStickButton(), lambda: None
-        )
-        builder.addDoubleProperty("LeftX", lambda: self.getLeftX(), lambda: None)
-        builder.addDoubleProperty("LeftY", lambda: self.getLeftY(), lambda: None)
-        builder.addDoubleProperty("RightX", lambda: self.getRightX(), lambda: None)
-        builder.addDoubleProperty("RightY", lambda: self.getRightY(), lambda: None)
-        builder.addDoubleProperty(
-            "RightTrigger", lambda: self.getRightTriggerAxis(), lambda: None
-        )
-        builder.addDoubleProperty(
-            "LeftTrigger", lambda: self.getLeftTriggerAxis(), lambda: None
-        )
-        builder.addDoubleProperty("POV_X", lambda: self.getPovX(), lambda: None)
-        builder.addDoubleProperty("POV_Y", lambda: self.getPovY(), lambda: None)

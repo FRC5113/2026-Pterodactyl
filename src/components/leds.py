@@ -1,12 +1,12 @@
-from magicbot import will_reset_to
-from wpilib import Color, DriverStation
+from magicbot import feedback, will_reset_to
+from wpilib import DriverStation
+from wpiutil import Color
 
 from components.intake import Intake, IntakeAngle
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
-from magicbot import feedback
 
 
 class LEDStrip:

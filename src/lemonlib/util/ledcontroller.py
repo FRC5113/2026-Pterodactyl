@@ -2,7 +2,8 @@ import colorsys
 from typing import Tuple
 
 import wpimath.units
-from wpilib import AddressableLED, Color, LEDPattern, RobotController, Timer
+from wpilib import AddressableLED, LEDPattern, RobotController, Timer
+from wpiutil import Color
 
 
 class LEDController:

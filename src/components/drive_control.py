@@ -3,7 +3,7 @@ from magicbot import StateMachine, will_reset_to
 from magicbot.state_machine import state
 from wpilib import DriverStation
 from wpimath import units
-from wpimath.geometry import Pose2d
+from wpimath import Pose2d
 
 from components.swerve_drive import SwerveDrive
 

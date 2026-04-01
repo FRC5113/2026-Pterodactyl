@@ -15,8 +15,7 @@ import math
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from wpimath.geometry import Pose2d, Rotation2d, Translation2d, Twist2d
-from wpimath.kinematics import ChassisSpeeds
+from wpimath import ChassisVelocities, Pose2d, Rotation2d, Translation2d, Twist2d
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -35,6 +34,27 @@ def _angle_modulus(angle_rad: float) -> float:
 def _interpolate(a: float, b: float, t: float) -> float:
     """Linear interpolation between a and b by fraction t."""
     return a + (b - a) * t
+
+
+def _apply_pose_delta(
+    pose: Pose2d, dx_robot: float, dy_robot: float, dtheta: float
+) -> Pose2d:
+    if hasattr(pose, "exp"):
+        try:
+            return pose.exp(Twist2d(dx_robot, dy_robot, dtheta))
+        except AttributeError:
+            pass
+
+    heading = pose.rotation().radians()
+    cos_h = math.cos(heading)
+    sin_h = math.sin(heading)
+    dx_field = dx_robot * cos_h - dy_robot * sin_h
+    dy_field = dx_robot * sin_h + dy_robot * cos_h
+    return Pose2d(
+        pose.x + dx_field,
+        pose.y + dy_field,
+        Rotation2d(heading + dtheta),
+    )
 
 
 class _InterpolatingMap:
@@ -167,8 +187,8 @@ class ShotInputs:
     """All state the solver needs from your robot each cycle."""
 
     robot_pose: Pose2d
-    field_velocity: ChassisSpeeds
-    robot_velocity: ChassisSpeeds
+    field_velocity: ChassisVelocities
+    robot_velocity: ChassisVelocities
     hub_center: Translation2d
     hub_forward: Translation2d
     vision_confidence: float = 1.0
@@ -279,12 +299,11 @@ class ShotCalculator:
             ax = (robot_vel.vx - self._prev_robot_vx) / 0.02
             ay = (robot_vel.vy - self._prev_robot_vy) / 0.02
             a_omega = (robot_vel.omega - self._prev_robot_omega) / 0.02
-            pose = pose.exp(
-                Twist2d(
-                    robot_vel.vx * dt + 0.5 * ax * dt * dt,
-                    robot_vel.vy * dt + 0.5 * ay * dt * dt,
-                    robot_vel.omega * dt + 0.5 * a_omega * dt * dt,
-                )
+            pose = _apply_pose_delta(
+                pose,
+                robot_vel.vx * dt + 0.5 * ax * dt * dt,
+                robot_vel.vy * dt + 0.5 * ay * dt * dt,
+                robot_vel.omega * dt + 0.5 * a_omega * dt * dt,
             )
 
         origin_x = pose.x
@@ -335,12 +354,11 @@ class ShotCalculator:
         ay = (robot_vel.vy - self._prev_robot_vy) / 0.02
         a_omega = (robot_vel.omega - self._prev_robot_omega) / 0.02
 
-        compensated_pose = raw_pose.exp(
-            Twist2d(
-                robot_vel.vx * dt + 0.5 * ax * dt * dt,
-                robot_vel.vy * dt + 0.5 * ay * dt * dt,
-                robot_vel.omega * dt + 0.5 * a_omega * dt * dt,
-            )
+        compensated_pose = _apply_pose_delta(
+            raw_pose,
+            robot_vel.vx * dt + 0.5 * ax * dt * dt,
+            robot_vel.vy * dt + 0.5 * ay * dt * dt,
+            robot_vel.omega * dt + 0.5 * a_omega * dt * dt,
         )
         self._prev_robot_vx = robot_vel.vx
         self._prev_robot_vy = robot_vel.vy

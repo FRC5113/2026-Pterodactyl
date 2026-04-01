@@ -10,8 +10,8 @@ from phoenix6 import CANBus
 from phoenix6.hardware import TalonFX, TalonFXS
 from wpilib import DriverStation, DutyCycleEncoder, Field2d, SmartDashboard
 from wpimath import units
-from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Rotation3d, Transform3d
+from wpimath import SlewRateLimiter
+from wpimath import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl

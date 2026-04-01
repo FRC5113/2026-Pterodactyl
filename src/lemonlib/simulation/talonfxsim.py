@@ -1,12 +1,12 @@
 from phoenix6.hardware.talon_fx import TalonFX
 from wpilib.simulation import DCMotorSim
-from wpimath.system.plant import DCMotor, LinearSystemId
+from wpimath import DCMotor, Models
 
 
 class FalconSim:
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
         self.gearbox = DCMotor.falcon500(1)
-        self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
+        self.plant = Models.elevatorFromPhysicalConstants(self.gearbox, moi, gearing)
         self.gearing = gearing
         self.sim_state = motor.sim_state
         self.sim_state.set_supply_voltage(12.0)
@@ -30,7 +30,7 @@ class FalconSim:
 class FalconSimFOC:
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
         self.gearbox = DCMotor.falcon500FOC(1)
-        self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
+        self.plant = Models.elevatorFromPhysicalConstants(self.gearbox, moi, gearing)
         self.gearing = gearing
         self.sim_state = motor.sim_state
         self.sim_state.set_supply_voltage(12.0)
@@ -54,7 +54,7 @@ class FalconSimFOC:
 class KrakenSim:
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
         self.gearbox = DCMotor.krakenX60(1)
-        self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
+        self.plant = Models.elevatorFromPhysicalConstants(self.gearbox, moi, gearing)
         self.gearing = gearing
         self.sim_state = motor.sim_state
         self.sim_state.set_supply_voltage(12.0)
@@ -78,7 +78,7 @@ class KrakenSim:
 class KrakenSimFOC:
     def __init__(self, motor: TalonFX, moi: float, gearing: float):
         self.gearbox = DCMotor.krakenX60FOC(1)
-        self.plant = LinearSystemId.DCMotorSystem(self.gearbox, moi, gearing)
+        self.plant = Models.elevatorFromPhysicalConstants(self.gearbox, moi, gearing)
         self.gearing = gearing
         self.sim_state = motor.sim_state
         self.sim_state.set_supply_voltage(12.0)

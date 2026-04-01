@@ -1,24 +1,27 @@
 import math
 
-from choreo.trajectory import SwerveSample
 from magicbot import will_reset_to
-from phoenix6 import configs, hardware, swerve, utils
-from phoenix6.signals import StaticFeedforwardSignValue
-from phoenix6.swerve import requests
 from wpilib import DriverStation, Field2d, SmartDashboard, Timer
-from wpimath import units
-from wpimath.controller import HolonomicDriveController
-from wpimath.geometry import Pose2d, Rotation2d
-from wpimath.kinematics import (
-    ChassisSpeeds,
-    SwerveDrive4Kinematics,
-    SwerveModuleState,
+from wpimath import (
+    ChassisAccelerations,
+    ChassisVelocities,
+    Pose2d,
+    Rotation2d,
+    SwerveModuleAcceleration,
+    SwerveModulePosition,
+    SwerveModuleVelocity,
+    Translation2d,
+    units,
 )
 from wpiutil import Sendable, SendableBuilder
 
+from choreo.trajectory import SwerveSample
 from generated.tuner_constants import TunerConstants
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
+from phoenix6 import configs, hardware, swerve, utils
+from phoenix6.signals import StaticFeedforwardSignValue
+from phoenix6.swerve import requests
 
 _RED = DriverStation.Alliance.kRed
 
@@ -51,12 +54,27 @@ class SwerveDrive(Sendable):
         if self.telemetry_enabled:
             SmartDashboard.putData("Swerve Drive", self)
         self.cached_pose = Pose2d()
-        self.chassis_speeds = ChassisSpeeds()
-        self.swerve_module_states = (
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
-            SwerveModuleState(),
+        self.chassis_velocity = ChassisVelocities()
+        self.chassis_speeds = ChassisVelocities()
+        self.chassis_acceleration = ChassisAccelerations()
+        self.swerve_module_acceleration = (
+            SwerveModuleAcceleration(),
+            SwerveModuleAcceleration(),
+            SwerveModuleAcceleration(),
+            SwerveModuleAcceleration(),
+        )
+        self.swerve_module_velocities = (
+            SwerveModuleVelocity(),
+            SwerveModuleVelocity(),
+            SwerveModuleVelocity(),
+            SwerveModuleVelocity(),
+        )
+        self.swerve_module_states = self.swerve_module_velocities
+        self.swerve_module_positions = (
+            SwerveModulePosition(),
+            SwerveModulePosition(),
+            SwerveModulePosition(),
+            SwerveModulePosition(),
         )
 
     @staticmethod
@@ -79,8 +97,6 @@ class SwerveDrive(Sendable):
             tc.drivetrain_constants,
             [tc.front_left, tc.front_right, tc.back_left, tc.back_right],
         )
-
-        self.kinematics: SwerveDrive4Kinematics = self.drivetrain.kinematics
 
         # Pre-built SwerveRequest objects (mutated in-place each cycle)
         self.field_centric_req = (
@@ -147,9 +163,6 @@ class SwerveDrive(Sendable):
         self.theta_controller = (
             self.rotation_profile.create_wpi_profiled_pid_controller_radians()
         )
-        self.holonomic_controller = HolonomicDriveController(
-            self.x_controller, self.y_controller, self.theta_controller
-        )
 
         # Apply steer & drive gains from SmartProfiles to all modules
         if self.tuning_enabled:
@@ -191,15 +204,8 @@ class SwerveDrive(Sendable):
     def get_estimated_pose(self) -> Pose2d:
         return self.cached_pose
 
-    def get_velocity(self) -> ChassisSpeeds:
+    def get_velocity(self) -> ChassisVelocities:
         return self.chassis_speeds
-
-    def get_module_states(
-        self,
-    ) -> tuple[
-        SwerveModuleState, SwerveModuleState, SwerveModuleState, SwerveModuleState
-    ]:
-        return self.swerve_module_states
 
     # @feedback
     def get_distance_from_desired_pose(self) -> units.meters:
@@ -349,11 +355,23 @@ class SwerveDrive(Sendable):
             pose, utils.fpga_to_current_time(timestamp), std_devs
         )
 
+    def fromFieldRelativeSpeeds(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        omega: units.radians_per_second,
+        robot_angle: Rotation2d,
+    ) -> ChassisVelocities:
+        rotated = Translation2d(vx, vy).rotateBy(
+            robot_angle.rotateBy(Rotation2d(math.pi))
+        )
+        return ChassisVelocities(rotated.X(), rotated.Y(), omega)
+
     def follow_trajectory(self, sample: SwerveSample):
         self.stopped = False
         pose = self.cached_pose
         # Compute field-relative speeds: feedforward from trajectory + PID feedback
-        field_speeds = ChassisSpeeds(
+        field_speeds = ChassisVelocities(
             sample.vx + self.x_controller.calculate(pose.X(), sample.x),
             sample.vy + self.y_controller.calculate(pose.Y(), sample.y),
             sample.omega
@@ -363,14 +381,10 @@ class SwerveDrive(Sendable):
         )
         # Convert field-relative to robot-relative for ApplyRobotSpeeds
         rot = pose.rotation()
-        robot_speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
+        robot_speeds = self.fromFieldRelativeSpeeds(
             field_speeds.vx, field_speeds.vy, field_speeds.omega, rot
         )
         self.pending_request = self.apply_speeds_req.with_speeds(robot_speeds)
-
-    def driveRobotRelative(self, speeds: ChassisSpeeds):
-        self.stopped = False
-        return self.drive(speeds.vx, speeds.vy, speeds.omega, False)
 
     def set_starting_pose(self, pose: Pose2d):
         """ONLY USE IN SIM!"""

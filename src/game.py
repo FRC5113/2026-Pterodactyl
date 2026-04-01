@@ -6,7 +6,7 @@ from pathlib import Path
 
 import robotpy_apriltag
 import wpilib
-from wpimath.geometry import (
+from wpimath import (
     Pose2d,
     Pose3d,
     Rotation2d,

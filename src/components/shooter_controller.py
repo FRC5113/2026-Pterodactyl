@@ -2,8 +2,8 @@ import math
 
 from magicbot import StateMachine, feedback, state, will_reset_to
 from wpilib import DriverStation, Field2d
-from wpimath.geometry import Translation2d
-from wpimath.kinematics import ChassisSpeeds
+from wpimath import Translation2d
+from wpimath import ChassisVelocities
 
 from components.drive_control import DriveControl
 from components.indexer import Indexer
@@ -127,7 +127,7 @@ class ShooterController(StateMachine):
         sin_h = math.sin(heading)
         field_vx = robot_vel.vx * cos_h - robot_vel.vy * sin_h
         field_vy = robot_vel.vx * sin_h + robot_vel.vy * cos_h
-        field_vel = ChassisSpeeds(field_vx, field_vy, robot_vel.omega)
+        field_vel = ChassisVelocities(field_vx, field_vy, robot_vel.omega)
 
         is_red = DriverStation.getAlliance() == _RED
         hub_pos = get_hub_pos(is_red)

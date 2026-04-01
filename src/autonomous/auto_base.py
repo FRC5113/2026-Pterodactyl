@@ -6,7 +6,7 @@ import choreo.util
 from choreo.trajectory import SwerveTrajectory
 from magicbot import AutonomousStateMachine, state, timed_state
 from wpilib import DriverStation, Field2d, RobotBase, SmartDashboard
-from wpimath.geometry import Pose2d
+from wpimath import Pose2d
 
 from components.drive_control import DriveControl
 from components.intake import Intake, IntakeAngle
@@ -182,7 +182,7 @@ class AutoBase(AutonomousStateMachine):
 
     @timed_state(duration=1.0, next_state="next_step")
     def intake_down(self):
-        self.drive_control.drive_auto_manual(-0.5,0.0,0.0,False)
+        self.drive_control.drive_auto_manual(-0.5, 0.0, 0.0, False)
         self.intake.set_arm_voltage(-4)
 
     @timed_state(duration=5.0, next_state="next_step")
