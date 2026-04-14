@@ -272,7 +272,7 @@ class ShooterController(StateMachine):
         # (e.g. heading error spike) — don't drop back to idle and stop
         # pointing, which causes drive-state flutter.
         self.shooter.set_velocity(self.target_rps)
-        self.drive_control.point_to(self.target_angle)
+        self.drive_control.point_to_field(self.target_angle)
 
         tolerance = self.speed_tolerance * self.target_rps
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
@@ -294,7 +294,7 @@ class ShooterController(StateMachine):
         self._update_target()
 
         # Always keep aiming and spinning — don't bail on momentary invalid
-        self.drive_control.point_to(self.target_angle)
+        self.drive_control.point_to_field(self.target_angle)
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
