@@ -7,6 +7,7 @@ from wpimath.kinematics import ChassisSpeeds
 
 from components.drive_control import DriveControl
 from components.indexer import Indexer
+from components.intake import Intake
 from components.shooter import Shooter
 from components.shot_calculator import (
     INVALID,
@@ -15,7 +16,6 @@ from components.shot_calculator import (
     ShotConfig,
     ShotInputs,
 )
-from components.intake import Intake
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
 from lemonlib.smart import SmartPreference
@@ -42,6 +42,7 @@ class ShooterController(StateMachine):
     unjamming = will_reset_to(False)
     force_shoot_req = will_reset_to(False)
     force_shoot_rps = will_reset_to(0.0)
+    shoot_noncalc = will_reset_to(False)
 
     forceshoottolgood = will_reset_to(False)
 
@@ -110,6 +111,9 @@ class ShooterController(StateMachine):
         self.force_shoot_req = True
         self.force_shoot_rps = rps
 
+    def request_shoot_noncalc(self):
+        self.shoot_noncalc = True
+
     def adjust_rpm_offset(self, delta: float):
         """Copilot D-pad trim.  Persists until reset."""
         self.calculator.adjust_offset(delta)
@@ -144,19 +148,47 @@ class ShooterController(StateMachine):
     def _update_target(self):
         inputs = self._build_shot_inputs()
         self.distance = self.calculator.get_distance_from_hub(inputs)
-        self.launch = self.calculator.calculate(inputs)
-
-        if self.launch.is_valid:
+        if self.shoot_noncalc:
+            # Bypass the solver and just do a linear interpolation based on
+            # distance.
             self.valid_shot = True
-            self.target_rps = self.launch.rpm
-            self.target_angle = self.launch.drive_angle.radians()
-            self.shot_confidence = self.launch.confidence
+            self.target_rps = self._linear_interp(
+                self.distance, self.distance_lookup, self.speed_lookup
+            )
+            self.target_angle = math.atan2(
+                inputs.hub_center.y - inputs.robot_pose.Y(),
+                inputs.hub_center.x - inputs.robot_pose.X(),
+            )
+            self.shot_confidence = 100.0  # Fake it
         else:
-            self.valid_shot = False
-            self.target_rps = 0.0
-            self.shot_confidence = 0.0
-            # Keep target_angle from last valid solution so idle spin-up
-            # doesn't jump around.
+            self.launch = self.calculator.calculate(inputs)
+
+            if self.launch.is_valid:
+                self.valid_shot = True
+                self.target_rps = self.launch.rpm
+                self.target_angle = self.launch.drive_angle.radians()
+                self.shot_confidence = self.launch.confidence
+            else:
+                self.valid_shot = False
+                self.target_rps = 0.0
+                self.shot_confidence = 0.0
+                # Keep target_angle from last valid solution so idle spin-up
+                # doesn't jump around.
+
+    def _linear_interp(self, x, xp, fp):
+        """Fast linear interpolation"""
+        if x <= xp[0]:
+            return fp[0]
+        if x >= xp[-1]:
+            return fp[-1]
+
+        for i in range(len(xp) - 1):
+            if xp[i] <= x <= xp[i + 1]:
+                # Linear interpolation formula
+                t = (x - xp[i]) / (xp[i + 1] - xp[i])
+                return fp[i] + t * (fp[i + 1] - fp[i])
+
+        return fp[-1]
 
     """
     INFORMATIONAL METHODS

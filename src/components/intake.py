@@ -234,10 +234,8 @@ class Intake:
         #     )
         #     self.left_motor.set_control(self.arm_follower)
 
-
         # if self.arm_manual_control:
         self.right_motor.set_control(
             self.arm_voltage_control.with_output(self.arm_voltage)
         )
         self.arm_voltage = 0.0
-            

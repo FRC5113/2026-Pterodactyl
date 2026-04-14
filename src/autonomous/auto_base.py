@@ -182,7 +182,7 @@ class AutoBase(AutonomousStateMachine):
 
     @timed_state(duration=1.0, next_state="next_step")
     def intake_down(self):
-        self.drive_control.drive_auto_manual(-0.5,0.0,0.0,False)
+        self.drive_control.drive_auto_manual(-0.5, 0.0, 0.0, False)
         self.intake.set_arm_voltage(-4)
 
     @timed_state(duration=5.0, next_state="next_step")

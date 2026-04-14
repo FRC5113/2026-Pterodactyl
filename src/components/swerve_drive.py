@@ -1,10 +1,6 @@
 import math
 
-from choreo.trajectory import SwerveSample
 from magicbot import will_reset_to
-from phoenix6 import configs, hardware, swerve, utils
-from phoenix6.signals import StaticFeedforwardSignValue
-from phoenix6.swerve import requests
 from wpilib import DriverStation, Field2d, SmartDashboard, Timer
 from wpimath import units
 from wpimath.controller import HolonomicDriveController
@@ -16,9 +12,13 @@ from wpimath.kinematics import (
 )
 from wpiutil import Sendable, SendableBuilder
 
+from choreo.trajectory import SwerveSample
 from generated.tuner_constants import TunerConstants
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
+from phoenix6 import configs, hardware, swerve, utils
+from phoenix6.signals import StaticFeedforwardSignValue
+from phoenix6.swerve import requests
 
 _RED = DriverStation.Alliance.kRed
 
@@ -43,6 +43,10 @@ class SwerveDrive(Sendable):
     telemetry_period = SmartPreference(0.1)
     adv_scope_enabled = SmartPreference(False)
     adv_scope_period = SmartPreference(0.1)
+    joy_heading_deadband = SmartPreference(0.25)
+    joy_heading_release_deadband = SmartPreference(0.20)
+    joy_heading_stationary_rate_deg_per_s = SmartPreference(120.0)
+    joy_heading_max_rate_deg_per_s = SmartPreference(360.0)
 
     stopped = will_reset_to(True)
 
@@ -58,6 +62,10 @@ class SwerveDrive(Sendable):
             SwerveModuleState(),
             SwerveModuleState(),
         )
+        self._joy_heading_target = 0.0
+        self._joy_heading_initialized = False
+        self._joy_heading_active = False
+        self._joy_heading_last_time = Timer.getFPGATimestamp()
 
     @staticmethod
     def shouldFlipPath():
@@ -162,6 +170,11 @@ class SwerveDrive(Sendable):
             )
         else:
             self.drivetrain.set_operator_perspective_forward(Rotation2d())
+
+        self._joy_heading_target = self.cached_pose.rotation().radians()
+        self._joy_heading_initialized = True
+        self._joy_heading_active = False
+        self._joy_heading_last_time = Timer.getFPGATimestamp()
 
     def initSendable(self, builder: SendableBuilder) -> None:
         builder.setSmartDashboardType("SwerveDrive")
@@ -320,12 +333,69 @@ class SwerveDrive(Sendable):
         joystick.  Uses OPERATOR_PERSPECTIVE so 'push forward' = face away
         from the driver."""
         self.stopped = False
-        angle = math.atan2(joy_y, joy_x) + math.pi
+
+        now = Timer.getFPGATimestamp()
+        dt = max(0.0, min(0.1, now - self._joy_heading_last_time))
+        self._joy_heading_last_time = now
+
+        if not self._joy_heading_initialized:
+            self._joy_heading_target = self.cached_pose.rotation().radians()
+            self._joy_heading_initialized = True
+
+        current_heading = self.cached_pose.rotation().radians()
+        stick_mag = math.hypot(joy_x, joy_y)
+        engage_db = max(0.0, float(self.joy_heading_deadband))
+        release_db = max(0.0, float(self.joy_heading_release_deadband))
+
+        if release_db > engage_db:
+            release_db = engage_db
+
+        if self._joy_heading_active:
+            if stick_mag < release_db:
+                self._joy_heading_active = False
+        elif stick_mag > engage_db:
+            self._joy_heading_active = True
+
+        requested_heading = self._joy_heading_target
+        if self._joy_heading_active:
+            requested_heading = math.atan2(joy_y, joy_x) + math.pi
+
+        max_rate_deg = max(1.0, float(self.joy_heading_max_rate_deg_per_s))
+        stationary_rate_deg = max(
+            1.0, float(self.joy_heading_stationary_rate_deg_per_s)
+        )
+        if stationary_rate_deg > max_rate_deg:
+            stationary_rate_deg = max_rate_deg
+
+        max_linear_speed = max(0.01, float(self.max_speed))
+        commanded_linear_speed = math.hypot(vx, vy)
+        speed_ratio = min(1.0, max(0.0, commanded_linear_speed / max_linear_speed))
+
+        slew_rate_deg = stationary_rate_deg + (
+            (max_rate_deg - stationary_rate_deg) * speed_ratio
+        )
+        max_rate = math.radians(slew_rate_deg)
+        max_delta = max_rate * dt
+        error = self._angle_error_radians(requested_heading, self._joy_heading_target)
+
+        if abs(error) <= max_delta or max_delta <= 0.0:
+            self._joy_heading_target = requested_heading
+        else:
+            self._joy_heading_target += math.copysign(max_delta, error)
+
+        self._joy_heading_target = current_heading + self._angle_error_radians(
+            self._joy_heading_target, current_heading
+        )
+
         self.pending_request = (
             self.facing_angle_req.with_velocity_x(vx)
             .with_velocity_y(vy)
-            .with_target_direction(Rotation2d(angle))
+            .with_target_direction(Rotation2d(self._joy_heading_target))
         )
+
+    @staticmethod
+    def _angle_error_radians(target: float, current: float) -> float:
+        return math.atan2(math.sin(target - current), math.cos(target - current))
 
     def XBrake(self):
         """

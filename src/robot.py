@@ -2,11 +2,9 @@
 
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
 import math
-from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
-from phoenix6.hardware import TalonFX, TalonFXS
 from wpilib import (
     DriverStation,
     Field2d,
@@ -33,6 +31,7 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
+from phoenix6.hardware import TalonFX, TalonFXS
 
 
 class MyRobot(LemonRobot):
@@ -394,6 +393,9 @@ class MyRobot(LemonRobot):
         with self.consumeExceptions():
             if secondary.getRightTriggerAxis() >= 0.8:
                 self.shooter_controller.request_shoot()
+
+            elif secondary_right_bumper:
+                self.shooter_controller.request_shoot_noncalc()
 
             elif secondary.getStartButton():
                 self.shooter_controller.request_force_shoot(14.0)

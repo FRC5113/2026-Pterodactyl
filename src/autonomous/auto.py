@@ -57,6 +57,7 @@ class hard_code_shoot(AutoBase):
     def intake_out(self):
         self.intake.set_arm_voltage(-8)
 
+
 class hard_code_shoot_angled(AutoBase):
     MODE_NAME = "Hard Code Shoot angled"
     DEFAULT = True
