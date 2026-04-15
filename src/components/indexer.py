@@ -92,7 +92,7 @@ class Indexer:
         self.right_kicker_motor.set_control(
             self.voltage_control.with_output(self.kicker_duty)
         )
-        self.left_kicker_motor.set_control(self.kicker_follower)
+        self.left_kicker_motor.set_control(self.voltage_control.with_output(self.kicker_duty))
 
         self.conveyor_motor.set_control(
             self.voltage_control.with_output(self.conveyor_volt)

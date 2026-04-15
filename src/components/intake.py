@@ -116,4 +116,7 @@ class Intake:
         self.right_motor.set_control(
             self.arm_voltage_control.with_output(self.arm_voltage)
         )
+        self.left_motor.set_control(
+            self.arm_voltage_control.with_output(self.arm_voltage)
+        )
         self.arm_voltage = 0.0

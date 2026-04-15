@@ -365,9 +365,9 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(10.0)
 
             if secondary.getXButton():
-                self.intake.set_arm_voltage(-12.0)
+                self.intake.set_arm_voltage(12.0)
             elif secondary.getBButton():
-                self.intake.set_arm_voltage(6.5)
+                self.intake.set_arm_voltage(-6.5)
 
         """
         SHOOTER
