@@ -1,6 +1,7 @@
 import math
 from collections import deque
 
+import numpy as np
 from photonlibpy.photonPoseEstimator import PhotonPoseEstimator
 from robotpy_apriltag import AprilTagFieldLayout
 from wpilib import DriverStation, Field2d, SmartDashboard
@@ -118,57 +119,50 @@ class Odometry:
         estimates.sort(key=lambda e: e[1])
         newest_ts = estimates[-1][1]
 
+        speeds = self.swerve_drive.get_velocity()
+        vx = speeds.vx
+        vy = speeds.vy
+        omega = speeds.omega
+
         # Time-align older estimates to newest using odometry delta
-        aligned: list[tuple[Pose2d, tuple[float, float, float]]] = []
+        aligned_poses: list[tuple[float, float, float]] = []
+        aligned_stds: list[tuple[float, float, float]] = []
         for pose, ts, stds in estimates:
             if ts < newest_ts:
                 # Approximate alignment: use the pose estimator's odometry
                 # The time difference should be small (< 1 frame), so we use
                 # the raw pose offset as a simple approximation
                 dt = newest_ts - ts
-                speeds = self.swerve_drive.get_velocity()
-                dx = speeds.vx * dt
-                dy = speeds.vy * dt
-                dtheta = speeds.omega * dt
+                dx = vx * dt
+                dy = vy * dt
+                dtheta = omega * dt
                 cos_t = math.cos(dtheta)
                 sin_t = math.sin(dtheta)
                 new_x = pose.x + dx * cos_t - dy * sin_t
                 new_y = pose.y + dx * sin_t + dy * cos_t
                 new_rot = pose.rotation().radians() + dtheta
                 pose = Pose2d(new_x, new_y, Rotation2d(new_rot))
-            aligned.append((pose, stds))
+            aligned_poses.append((pose.x, pose.y, pose.rotation().radians()))
+            aligned_stds.append(stds)
 
-        # Inverse-variance weighting for X and Y independently
-        sum_inv_var_x = 0.0
-        sum_inv_var_y = 0.0
-        sum_inv_var_rot = 0.0
-        weighted_x = 0.0
-        weighted_y = 0.0
-        weighted_sin = 0.0
-        weighted_cos = 0.0
+        poses = np.asarray(aligned_poses, dtype=float)
+        stds = np.asarray(aligned_stds, dtype=float)
 
-        for pose, stds in aligned:
-            inv_var_x = 1.0 / (stds[0] ** 2) if stds[0] > 0 else 1e6
-            inv_var_y = 1.0 / (stds[1] ** 2) if stds[1] > 0 else 1e6
-            inv_var_rot = 1.0 / (stds[2] ** 2) if stds[2] > 0 else 1e6
+        inv_var = np.where(stds > 0.0, 1.0 / (stds**2), 1e6)
+        sum_inv_var = inv_var.sum(axis=0)
 
-            sum_inv_var_x += inv_var_x
-            sum_inv_var_y += inv_var_y
-            sum_inv_var_rot += inv_var_rot
+        weighted_xy = (poses[:, :2] * inv_var[:, :2]).sum(axis=0)
+        rot = poses[:, 2]
+        weighted_sin = np.sin(rot) @ inv_var[:, 2]
+        weighted_cos = np.cos(rot) @ inv_var[:, 2]
 
-            weighted_x += pose.x * inv_var_x
-            weighted_y += pose.y * inv_var_y
-            rot = pose.rotation().radians()
-            weighted_sin += math.sin(rot) * inv_var_rot
-            weighted_cos += math.cos(rot) * inv_var_rot
-
-        fused_x = weighted_x / sum_inv_var_x
-        fused_y = weighted_y / sum_inv_var_y
+        fused_x = weighted_xy[0] / sum_inv_var[0]
+        fused_y = weighted_xy[1] / sum_inv_var[1]
         fused_rot = math.atan2(weighted_sin, weighted_cos)
 
-        fused_std_x = math.sqrt(1.0 / sum_inv_var_x)
-        fused_std_y = math.sqrt(1.0 / sum_inv_var_y)
-        fused_std_rot = math.sqrt(1.0 / sum_inv_var_rot)
+        fused_std_x = math.sqrt(1.0 / sum_inv_var[0])
+        fused_std_y = math.sqrt(1.0 / sum_inv_var[1])
+        fused_std_rot = math.sqrt(1.0 / sum_inv_var[2])
 
         fused_pose = Pose2d(fused_x, fused_y, Rotation2d(fused_rot))
         return (fused_pose, newest_ts, (fused_std_x, fused_std_y, fused_std_rot))

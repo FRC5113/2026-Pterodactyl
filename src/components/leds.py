@@ -1,12 +1,11 @@
-from magicbot import will_reset_to
+from magicbot import feedback, will_reset_to
 from wpilib import Color, DriverStation
 
-from components.intake import Intake, IntakeAngle
+from components.intake import Intake
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
-from magicbot import feedback
 
 
 class LEDStrip:
@@ -32,6 +31,7 @@ class LEDStrip:
         self.intake_up = (141, 55, 255)
 
         self.zone_active = (0, 255, 255)
+        self.good_shoot = (0, 255, 0)
 
         self.leds.set_solid_color(self.disabled)
 
@@ -42,7 +42,7 @@ class LEDStrip:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_colors(self) -> list[str]:
         """Returns LED colors in list of hex strings"""
         return [Color(led.r, led.g, led.b).hexString() for led in self.leds.buffer]
@@ -76,11 +76,11 @@ class LEDStrip:
         elif DriverStation.isAutonomousEnabled():
             self.leds.move_across(self.auton_color, 20, 50)
 
-        elif self.intake.get_position() > IntakeAngle.LED_DOWN.value:
-            self.leds.set_solid_color(self.intake_up)
+        elif self.shooter_controller.is_valid_shot():
+            self.leds.set_solid_color(self.good_shoot)
 
         elif is_alliance_hub_active():
-            self.leds.set_solid_color(self.zone_active, 2)
+            self.leds.set_solid_color(self.zone_active)
 
         else:
             self.leds.move_across(self.idle)

@@ -17,6 +17,7 @@ from autonomous.auto_base import AutoBase
 from components.drive_control import DriveControl
 from components.indexer import Indexer
 from components.intake import Intake
+from components.leds import LEDStrip
 from components.odometry import Odometry
 from components.shooter import Shooter
 from components.shooter_controller import ShooterController
@@ -35,7 +36,7 @@ from phoenix6.hardware import TalonFX, TalonFXS
 
 
 class MyRobot(LemonRobot):
-    # led_strip: LEDStrip
+    led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -133,28 +134,9 @@ class MyRobot(LemonRobot):
         self.intake_spin_motor = TalonFX(51)
         self.intake_left_motor = TalonFXS(52)
         self.intake_right_motor = TalonFXS(53)
-        # self.intake_encoder = CANcoder(54)
-        self.intake_encoder_offset = 0.0
 
         self.intake_spin_amps: units.amperes = 60.0
         self.intake_arm_amps: units.amperes = 24.0
-
-        self.intake_hard_stop_amps: units.amperes = 10.0
-
-        self.intake_profile = SmartProfile(
-            "intake",
-            {
-                "kP": 0.0,
-                "kI": 0.0,
-                "kD": 0.0,
-                "kS": 0.0,
-                "kV": 0.0,
-                "kG": 0.0,
-                "kMaxV": 0.0,
-                "kMaxA": 0.0,
-            },
-            (not self.low_bandwidth) and self.tuning_enabled,
-        )
 
         """
         SHOOTER
@@ -383,9 +365,9 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(10.0)
 
             if secondary.getXButton():
-                self.intake.set_arm_voltage(10)
+                self.intake.set_arm_voltage(-12.0)
             elif secondary.getBButton():
-                self.intake.set_arm_voltage(-4)
+                self.intake.set_arm_voltage(6.5)
 
         """
         SHOOTER
@@ -397,21 +379,21 @@ class MyRobot(LemonRobot):
             elif secondary_right_bumper:
                 self.shooter_controller.request_shoot_noncalc()
 
-            elif secondary.getStartButton():
-                self.shooter_controller.request_force_shoot(14.0)
-
             elif secondary.getYButton():
                 self.shooter_controller.request_unjam()
 
             elif secondary.getAButton():
                 self.shooter_controller.request_force_shoot(47.5)
 
+            elif secondary.getStartButton():
+                self.shooter_controller.request_force_shoot(14.0)
+
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
         if isinstance(selected_auto, AutoBase):
             selected_auto.display_trajectory()
 
-    # @feedback
+    @feedback
     def hub_status(self) -> bool:
         return is_alliance_hub_active()
 

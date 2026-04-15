@@ -23,7 +23,6 @@ class Indexer:
 
     kicker_duty = will_reset_to(0.0)
     conveyor_volt = will_reset_to(0.0)
-    manual_control = will_reset_to(False)
 
     def setup(self):
         self._kicker_follower_set = False

@@ -9,7 +9,7 @@ from wpilib import DriverStation, Field2d, RobotBase, SmartDashboard
 from wpimath.geometry import Pose2d
 
 from components.drive_control import DriveControl
-from components.intake import Intake, IntakeAngle
+from components.intake import Intake
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 
@@ -183,7 +183,7 @@ class AutoBase(AutonomousStateMachine):
     @timed_state(duration=1.0, next_state="next_step")
     def intake_down(self):
         self.drive_control.drive_auto_manual(-0.5, 0.0, 0.0, False)
-        self.intake.set_arm_voltage(-4)
+        self.intake.set_arm_voltage(-6)
 
     @timed_state(duration=5.0, next_state="next_step")
     def shoot(self):
@@ -192,7 +192,6 @@ class AutoBase(AutonomousStateMachine):
     @timed_state(duration=3.0, next_state="next_step")
     def go_forward_and_intake(self):
         self.drive_control.drive_auto_manual(1, 0.0, 0.0, False)
-        self.intake.set_arm_angle(IntakeAngle.INTAKING.value)
         self.intake.set_voltage(8)
 
     @timed_state(duration=5.0, next_state="next_step")
