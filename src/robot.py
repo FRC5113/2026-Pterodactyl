@@ -342,15 +342,15 @@ class MyRobot(LemonRobot):
         """
         GENERAL CONTROLS
         """
-        with self.consumeExceptions():
-            if secondary_pov == 0 or primary_pov == 0:
-                self.shooter.turn_off_component()
-                self.intake.turn_off_component()
-                return
-            elif secondary_pov == 180 or primary_pov == 180:
-                self.shooter.turn_on_component()
-                self.intake.turn_on_component()
-                return
+        # with self.consumeExceptions():
+        #     if secondary_pov == 0 or primary_pov == 0:
+        #         self.shooter.turn_off_component()
+        #         self.intake.turn_off_component()
+        #         return
+        #     elif secondary_pov == 180 or primary_pov == 180:
+        #         self.shooter.turn_on_component()
+        #         self.intake.turn_on_component()
+        #         return
 
         """
         INTAKE

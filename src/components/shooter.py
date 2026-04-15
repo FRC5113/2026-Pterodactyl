@@ -144,10 +144,10 @@ class Shooter:
         return self.shooter_velocity
 
     def execute(self):
-        if not self.component_enabled:
-            self.right_motor.set_control(self.coast_control)
-            self.left_motor.set_control(self.coast_control)
-            return
+        # if not self.component_enabled:
+        #     self.right_motor.set_control(self.coast_control)
+        #     self.left_motor.set_control(self.coast_control)
+        #     return
 
         # cache velocity
         self._cached_velocity = self.left_motor.get_velocity().value
@@ -156,7 +156,13 @@ class Shooter:
             self.left_motor.set_control(
                 self.voltage_control.with_output(self.shooter_voltage)
             )
+            self.right_motor.set_control(
+                self.shooter_follower
+            )
         else:
             self.left_motor.set_control(
                 self.shooter_control.with_velocity(self.shooter_velocity)
+            )
+            self.right_motor.set_control(
+                self.shooter_follower
             )

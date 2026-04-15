@@ -100,12 +100,12 @@ class Intake:
         self.component_enabled = True
 
     def execute(self):
-        # thing so that if batt low we can turn off to save energy
-        if not self.component_enabled:
-            self.spin_motor.set_control(self.coast_control)
-            self.right_motor.set_control(self.coast_control)
-            self.left_motor.set_control(self.coast_control)
-            return
+        # # thing so that if batt low we can turn off to save energy
+        # if not self.component_enabled:
+        #     self.spin_motor.set_control(self.coast_control)
+        #     self.right_motor.set_control(self.coast_control)
+        #     self.left_motor.set_control(self.coast_control)
+        #     return
 
         if self.spin_voltage != self.prev_spin_voltage:
             self.prev_spin_voltage = self.spin_voltage

@@ -82,17 +82,17 @@ class Indexer:
         self.component_enabled = True
 
     def execute(self):
-        # thing so that if batt low we can turn off to save energy
-        if not self.component_enabled:
-            self.right_kicker_motor.set_control(self.coast_control)
-            self.left_kicker_motor.set_control(self.coast_control)
-            self.conveyor_motor.set_control(self.coast_control)
-            return
+        # # thing so that if batt low we can turn off to save energy
+        # if not self.component_enabled:
+        #     self.right_kicker_motor.set_control(self.coast_control)
+        #     self.left_kicker_motor.set_control(self.coast_control)
+        #     self.conveyor_motor.set_control(self.coast_control)
+        #     return
 
         self.right_kicker_motor.set_control(
             self.voltage_control.with_output(self.kicker_duty)
         )
-        self.left_kicker_motor.set_control(self.voltage_control.with_output(self.kicker_duty))
+        self.left_kicker_motor.set_control(self.voltage_control.with_output(-self.kicker_duty))
 
         self.conveyor_motor.set_control(
             self.voltage_control.with_output(self.conveyor_volt)

@@ -113,6 +113,7 @@ class ShooterController(StateMachine):
 
     def request_shoot_noncalc(self):
         self.shoot_noncalc = True
+        self.shooting = True
 
     def adjust_rpm_offset(self, delta: float):
         """Copilot D-pad trim.  Persists until reset."""
@@ -202,7 +203,7 @@ class ShooterController(StateMachine):
     def get_distance(self):
         return self.distance
 
-    @feedback
+    # @feedback
     def get_confidence(self):
         return self.shot_confidence
 
@@ -210,10 +211,11 @@ class ShooterController(StateMachine):
     def is_at_speed(self):
         return self.at_speed
 
-    @feedback
+    # @feedback
     def is_valid_shot(self) -> bool:
         return self.valid_shot
 
+    @feedback
     def get_force_good(self):
         return self.forceshoottolgood
 
@@ -224,8 +226,8 @@ class ShooterController(StateMachine):
     @state(first=True)
     def idle(self):
         self._update_target()
-        self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
-        self.shooter.set_acceleration(self.idle_accerlation)
+        # self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
+        # self.shooter.set_acceleration(self.idle_accerlation)
 
         if self.unjamming:
             self.next_state("unjam")
@@ -260,7 +262,7 @@ class ShooterController(StateMachine):
             self.forceshoottolgood = True
             self.indexer.set_kicker(self.kicker_volts)
             self.indexer.set_conveyor(self.conveyor_volts)
-            self.intake.set_voltage(-10)
+            # self.intake.set_voltage(-10)
         if not self.force_shoot_req:
             self.next_state("idle")
 
@@ -284,10 +286,11 @@ class ShooterController(StateMachine):
 
         self.at_speed = speed_ready and confident
 
+        if not self.shooting:
+            self.next_state("idle")
         if self.at_speed:
             self.next_state("shoot")
-        else:
-            self.next_state("idle")
+
 
     @state
     def shoot(self):
