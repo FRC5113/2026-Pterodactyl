@@ -156,13 +156,9 @@ class Shooter:
             self.left_motor.set_control(
                 self.voltage_control.with_output(self.shooter_voltage)
             )
-            self.right_motor.set_control(
-                self.shooter_follower
-            )
+            self.right_motor.set_control(self.shooter_follower)
         else:
             self.left_motor.set_control(
                 self.shooter_control.with_velocity(self.shooter_velocity)
             )
-            self.right_motor.set_control(
-                self.shooter_follower
-            )
+            self.right_motor.set_control(self.shooter_follower)

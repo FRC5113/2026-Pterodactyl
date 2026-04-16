@@ -97,9 +97,17 @@ class ShooterController(StateMachine):
         self.speed_tolerance = 0.05  # 5 %
         self.idle_accerlation = 300.0  # RPS
 
+        self.vx = 0.0
+        self.vy = 0.0
+
     """
     CONTROL METHODS
     """
+
+    def set_drive_velocity(self, vx: float, vy: float, omega: float):
+        self.vx = vx
+        self.vy = vy
+        self.omega = omega
 
     def request_shoot(self):
         self.shooting = True
@@ -274,7 +282,7 @@ class ShooterController(StateMachine):
         # (e.g. heading error spike) — don't drop back to idle and stop
         # pointing, which causes drive-state flutter.
         self.shooter.set_velocity(self.target_rps)
-        self.drive_control.point_to_field(self.target_angle)
+        self.drive_control.point_to_field(self.vx, self.vy, self.target_angle)
 
         tolerance = self.speed_tolerance * self.target_rps
         speed_ready = abs(self.shooter.get_velocity() - self.target_rps) <= tolerance
@@ -291,13 +299,12 @@ class ShooterController(StateMachine):
         if self.at_speed:
             self.next_state("shoot")
 
-
     @state
     def shoot(self):
         self._update_target()
 
         # Always keep aiming and spinning — don't bail on momentary invalid
-        self.drive_control.point_to_field(self.target_angle)
+        self.drive_control.point_to_field(self.vx, self.vy, self.target_angle)
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps
@@ -316,3 +323,8 @@ class ShooterController(StateMachine):
         elif self.at_speed:
             self.indexer.set_kicker(self.kicker_volts)
             self.indexer.set_conveyor(self.conveyor_volts)
+
+    def execute(self):
+        super().execute()
+        self.vx = 0.0
+        self.vy = 0.0

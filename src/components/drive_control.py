@@ -1,10 +1,10 @@
-from choreo.trajectory import SwerveSample
 from magicbot import StateMachine, will_reset_to
 from magicbot.state_machine import state
 from wpilib import DriverStation
 from wpimath import units
 from wpimath.geometry import Pose2d
 
+from choreo.trajectory import SwerveSample
 from components.swerve_drive import SwerveDrive
 
 _isAutonomousEnabled = DriverStation.isAutonomousEnabled
@@ -81,10 +81,12 @@ class DriveControl(StateMachine):
         self.point_to_target = True
         self.point_target = angle
 
-    def point_to_field(self, angle: units.radians):
+    def point_to_field(self, vx: float, vy: float, angle: units.radians):
         """Request the robot to point towards a specific field coordinate."""
         self.point_to_field_bool = True
         self.point_target = angle
+        self.translationX = vx
+        self.translationY = vy
 
     def point_to_joy(self, rightX: float, rightY: float):
         """Request the robot to point in the direction of the right joystick."""
