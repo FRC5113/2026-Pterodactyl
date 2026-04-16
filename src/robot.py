@@ -36,7 +36,7 @@ from phoenix6.hardware import TalonFX, TalonFXS
 
 
 class MyRobot(LemonRobot):
-    led_strip: LEDStrip
+    # led_strip: LEDStrip
     shooter_controller: ShooterController
 
     drive_control: DriveControl
@@ -220,12 +220,12 @@ class MyRobot(LemonRobot):
             "Front_Right", self.rtc_front_right, self.field_layout
         )
 
-        self.camera_back_left = LemonCamera(
-            "Back_Left", self.rtc_back_left, self.field_layout
-        )
-        self.camera_back_right = LemonCamera(
-            "Back_Right", self.rtc_back_right, self.field_layout
-        )
+        # self.camera_back_left = LemonCamera(
+        #     "Back_Left", self.rtc_back_left, self.field_layout
+        # )
+        # self.camera_back_right = LemonCamera(
+        #     "Back_Right", self.rtc_back_right, self.field_layout
+        # )
 
         """
         MISCELLANEOUS
@@ -260,6 +260,9 @@ class MyRobot(LemonRobot):
         self.shooter_controller.engage()
         if not self.fms:
             self._display_auto_trajectory()
+
+    def _simulationPeriodic(self):
+        self.swerve_drive
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
@@ -329,7 +332,7 @@ class MyRobot(LemonRobot):
                 self.drive_control.drive_manual(
                     -vx,
                     -vy,
-                    -omega,
+                    omega,
                     not primary.getCreateButton(),  # temporary
                 )
 
@@ -373,20 +376,23 @@ class MyRobot(LemonRobot):
         SHOOTER
         """
         with self.consumeExceptions():
+            # self.shooter_controller.set_drive_velocity(-vx, -vy, omega)
+
             if secondary.getRightTriggerAxis() >= 0.8:
                 self.shooter_controller.request_shoot()
+                
 
             elif secondary_right_bumper:
                 self.shooter_controller.request_shoot_noncalc()
 
             elif secondary.getYButton():
                 self.shooter_controller.request_unjam()
-
-            elif secondary.getAButton():
-                self.shooter_controller.request_force_shoot(47.5)
-
             elif secondary.getStartButton():
                 self.shooter_controller.request_force_shoot(14.0)
+
+        with self.consumeExceptions():
+            if secondary.getAButton():
+                self.shooter_controller.request_force_shoot(47.5)
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()

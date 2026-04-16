@@ -15,8 +15,8 @@ from lemonlib.vision import LemonCamera
 class Odometry:
     camera_front_left: LemonCamera
     camera_front_right: LemonCamera
-    camera_back_left: LemonCamera
-    camera_back_right: LemonCamera
+    # camera_back_left: LemonCamera
+    # camera_back_right: LemonCamera
 
     field_layout: AprilTagFieldLayout
     swerve_drive: SwerveDrive

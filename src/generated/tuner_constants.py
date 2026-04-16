@@ -1,5 +1,6 @@
 from phoenix6 import CANBus, configs, signals, swerve, units
 from wpimath.units import inchesToMeters
+from wpilib import RobotBase
 
 
 class TunerConstants:

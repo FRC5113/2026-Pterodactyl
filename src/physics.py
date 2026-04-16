@@ -14,29 +14,29 @@ class PhysicsEngine:
     def __init__(self, physics_controller: PhysicsInterface, robot: "MyRobot"):
         self.physics_controller = physics_controller
         self.robot = robot
-
+        self.robot.swerve_drive.setup()     
         # Shared vision simulation for all cameras
         self.vision_sim = LemonVisionSim(robot.field_layout)
 
         # Vision camera simulations
         self.vision_sim_front_left = LemonCameraSim(
-            robot.camera_front_left, robot.field_layout, fov=70.0, fps=60.0
+            robot.camera_front_left, robot.field_layout, fov=80.0, fps=60.0
         )
         self.vision_sim_front_right = LemonCameraSim(
-            robot.camera_front_right, robot.field_layout, fov=70.0, fps=60.0
+            robot.camera_front_right, robot.field_layout, fov=80.0, fps=60.0
         )
-        self.vision_sim_back_left = LemonCameraSim(
-            robot.camera_back_left, robot.field_layout, fov=70.0, fps=60.0
-        )
-        self.vision_sim_back_right = LemonCameraSim(
-            robot.camera_back_right, robot.field_layout, fov=70.0, fps=60.0
-        )
+        # self.vision_sim_back_left = LemonCameraSim(
+        #     robot.camera_back_left, robot.field_layout, fov=70.0, fps=60.0
+        # )
+        # self.vision_sim_back_right = LemonCameraSim(
+        #     robot.camera_back_right, robot.field_layout, fov=70.0, fps=60.0
+        # )
 
         # Register all cameras with the shared vision sim
         self.vision_sim.add_camera(self.vision_sim_front_left)
         self.vision_sim.add_camera(self.vision_sim_front_right)
-        self.vision_sim.add_camera(self.vision_sim_back_left)
-        self.vision_sim.add_camera(self.vision_sim_back_right)
+        # self.vision_sim.add_camera(self.vision_sim_back_left)
+        # self.vision_sim.add_camera(self.vision_sim_back_right)
         # self.robot.sim_intake_left_motor = FalconSim(
         #     self.robot.intake_left_motor, 0.1, 100
         # )
