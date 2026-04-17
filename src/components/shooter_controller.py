@@ -5,8 +5,10 @@ from wpilib import DriverStation, Field2d
 from wpimath.geometry import Translation2d
 from wpimath.kinematics import ChassisSpeeds
 
+from choreo.trajectory import SwerveSample
 from components.drive_control import DriveControl
 from components.indexer import Indexer
+from components.intake import Intake
 from components.shooter import Shooter
 from components.shot_calculator import (
     INVALID,
@@ -15,7 +17,6 @@ from components.shot_calculator import (
     ShotConfig,
     ShotInputs,
 )
-from components.intake import Intake
 from components.swerve_drive import SwerveDrive
 from game import get_hub_pos
 from lemonlib.smart import SmartPreference
@@ -42,6 +43,12 @@ class ShooterController(StateMachine):
     unjamming = will_reset_to(False)
     force_shoot_req = will_reset_to(False)
     force_shoot_rps = will_reset_to(0.0)
+
+    transx = will_reset_to(0.0)
+    transy = will_reset_to(0.0)
+    omega = will_reset_to(0.0)
+    sample = will_reset_to(None)
+    drive_auto_mode = will_reset_to(False)
 
     forceshoottolgood = will_reset_to(False)
 
@@ -99,6 +106,15 @@ class ShooterController(StateMachine):
     """
     CONTROL METHODS
     """
+
+    def drive(self, transx: float, transy: float, omega: float):
+        self.transx = transx
+        self.transy = transy
+        self.omega = omega
+
+    def drive_auto(self, sample: SwerveSample):
+        self.drive_auto_mode = True
+        self.sample = sample
 
     def request_shoot(self):
         self.shooting = True
@@ -191,6 +207,11 @@ class ShooterController(StateMachine):
 
     @state(first=True)
     def idle(self):
+        if self.drive_auto_mode and self.sample is not None:
+            self.drive_control.drive_auto(self.sample)
+        else:
+            self.drive_control.drive_manual(self.transx, self.transy, self.omega, True)
+
         self._update_target()
         self.shooter.set_velocity(self.target_rps * self.idle_speed_scalar)
         self.shooter.set_acceleration(self.idle_accerlation)
@@ -262,7 +283,9 @@ class ShooterController(StateMachine):
         self._update_target()
 
         # Always keep aiming and spinning — don't bail on momentary invalid
-        self.drive_control.point_to(self.target_angle)
+        self.drive_control.drive_point_field(
+            self.transx, self.transy, self.target_angle
+        )
         self.shooter.set_velocity(self.target_rps)
 
         tolerance = self.speed_tolerance * self.target_rps

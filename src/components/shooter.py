@@ -10,7 +10,7 @@ from phoenix6.signals import (
     FeedbackSensorSourceValue,
     MotorAlignmentValue,
     NeutralModeValue,
-    InvertedValue
+    InvertedValue,
 )
 from wpimath import units
 
@@ -44,9 +44,7 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.VelocityVoltage(
-            0
-        ).with_slot(0)
+        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
 
         # follower (set once)
         self.shooter_follower = controls.Follower(

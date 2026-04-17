@@ -293,6 +293,21 @@ class SwerveDrive(Sendable):
             .with_target_direction(Rotation2d(angle))
         )
 
+    def drive_point_field(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        angle: units.radians,
+    ):
+        """Drive while pointing the robot at a field-absolute angle.
+        No operator perspective rotation"""
+        self.stopped = False
+        self.pending_request = (
+            self.facing_angle_field_req.with_velocity_x(vx)
+            .with_velocity_y(vy)
+            .with_target_direction(Rotation2d(angle))
+        )
+
     def drive_point_joy(
         self,
         vx: units.meters_per_second,

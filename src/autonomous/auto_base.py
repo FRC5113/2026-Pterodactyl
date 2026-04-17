@@ -1,13 +1,13 @@
 import math
 from typing import List
 
+from magicbot import AutonomousStateMachine, state, timed_state
+from wpilib import DriverStation, Field2d, SmartDashboard
+from wpimath.geometry import Pose2d
+
 import choreo
 import choreo.util
 from choreo.trajectory import SwerveTrajectory
-from magicbot import AutonomousStateMachine, state, timed_state
-from wpilib import DriverStation, Field2d, RobotBase, SmartDashboard
-from wpimath.geometry import Pose2d
-
 from components.drive_control import DriveControl
 from components.intake import Intake, IntakeAngle
 from components.shooter_controller import ShooterController
@@ -65,7 +65,7 @@ class AutoBase(AutonomousStateMachine):
 
     def on_enable(self) -> None:
         starting_pose = self.get_starting_pose()
-        if starting_pose is not None and RobotBase.isSimulation():
+        if starting_pose is not None:  # and RobotBase.isSimulation():
             self.swerve_drive.set_starting_pose(starting_pose)
 
         self.current_step = -1  # Reset current step
@@ -171,10 +171,9 @@ class AutoBase(AutonomousStateMachine):
             state_tm, is_red()
         )  # Sample trajectory at current time
         if sample is not None:
-            self.drive_control.drive_auto(sample)  # Drive using the sampled trajectory
-
-            if not self._fms:
-                SmartDashboard.putNumber("Distance", distance)
+            self.shooter_controller.drive_auto(
+                sample
+            )  # Drive using the sampled trajectory
 
     """
     STATES
@@ -182,7 +181,7 @@ class AutoBase(AutonomousStateMachine):
 
     @timed_state(duration=1.0, next_state="next_step")
     def intake_down(self):
-        self.drive_control.drive_auto_manual(-0.5,0.0,0.0,False)
+        self.drive_control.drive_auto_manual(-0.5, 0.0, 0.0, False)
         self.intake.set_arm_voltage(-4)
 
     @timed_state(duration=5.0, next_state="next_step")

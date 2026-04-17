@@ -1,10 +1,10 @@
-from choreo.trajectory import SwerveSample
 from magicbot import StateMachine, will_reset_to
 from magicbot.state_machine import state
 from wpilib import DriverStation
 from wpimath import units
 from wpimath.geometry import Pose2d
 
+from choreo.trajectory import SwerveSample
 from components.swerve_drive import SwerveDrive
 
 _isAutonomousEnabled = DriverStation.isAutonomousEnabled
@@ -37,6 +37,9 @@ class DriveControl(StateMachine):
     point_joy_y = will_reset_to(0.0)
     sample = will_reset_to(None)  # Trajectory sample for autonomous path following
     xbrake_req = will_reset_to(False)  # Request to engage X-brake mode
+    point_field_req = will_reset_to(
+        False
+    )  # Request to point towards field angle while driving
 
     def setup(self):
         pass
@@ -112,6 +115,17 @@ class DriveControl(StateMachine):
         self.point_joy_x = joy_x
         self.point_joy_y = joy_y
 
+    def drive_point_field(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        angle: units.radians,
+    ):
+        """Request field-relative drive while facing a field-absolute angle."""
+        self.translationX = vx
+        self.translationY = vy
+        self.point_target = angle
+
     def drive_auto(self, sample: SwerveSample = None):
         """Provide a trajectory sample for autonomous path following."""
         self.sample = sample
@@ -171,26 +185,20 @@ class DriveControl(StateMachine):
         elif self.xbrake_req:
             self.next_state("x_brake_state")
 
+        elif self.point_field_req:
+            self.next_state(
+                "point_towards_field"
+            )  # Reuse point_towards_target state but with field-relative commands
+
         elif self.point_to_target:
-            # Drive-point this frame so there is no stutter on transition
-            self.swerve_drive.drive_point(
-                self.translationX,
-                self.translationY,
-                self.point_target,
-            )
             self.next_state("point_towards_target")
 
         elif self.point_joy_target:
-            self.swerve_drive.drive_point_joy(
-                self.translationX,
-                self.translationY,
-                self.point_joy_x,
-                self.point_joy_y,
-            )
             self.next_state("point_towards_joy")
 
         elif self.drive_sysid:
             self.next_state("drive_sysid_state")
+
         else:
             self.swerve_drive.drive(
                 self.translationX,
@@ -198,6 +206,22 @@ class DriveControl(StateMachine):
                 self.rotationX,
                 self.field_relative,
             )
+
+    @state
+    def apply_request(self):
+        """
+        State to apply drive commands when transitioning from free to a state that requires an immediate command.
+        This prevents a one-frame delay in command application during transitions.
+        Transitions back to free after applying the command.
+        """
+        self.swerve_drive.apply_control(
+            self.translationX,
+            self.translationY,
+            self.rotationX,
+            self.field_relative,
+        )
+        # Transition back to free to allow for new commands or state changes
+        self.next_state("free")
 
     @state
     def x_brake_state(self):
@@ -242,6 +266,16 @@ class DriveControl(StateMachine):
         if self.xbrake_req:
             self.next_state("x_brake_state")
         elif not self.point_joy_target:
+            self.next_state("free")
+
+    @state
+    def point_towards_field(self):
+        self.swerve_drive.drive_point_field(
+            self.translationX,
+            self.translationY,
+            self.point_target,
+        )
+        if not self.point_field_req:
             self.next_state("free")
 
     @state

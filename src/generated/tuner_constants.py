@@ -1,5 +1,6 @@
-from phoenix6 import CANBus, configs, signals, swerve, units
 from wpimath.units import inchesToMeters
+
+from phoenix6 import CANBus, configs, signals, swerve, units
 
 
 class TunerConstants:
@@ -63,8 +64,7 @@ class TunerConstants:
         configs.CurrentLimitsConfigs()
         # Swerve azimuth does not require much torque output, so we can set a relatively low
         # stator current limit to help avoid brownouts without impacting performance.
-        .with_stator_current_limit(60.0)
-        .with_stator_current_limit_enable(True)
+        .with_stator_current_limit(60.0).with_stator_current_limit_enable(True)
     )
     _encoder_initial_configs = configs.CANcoderConfiguration()
     # Configs for the Pigeon 2; leave this None to skip applying Pigeon 2 configs
@@ -77,8 +77,8 @@ class TunerConstants:
 
     # CAN bus that the devices are located on;
     # All swerve devices must share the same CAN bus
-    # canbus = CANBus("can_s5")
-    canbus = CANBus.roborio()
+    canbus = CANBus("can_s5")
+    # canbus = CANBus.roborio()
 
     # Theoretical free speed (m/s) at 12 V applied output;
     # This needs to be tuned to your individual robot

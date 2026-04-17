@@ -2,11 +2,9 @@
 
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
 import math
-from pathlib import Path
 
 import robotpy_apriltag
 from magicbot import feedback
-from phoenix6.hardware import TalonFX, TalonFXS
 from wpilib import (
     DriverStation,
     Field2d,
@@ -33,6 +31,7 @@ from lemonlib.util import (
     LEDController,
     curve,
 )
+from phoenix6.hardware import TalonFX, TalonFXS
 
 
 class MyRobot(LemonRobot):
@@ -337,39 +336,25 @@ class MyRobot(LemonRobot):
             else:
                 omega = self.omega_filter.calculate(sammi(primary_rx) * self.top_omega)
 
-            if primary.getTriangleButton():
-                self.drive_control.drive_point(-vx, -vy, 0.0)
+            # if primary.getTriangleButton():
+            #     self.drive_control.drive_point(-vx, -vy, 0.0)
 
-            elif primary.getCircleButton():
-                self.drive_control.drive_point(
-                    -vx, -vy, self.shooter_controller.target_angle
-                )
-            else:
-                self.drive_control.drive_manual(
-                    -vx,
-                    -vy,
-                    -omega,
-                    not primary.getCreateButton(),  # temporary
-                )
+            # elif primary.getCircleButton():
+            #     self.drive_control.drive_point(
+            #         -vx, -vy, self.shooter_controller.target_angle
+            #     )
+            # else:
+            self.shooter_controller.drive(
+                -vx,
+                -vy,
+                -omega,
+            )
 
             if primary.getCrossButton():
                 self.drive_control.Xbrake()
 
             if primary.getSquareButton():
                 self.swerve_drive.reset_gyro()
-
-        """
-        GENERAL CONTROLS
-        """
-        with self.consumeExceptions():
-            if secondary_pov == 0 or primary_pov == 0:
-                self.shooter.turn_off_component()
-                self.intake.turn_off_component()
-                return
-            elif secondary_pov == 180 or primary_pov == 180:
-                self.shooter.turn_on_component()
-                self.intake.turn_on_component()
-                return
 
         """
         INTAKE
@@ -384,9 +369,9 @@ class MyRobot(LemonRobot):
                 self.intake.set_voltage(10.0)
 
             if secondary.getXButton():
-                self.intake.set_arm_voltage(10)
+                self.intake.set_arm_voltage(12)
             elif secondary.getBButton():
-                self.intake.set_arm_voltage(-4)
+                self.intake.set_arm_voltage(-6)
 
         """
         SHOOTER
