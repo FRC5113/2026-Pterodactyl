@@ -98,9 +98,9 @@ class ShooterController(StateMachine):
         # Tuning constants
         self.idle_speed_scalar = 0.5
         self.kicker_volts = 8  # Volts
-        self.conveyor_volts = -9  # Volts
+        self.conveyor_volts = -11  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
-        self.speed_tolerance = 0.05  # 5 %
+        self.speed_tolerance = 0.1  # 5 %
         self.idle_accerlation = 300.0  # RPS
 
     """
