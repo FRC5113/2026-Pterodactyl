@@ -29,6 +29,7 @@ States: (start with state:)
 
 class hub_shoot_outpost_shoot(AutoBase):
     MODE_NAME = "H-shoot-outpost-shoot"
+    DEFAULT = True
 
     drive_control: DriveControl
     shooter_controller: ShooterController
@@ -90,14 +91,9 @@ class hard_code_shoot(AutoBase):
         self.shooter_controller.request_force_shoot(45.5)
         self.intake.set_voltage(-10)
 
-    @timed_state(duration=2, next_state="next_step")
-    def intake_out(self):
-        self.intake.set_arm_voltage(-8)
-
 
 class hard_code_shoot_angled(AutoBase):
     MODE_NAME = "Hard Code Shoot angled"
-    DEFAULT = True
 
     drive_control: DriveControl
     shooter_controller: ShooterController
@@ -122,25 +118,6 @@ class hard_code_shoot_angled(AutoBase):
     def hard_shoot(self):
         self.shooter_controller.request_force_shoot(46)
         self.intake.set_voltage(-10)
-
-    @timed_state(duration=2, next_state="next_step")
-    def intake_out(self):
-        self.intake.set_arm_voltage(-8)
-
-
-# class auto_test(AutoBase):
-#     MODE_NAME = "Auto Test"
-
-#     drive_control: DriveControl
-
-#     def __init__(self):
-#         super().__init__(
-#             [
-#                 "trajectory:auto_test",
-#                 "state:outpost_wait",
-#                 "state:shoot",
-#             ]
-#         )
 
 
 class hub_outpost_shoot(AutoBase):

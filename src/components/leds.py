@@ -80,7 +80,7 @@ class LEDStrip:
             self.leds.set_solid_color(self.intake_up)
 
         elif is_alliance_hub_active():
-            self.leds.set_solid_color(self.zone_active, 2)
+            self.leds.set_solid_color(self.zone_active)
 
         else:
             self.leds.move_across(self.idle)

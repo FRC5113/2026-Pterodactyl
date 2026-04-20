@@ -8,7 +8,6 @@ from phoenix6.configs import (
 from phoenix6.hardware import TalonFX
 from phoenix6.signals import (
     FeedbackSensorSourceValue,
-    MotorAlignmentValue,
     NeutralModeValue,
     InvertedValue,
 )
@@ -47,9 +46,7 @@ class Shooter:
         self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
 
         # follower (set once)
-        self.shooter_follower = controls.Follower(
-            self.left_motor.device_id, MotorAlignmentValue.OPPOSED
-        )
+        self.shooter_follower = controls.Follower(self.left_motor.device_id, True)
         self.right_motor.set_control(self.shooter_follower)
 
         self.voltage_control = controls.VoltageOut(0)
