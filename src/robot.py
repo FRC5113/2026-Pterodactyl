@@ -8,6 +8,7 @@ from magicbot import feedback
 from wpilib import (
     DriverStation,
     Field2d,
+    DataLogManager,
 )
 from wpimath import units
 from wpimath.filter import SlewRateLimiter
@@ -210,25 +211,32 @@ class MyRobot(LemonRobot):
             -0.279,
             0.222,
             0.229,
-            Rotation3d(0, units.degreesToRadians(-30), units.degreesToRadians(45)),
+            Rotation3d(0.0, units.degreesToRadians(-30), units.degreesToRadians(45)),
         )
         self.rtc_front_right = Transform3d(
             -0.279,
             -0.222,
             0.229,
-            Rotation3d(0, units.degreesToRadians(-30), units.degreesToRadians(-45)),
+            Rotation3d(0.0, units.degreesToRadians(-30), units.degreesToRadians(-45)),
         )
         self.rtc_back_left = Transform3d(
             -ox,
             oy,
             0.21,
-            Rotation3d(0, units.degreesToRadians(-10), units.degreesToRadians(135)),
+            Rotation3d(0.0, units.degreesToRadians(-10), units.degreesToRadians(135)),
         )
         self.rtc_back_right = Transform3d(
             -ox,
             -oy,
             0.21,
-            Rotation3d(0, units.degreesToRadians(-10), units.degreesToRadians(-135)),
+            Rotation3d(0.0, units.degreesToRadians(-10), units.degreesToRadians(-135)),
+        )
+        self.rtc_mid = Transform3d(
+            -0.241,
+            0.0,
+            0.229,
+            Rotation3d(0.0,units.degreesToRadians(-20),0.0)
+
         )
 
         self.camera_front_left = LemonCamera(
@@ -243,6 +251,10 @@ class MyRobot(LemonRobot):
         )
         self.camera_back_right = LemonCamera(
             "Back_Right", self.rtc_back_right, self.field_layout
+        )
+
+        self.camera_middle = LemonCamera(
+            "Middle",self.rtc_mid,self.field_layout
         )
 
         """
@@ -278,6 +290,9 @@ class MyRobot(LemonRobot):
         self.shooter_controller.engage()
         if not self.fms:
             self._display_auto_trajectory()
+
+    def autonomousInit(self):
+        DataLogManager.start()
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
@@ -381,7 +396,7 @@ class MyRobot(LemonRobot):
                 self.shooter_controller.request_shoot()
 
             elif secondary.getStartButton():
-                self.shooter_controller.request_force_shoot(14.0)
+                self.shooter_controller.request_force_shoot(100.0)
 
             elif secondary.getYButton():
                 self.shooter_controller.request_unjam()

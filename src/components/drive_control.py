@@ -125,6 +125,7 @@ class DriveControl(StateMachine):
         self.translationX = vx
         self.translationY = vy
         self.point_target = angle
+        self.point_field_req = True
 
     def drive_auto(self, sample: SwerveSample = None):
         """Provide a trajectory sample for autonomous path following."""

@@ -16,6 +16,7 @@ class Odometry:
     camera_front_right: LemonCamera
     camera_back_left: LemonCamera
     camera_back_right: LemonCamera
+    camera_middle: LemonCamera
 
     field_layout: AprilTagFieldLayout
     swerve_drive: SwerveDrive
@@ -26,7 +27,8 @@ class Odometry:
         cameras = (
             self.camera_front_left,
             self.camera_front_right,
-            self.camera_back_left,
+            self.camera_middle,
+            # self.camera_back_left,
             # self.camera_back_right,
         )
         self._camera_estimator_pairs = tuple(

@@ -37,7 +37,7 @@ class Climber:
     def go_up(self):
         self.beDown = False
 
-    @feedback
+    # @feedback
     def current_volatge(self) -> volts:
         return self.voltsToApply
 

@@ -97,8 +97,8 @@ class ShooterController(StateMachine):
 
         # Tuning constants
         self.idle_speed_scalar = 0.5
-        self.kicker_volts = 8  # Volts
-        self.conveyor_volts = -11  # Volts
+        self.kicker_volts = 12  # Volts
+        self.conveyor_volts = -12  # Volts
         self.angle_tolerance = 0.035  # radians (~2 deg)
         self.speed_tolerance = 0.1  # 5 %
         self.idle_accerlation = 300.0  # RPS
@@ -178,19 +178,19 @@ class ShooterController(StateMachine):
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_target_rps(self):
         return self.target_rps
 
-    @feedback
+    # @feedback
     def get_distance(self):
         return self.distance
 
-    @feedback
+    # @feedback
     def get_confidence(self):
         return self.shot_confidence
 
-    @feedback
+    # @feedback
     def is_at_speed(self):
         return self.at_speed
 
@@ -275,7 +275,7 @@ class ShooterController(StateMachine):
 
         if self.at_speed:
             self.next_state("shoot")
-        else:
+        if not self.shooting:
             self.next_state("idle")
 
     @state

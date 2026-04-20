@@ -42,7 +42,7 @@ class LEDStrip:
     INFORMATIONAL METHODS
     """
 
-    @feedback
+    # @feedback
     def get_colors(self) -> list[str]:
         """Returns LED colors in list of hex strings"""
         return [Color(led.r, led.g, led.b).hexString() for led in self.leds.buffer]

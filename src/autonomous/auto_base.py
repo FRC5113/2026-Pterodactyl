@@ -184,9 +184,10 @@ class AutoBase(AutonomousStateMachine):
         self.drive_control.drive_auto_manual(-0.5, 0.0, 0.0, False)
         self.intake.set_arm_voltage(-4)
 
-    @timed_state(duration=5.0, next_state="next_step")
+    @timed_state(duration=20.0, next_state="next_step")
     def shoot(self):
         self.shooter_controller.request_shoot()
+        self.intake.set_voltage(-10)
 
     @timed_state(duration=3.0, next_state="next_step")
     def go_forward_and_intake(self):

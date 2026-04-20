@@ -139,6 +139,7 @@ class SwerveDrive(Sendable):
 
         self.last_adv_scope_time = 0.0
         self.last_telem_time = 0.0
+        self.drivetrain.seed_field_centric()
 
     def on_enable(self):
         # PID controllers for autonomous pose tracking
@@ -155,7 +156,7 @@ class SwerveDrive(Sendable):
         if self.tuning_enabled:
             self._apply_motor_gains()
 
-        # Set operator perspective based on alliance colour
+        # # Set operator perspective based on alliance colour
         if DriverStation.getAlliance() == _RED:
             self.drivetrain.set_operator_perspective_forward(
                 Rotation2d.fromDegrees(180)
@@ -351,7 +352,7 @@ class SwerveDrive(Sendable):
             self.pending_request = self.apply_speeds_req.with_speeds(speeds)
 
     def reset_gyro(self) -> None:
-        self.drivetrain.seed_field_centric()
+        self.drivetrain.seed_field_centric(Rotation2d.fromDegrees(180) if DriverStation.getAlliance() == _RED else Rotation2d())
         self.pigeon_alert.enable()
 
     def addVisionPoseEstimate(
