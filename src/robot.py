@@ -128,9 +128,9 @@ class MyRobot(LemonRobot):
 
         self.intake_canbus = CANBus.system_core(1)
 
-        self.intake_spin_motor = TalonFX(51)
-        self.intake_left_motor = TalonFXS(52)
-        self.intake_right_motor = TalonFXS(53)
+        self.intake_spin_motor = TalonFX(51, self.intake_canbus)
+        self.intake_left_motor = TalonFXS(52, self.intake_canbus)
+        self.intake_right_motor = TalonFXS(53, self.intake_canbus)
 
         self.intake_spin_amps: units.amperes = 60.0
         self.intake_arm_amps: units.amperes = 24.0
@@ -140,8 +140,8 @@ class MyRobot(LemonRobot):
         """
         self.shooter_canbus = CANBus.system_core(0)
 
-        self.shooter_left_motor = TalonFX(2)
-        self.shooter_right_motor = TalonFX(3)
+        self.shooter_left_motor = TalonFX(2, self.shooter_canbus)
+        self.shooter_right_motor = TalonFX(3, self.shooter_canbus)
 
         self.shooter_gear_ratio = 1.0
         self.shooter_stator_amps: units.amperes = 120.0
@@ -168,9 +168,9 @@ class MyRobot(LemonRobot):
         """
         self.indexer_canbus = CANBus.system_core(2)
 
-        self.indexer_left_kicker_motor = TalonFXS(4)
-        self.indexer_right_kicker_motor = TalonFXS(5)
-        self.indexer_conveyor_motor = TalonFXS(6)
+        self.indexer_left_kicker_motor = TalonFXS(4, self.shooter_canbus)
+        self.indexer_right_kicker_motor = TalonFXS(5, self.shooter_canbus)
+        self.indexer_conveyor_motor = TalonFXS(6, self.indexer_canbus)
         self.indexer_kicker_amps: units.amperes = 40.0
         self.indexer_conveyor_amps: units.amperes = 20.0
 
@@ -236,7 +236,7 @@ class MyRobot(LemonRobot):
             lambda x: 1.89 * x**3 + 0.61 * x, 0.0, deadband=0.1, max_mag=1.0
         )
 
-        self.led_length = 150
+        self.led_length = 80
         self.leds = LEDController(0, self.led_length)
 
         # alerts

@@ -6,7 +6,6 @@ from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
-from magicbot import feedback
 
 
 class LEDStrip:
