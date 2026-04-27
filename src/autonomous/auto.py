@@ -6,14 +6,19 @@ from components.swerve_drive import SwerveDrive
 from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
-from magicbot import StateMachine
+from magicbot import AutonomousStateMachine, state
 import time
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
 
-
-
+class AnnoyingGenericMagicbotAutoWrapperBecauseMagicBotIsPoorlyBuilt(AutonomousStateMachine):
+    MODE_NAME = "I mean seriously who's dumb idea was it to lock teams into this half baked excuse for an Auto framework"
+    def on_enable(self):
+        self.runner = AutoRunner(tempAutoRoutine)
+    @state(first=True)
+    def THE_ONLY_STATE(self):
+        self.runner.run()
 class AutoContext:
     sd: SwerveDrive
     sh: Shooter
@@ -36,7 +41,7 @@ class AutoStep:
 class AutoRunner:
     def __init__(self, steps: List[AutoStep]):
         self.steps = steps
-        self.ctx = AutoContext(SwerveDrive(), Shooter(), Intake(), ShooterController()) # Placeholder
+        self.ctx = None
         self.index = 0
 
     def reset(self):
@@ -46,7 +51,7 @@ class AutoRunner:
         if self.index >= len(self.steps):
             return
 
-        status = self.steps[self.index].execute(self.ctx)
+        status = self.steps[self.index].execute(ctx)
 
         if status == StepStatus.DONE:
             self.index += 1
@@ -114,7 +119,7 @@ class SwerveDriveBotRelativeAuto(AutoStep):
         self.heading = heading
         self.target_pose = None
     def execute(self, ctx: AutoContext) -> StepStatus:
-        if 
+        raise Exception("TODO")
 class IntakeAuto(AutoStep):
     """Lets you turn on or off the intake with the boolean parameter"""
 
@@ -134,7 +139,8 @@ class ShootAuto(AutoStep):
 
     def __init__(self):
         self.started = False
-        self.durration = durration
+        self.durration = 5.0
+        # TODO: This should have a durration parameter
     def execute(self, ctx: AutoContext) -> StepStatus:
         if self.start == 0:
             self.start = time.perf_counter()

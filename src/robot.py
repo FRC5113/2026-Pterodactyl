@@ -59,8 +59,7 @@ class MyRobot(LemonRobot):
     firstRun = True
 
     # flywheel_speed = SmartPreference(30.0)
-    auto_ctx: AutoContext
-    auto_routines: dict[str, list[AutoRunner]]
+    #auto_routines: dict[str, list[AutoRunner]]
     def createObjects(self):
 
         """This method is where all attributes to be injected are
@@ -259,7 +258,7 @@ class MyRobot(LemonRobot):
             self.alliance = True
         else:
             self.alliance = False
-
+    def enabledInit(self):
         self.auto_ctx = AutoContext(self.swerve_drive, self.shooter, self.intake, self.shooter_controller)
         self.auto_routines["move_back"] = AutoRunner(
             [
