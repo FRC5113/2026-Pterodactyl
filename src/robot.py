@@ -18,9 +18,8 @@ from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
-from autonomous import auto
+from autonomous.auto import AutoContext, AutoRunner, SwerveDriveAuto
 from components.swerve_drive import SwerveDrive
-from components.swerve_wheel import SwerveWheel
 from components.drive_control import DriveControl
 from components.intake import Intake
 from components.leds import LEDStrip
@@ -55,12 +54,14 @@ class MyRobot(LemonRobot):
     top_speed = SmartPreference(4.7)
     top_omega = SmartPreference(6.0)
 
-    rasing_slew_rate: SmartPreference = SmartPreference(5.0)
-    falling_slew_rate: SmartPreference = SmartPreference(5.0)
-    intake: Intake
-    auto_context: auto.AutoContext
+    rasing_slew_rate= SmartPreference(8.0)
+    # falling_slew_rate = SmartPreference(20.0)
+    firstRun = True
 
+    # flywheel_speed = SmartPreference(30.0)
+    #auto_routines: dict[str, list[AutoRunner]]
     def createObjects(self):
+
         """This method is where all attributes to be injected are
         initialized. This is done here rather that inside the components
         themselves so that all constants and initialization parameters
@@ -257,23 +258,30 @@ class MyRobot(LemonRobot):
             self.alliance = True
         else:
             self.alliance = False
-
+    def enabledInit(self):
+        self.auto_ctx = AutoContext(self.swerve_drive, self.shooter, self.intake, self.shooter_controller)
+        self.auto_routines["move_back"] = AutoRunner(
+            [
+                SwerveDriveAuto()
+            ]
+        )
     def enabledperiodic(self):
         self.drive_control.engage()
         self.shooter_controller.engage()
 
     def autonomousInit(self):
-        self.auto_context = auto.AutoContext(
-            sd=self.swerve_drive,
-            sh=self.shooter,
-            it=self.intake,
-            sc=self.shooter_controller,
-        )
-        auto.tempAutoRoutine.reset()
+        pass
+
+    def robotPeriodic(self) -> None:
+        if self.tuning_enabled:
+            watchdog = self.watchdog
+            self.__sd_update()
+            watchdog.addEpoch("SmartDashboard")
+            self.__lv_update()
+            watchdog.addEpoch("LiveWindow")
 
     def autonomousPeriodic(self):
-        auto.tempAutoRoutine.run(self.auto_context)
-
+        pass
     def teleopInit(self):
         # globalProfiler.enable()
         # initialize HIDs here in case they are changed after robot initializes
@@ -410,6 +418,9 @@ class MyRobot(LemonRobot):
         #     self.firstRun = False
         pass
 
+    # @feedback
+    def hub_status(self) -> bool:
+        return is_alliance_hub_active()
 
 
 

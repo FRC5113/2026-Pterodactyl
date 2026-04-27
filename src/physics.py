@@ -65,6 +65,6 @@ class PhysicsEngine:
         self.vision_sim_back_right.update(pose)
 
         """Intake"""
-        self.robot.sim_intake_left_motor.update(pose)
-        self.robot.sim_intake_right_motor.update(pose)
-        self.robot.sim_intake_spin_motor.update(pose)
+        self.robot.sim_intake_left_motor.update(tm_diff)
+        self.robot.sim_intake_right_motor.update(tm_diff)
+        self.robot.sim_intake_spin_motor.update(tm_diff)
