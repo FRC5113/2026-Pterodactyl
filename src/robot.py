@@ -1,8 +1,6 @@
 # import cProfile
-
 # Patch out the expensive traceback in Phoenix6 error reports (see _report_status_no_traceback).
 import math
-
 import wpilib
 from magicbot import feedback
 from phoenix6 import CANBus
@@ -18,7 +16,7 @@ from wpimath import units
 from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
-from autonomous.auto import AutoContext, AutoRunner, SwerveDriveAuto
+import autonomous.auto
 from components.swerve_drive import SwerveDrive
 from components.drive_control import DriveControl
 from components.intake import Intake
@@ -258,13 +256,6 @@ class MyRobot(LemonRobot):
             self.alliance = True
         else:
             self.alliance = False
-    def enabledInit(self):
-        self.auto_ctx = AutoContext(self.swerve_drive, self.shooter, self.intake, self.shooter_controller)
-        self.auto_routines["move_back"] = AutoRunner(
-            [
-                SwerveDriveAuto()
-            ]
-        )
     def enabledperiodic(self):
         self.drive_control.engage()
         self.shooter_controller.engage()

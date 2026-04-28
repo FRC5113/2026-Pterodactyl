@@ -11,14 +11,25 @@ import time
 class StepStatus(Enum):
     RUNNING = 1
     DONE = 2
-
-class AnnoyingGenericMagicbotAutoWrapperBecauseMagicBotIsPoorlyBuilt(AutonomousStateMachine):
+class AnnoyingGenericMagicBotAutoWrapperBecauseMagicBotIsPoorlyBuilt(AutonomousStateMachine):
     MODE_NAME = "I mean seriously who's dumb idea was it to lock teams into this half baked excuse for an Auto framework"
+    DEFAULT = True
+    swerve_drive: SwerveDrive
+    shooter: Shooter
+    intake: Intake
+    shooter_controller: ShooterController
+
     def on_enable(self):
-        self.runner = AutoRunner(tempAutoRoutine)
+        self.runner = tempAutoRoutine
+        self.ctx = AutoContext(self.swerve_drive, self.shooter, self.intake, self.shooter_controller)
+        return super().on_enable()
+    def on_disable(self) -> None:
+        return super().on_disable()
+    def on_iteration(self, tm: float) -> None:
+        return super().on_iteration(tm)
     @state(first=True)
     def THE_ONLY_STATE(self):
-        self.runner.run()
+        self.runner.run(self.ctx)
 class AutoContext:
     sd: SwerveDrive
     sh: Shooter
@@ -43,11 +54,14 @@ class AutoRunner:
         self.steps = steps
         self.ctx = None
         self.index = 0
+        print("\x1b[31m[DEBUG] AUTO RUNNER CREATED\x1b[0m")
 
     def reset(self):
         self.index = 0
 
     def run(self, ctx: AutoContext):
+        print("\x1b[31m[DEBUG] AUTO RUNNER Running\x1b[0m")
+
         if self.index >= len(self.steps):
             return
 
@@ -99,6 +113,8 @@ class SwerveDriveAuto(AutoStep):
         self.target_pose = None
 
     def execute(self, ctx: AutoContext) -> StepStatus:
+        print("\x1b[34m[DEBUG] Swerve drive executing\x1b[0m")
+
         # TODO: PID - it should do pid not just naivley drive there and dead stop
         # TODO: Angle tolerance
         if self.target_pose is None:
