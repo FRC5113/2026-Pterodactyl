@@ -264,8 +264,8 @@ class MyRobot(LemonRobot):
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
-        self.primary = LemonInput(0)
-        self.secondary = LemonInput(1)
+        self.primary = LemonInput(type="PS5")
+        self.secondary = LemonInput(type="Xbox")
 
         self.x_filter = SlewRateLimiter(self.rasing_slew_rate)
         self.y_filter = SlewRateLimiter(self.rasing_slew_rate)
