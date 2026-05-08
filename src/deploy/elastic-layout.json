@@ -1043,9 +1043,9 @@
           },
           {
             "title": "Distance",
-            "x": 0.0,
-            "y": 512.0,
-            "width": 512.0,
+            "x": 256.0,
+            "y": 384.0,
+            "width": 128.0,
             "height": 128.0,
             "type": "Text Display",
             "properties": {
@@ -1071,7 +1071,7 @@
           {
             "title": "Drive State",
             "x": 256.0,
-            "y": 384.0,
+            "y": 256.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Text Display",
@@ -1096,9 +1096,9 @@
           },
           {
             "title": "Final Pose",
-            "x": 0.0,
-            "y": 640.0,
-            "width": 512.0,
+            "x": 384.0,
+            "y": 384.0,
+            "width": 128.0,
             "height": 128.0,
             "type": "Text Display",
             "properties": {
@@ -1110,8 +1110,8 @@
           },
           {
             "title": "Swerve Drive",
-            "x": 512.0,
-            "y": 640.0,
+            "x": 768.0,
+            "y": 0.0,
             "width": 256.0,
             "height": 256.0,
             "type": "SwerveDrive",
@@ -1144,33 +1144,6 @@
       "grid_layout": {
         "layouts": [],
         "containers": [
-          {
-            "title": "photonvision_Port_1181_Input_MJPEG_Server",
-            "x": 0.0,
-            "y": 0.0,
-            "width": 512.0,
-            "height": 384.0,
-            "type": "Camera Stream",
-            "properties": {
-              "topic": "/CameraPublisher/photonvision_Port_1181_Input_MJPEG_Server",
-              "period": 0.06,
-              "rotation_turns": 0
-            }
-          },
-          {
-            "title": "photonvision_Port_1184_Output_MJPEG_Server",
-            "x": 0.0,
-            "y": 384.0,
-            "width": 512.0,
-            "height": 384.0,
-            "type": "Camera Stream",
-            "properties": {
-              "topic": "/CameraPublisher/photonvision_Port_1184_Output_MJPEG_Server",
-              "period": 0.06,
-              "rotation_turns": 0,
-              "resolution": [320.0, 180.0]
-            }
-          },
           {
             "title": "Alerts",
             "x": 1152.0,
@@ -1232,158 +1205,227 @@
             }
           },
           {
-            "title": "USB Camera 0",
+            "title": "orange_Port_1183_Input_MJPEG_Server",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 512.0,
+            "height": 384.0,
+            "type": "Camera Stream",
+            "properties": {
+              "topic": "/CameraPublisher/orange_Port_1183_Input_MJPEG_Server",
+              "period": 0.06,
+              "rotation_turns": 0,
+              "fps": 5,
+              "resolution": [120.0, 0.0]
+            }
+          },
+          {
+            "title": "orange_Port_1181_Input_MJPEG_Server",
             "x": 512.0,
             "y": 0.0,
             "width": 384.0,
             "height": 384.0,
             "type": "Camera Stream",
             "properties": {
-              "topic": "/CameraPublisher/USB Camera 0",
+              "topic": "/CameraPublisher/orange_Port_1181_Input_MJPEG_Server",
               "period": 0.06,
-              "rotation_turns": 0
+              "rotation_turns": 0,
+              "fps": 5,
+              "resolution": [120.0, 0.0]
+            }
+          },
+          {
+            "title": "left_angle",
+            "x": 1024.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/components/intake/left_angle",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "right_angle",
+            "x": 896.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/components/intake/right_angle",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "is_valid_shot",
+            "x": 0.0,
+            "y": 384.0,
+            "width": 512.0,
+            "height": 256.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/components/shooter_controller/is_valid_shot",
+              "period": 0.06,
+              "data_type": "boolean",
+              "true_color": 4283215696,
+              "false_color": 4294198070,
+              "true_icon": "None",
+              "false_icon": "None"
             }
           }
         ]
       }
     },
     {
-      "name": "Tab 5",
+      "name": "Intake",
+      "grid_layout": {
+        "layouts": [],
+        "containers": [
+          {
+            "title": "Alerts",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 256.0,
+            "height": 384.0,
+            "type": "Alerts",
+            "properties": {
+              "topic": "/SmartDashboard/Alerts",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "left_angle",
+            "x": 256.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/components/intake/left_angle",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "right_angle",
+            "x": 384.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/components/intake/right_angle",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "position",
+            "x": 512.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/components/intake/position",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "left_offset",
+            "x": 256.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/Preferences/left_offset",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "right_offset",
+            "x": 384.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/Preferences/right_offset",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Shooter",
       "grid_layout": {
         "layouts": [
           {
-            "title": "Direction 12",
-            "x": 768.0,
-            "y": 128.0,
+            "title": "state",
+            "x": 256.0,
+            "y": 0.0,
             "width": 256.0,
-            "height": 384.0,
+            "height": 256.0,
             "type": "List Layout",
             "properties": {
               "label_position": "TOP"
             },
             "children": [
               {
-                "title": "Error",
+                "title": "current_state",
                 "x": 0.0,
                 "y": 0.0,
                 "width": 128.0,
                 "height": 128.0,
                 "type": "Text Display",
                 "properties": {
-                  "topic": "/Swerve Modules/Direction 12/Error",
+                  "topic": "/components/shooter_controller/state/current_state",
                   "period": 0.06,
-                  "data_type": "double",
+                  "data_type": "string",
                   "show_submit_button": false
                 }
               },
               {
-                "title": "Mesurement",
+                "title": "state_descriptions",
                 "x": 0.0,
                 "y": 0.0,
                 "width": 128.0,
                 "height": 128.0,
                 "type": "Text Display",
                 "properties": {
-                  "topic": "/Swerve Modules/Direction 12/Mesurement",
+                  "topic": "/components/shooter_controller/state/state_descriptions",
                   "period": 0.06,
-                  "data_type": "double",
+                  "data_type": "string[]",
                   "show_submit_button": false
                 }
               },
               {
-                "title": "Output",
+                "title": "state_names",
                 "x": 0.0,
                 "y": 0.0,
                 "width": 128.0,
                 "height": 128.0,
                 "type": "Text Display",
                 "properties": {
-                  "topic": "/Swerve Modules/Direction 12/Output",
+                  "topic": "/components/shooter_controller/state/state_names",
                   "period": 0.06,
-                  "data_type": "double",
-                  "show_submit_button": false
-                }
-              },
-              {
-                "title": "Reference",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Text Display",
-                "properties": {
-                  "topic": "/Swerve Modules/Direction 12/Reference",
-                  "period": 0.06,
-                  "data_type": "double",
-                  "show_submit_button": false
-                }
-              }
-            ]
-          },
-          {
-            "title": "direction",
-            "x": 1024.0,
-            "y": 128.0,
-            "width": 256.0,
-            "height": 768.0,
-            "type": "List Layout",
-            "properties": {
-              "label_position": "TOP"
-            },
-            "children": [
-              {
-                "title": "kD",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Text Display",
-                "properties": {
-                  "topic": "/SmartDashboard/SmartProfile/direction/kD",
-                  "period": 0.06,
-                  "data_type": "double",
-                  "show_submit_button": false
-                }
-              },
-              {
-                "title": "kI",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Text Display",
-                "properties": {
-                  "topic": "/SmartDashboard/SmartProfile/direction/kI",
-                  "period": 0.06,
-                  "data_type": "double",
-                  "show_submit_button": false
-                }
-              },
-              {
-                "title": "kP",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Text Display",
-                "properties": {
-                  "topic": "/SmartDashboard/SmartProfile/direction/kP",
-                  "period": 0.06,
-                  "data_type": "double",
-                  "show_submit_button": false
-                }
-              },
-              {
-                "title": "kS",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Text Display",
-                "properties": {
-                  "topic": "/SmartDashboard/SmartProfile/direction/kS",
-                  "period": 0.06,
-                  "data_type": "double",
+                  "data_type": "string[]",
                   "show_submit_button": false
                 }
               }
@@ -1392,38 +1434,15 @@
         ],
         "containers": [
           {
-            "title": "Swerve Drive",
-            "x": 128.0,
-            "y": 128.0,
-            "width": 256.0,
-            "height": 256.0,
-            "type": "SwerveDrive",
-            "properties": {
-              "topic": "/SmartDashboard/Swerve Drive",
-              "period": 0.06,
-              "show_robot_rotation": true,
-              "rotation_unit": "Degrees"
-            }
-          },
-          {
-            "title": "Field",
+            "title": "Alerts",
             "x": 0.0,
-            "y": 384.0,
+            "y": 0.0,
             "width": 256.0,
-            "height": 256.0,
-            "type": "Field",
+            "height": 384.0,
+            "type": "Alerts",
             "properties": {
-              "topic": "/SmartDashboard/Field",
-              "period": 0.06,
-              "field_game": "Reefscape",
-              "robot_width": 0.85,
-              "robot_length": 0.85,
-              "show_other_objects": true,
-              "show_trajectories": true,
-              "field_rotation": 0.0,
-              "robot_color": 4294198070,
-              "trajectory_color": 4294967295,
-              "show_robot_outside_widget": true
+              "topic": "/SmartDashboard/Alerts",
+              "period": 0.06
             }
           }
         ]

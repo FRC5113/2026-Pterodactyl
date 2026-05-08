@@ -12,8 +12,17 @@ from wpimath.geometry import (
     Translation2d,
 )
 
-apriltag_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-    robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+# Cache frequently used enum values
+_Alliance = wpilib.DriverStation.Alliance
+_RED = _Alliance.kRed
+
+# Custom apriltag field layout
+# self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
+#     str(Path(__file__).parent.resolve() / "2026_test_field.json")
+# )
+
+apriltag_layout = robotpy_apriltag.AprilTagFieldLayout(
+    wpilib.getDeployDirectory() + "/2026-rebuilt-welded.json"
 )
 
 TagId = typing.Literal[
@@ -110,6 +119,24 @@ def is_red() -> bool:
     return wpilib.DriverStation.getAlliance() == wpilib.DriverStation.Alliance.kRed
 
 
+def is_match() -> bool:
+    return wpilib.DriverStation.isFMSAttached()
+
+
+def is_sim() -> bool:
+    return wpilib.RobotBase.isSimulation()
+
+
+def is_auton() -> bool:
+    mode = wpilib.SmartDashboard.getString("/robot/mode", "")
+    return mode in ["auto"]
+
+
+def is_disabled() -> bool:
+    mode = wpilib.SmartDashboard.getString("/robot/mode", "")
+    return mode in ["disabled", ""]
+
+
 def is_alliance_hub_active() -> bool:
     alliance = wpilib.DriverStation.getAlliance()
 
@@ -139,11 +166,7 @@ def is_alliance_hub_active() -> bool:
             return True
 
     # Shift 1 is active for blue if red won auto, or red if blue won auto.
-    shift1_active = (
-        not red_inactive_first
-        if alliance == wpilib.DriverStation.Alliance.kRed
-        else red_inactive_first
-    )
+    shift1_active = not red_inactive_first if alliance == _RED else red_inactive_first
 
     if match_time > 130:
         return True  # Transition shift, hub is active

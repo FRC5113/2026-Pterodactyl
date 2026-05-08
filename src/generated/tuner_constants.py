@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, overload
-
-from phoenix6 import CANBus, configs, hardware, signals, swerve, units
 from wpimath.units import inchesToMeters
+
+from phoenix6 import CANBus, configs, signals, swerve, units
 
 
 class TunerConstants:
@@ -16,11 +15,11 @@ class TunerConstants:
     # output type specified by SwerveModuleConstants.SteerMotorClosedLoopOutput
     _steer_gains = (
         configs.Slot0Configs()
-        .with_k_p(95.0)
+        .with_k_p(41)
         .with_k_i(0.0)
         .with_k_d(0.0)
-        .with_k_s(0.12)
-        .with_k_v(2.8)
+        .with_k_s(0.3409)
+        .with_k_v(2.582)
         .with_k_a(0.0)
         .with_static_feedforward_sign(
             signals.StaticFeedforwardSignValue.USE_CLOSED_LOOP_SIGN
@@ -33,9 +32,9 @@ class TunerConstants:
         .with_k_p(0.0)
         .with_k_i(0.0)
         .with_k_d(0.0)
-        .with_k_s(0.17)
-        .with_k_v(0.104)
-        .with_k_a(0.01)
+        .with_k_s(0.24545)
+        .with_k_v(0.12159)
+        .with_k_a(0.0076532)
     )
 
     # The closed-loop output type to use for the steer motors;
@@ -69,11 +68,17 @@ class TunerConstants:
     )
     _encoder_initial_configs = configs.CANcoderConfiguration()
     # Configs for the Pigeon 2; leave this None to skip applying Pigeon 2 configs
-    _pigeon_configs: configs.Pigeon2Configuration | None = None
+    _pigeon_configs = configs.Pigeon2Configuration().with_mount_pose(
+        configs.MountPoseConfigs()
+        .with_mount_pose_pitch(-0.7855049967765808)
+        .with_mount_pose_roll(-0.9881334900856018)
+        .with_mount_pose_yaw(-0.20631515979766846)
+    )
 
     # CAN bus that the devices are located on;
     # All swerve devices must share the same CAN bus
-    canbus = CANBus("can0", "./logs/example.hoot")
+    canbus = CANBus("can_s5")
+    # canbus = CANBus.roborio()
 
     # Theoretical free speed (m/s) at 12 V applied output;
     # This needs to be tuned to your individual robot
@@ -96,8 +101,8 @@ class TunerConstants:
     _steer_inertia: units.kilogram_square_meter = 0.01
     _drive_inertia: units.kilogram_square_meter = 0.01
     # Simulated voltage necessary to overcome friction
-    _steer_friction_voltage: units.volt = 0.2
-    _drive_friction_voltage: units.volt = 0.2
+    _steer_friction_voltage: units.volt = 0.0
+    _drive_friction_voltage: units.volt = 0.0
 
     drivetrain_constants = (
         swerve.SwerveDrivetrainConstants()
@@ -160,7 +165,7 @@ class TunerConstants:
     _back_left_drive_motor_id = 31
     _back_left_steer_motor_id = 32
     _back_left_encoder_id = 33
-    _back_left_encoder_offset: units.rotation = 0.331787109375
+    _back_left_encoder_offset: units.rotation = 0.326904296875
     _back_left_steer_motor_inverted = True
     _back_left_encoder_inverted = False
 

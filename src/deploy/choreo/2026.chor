@@ -69,6 +69,20 @@
      "val":0.0
     }
    },
+   "hubfront_faceaway":{
+    "x":{
+     "exp":"3.5 m",
+     "val":3.5
+    },
+    "y":{
+     "exp":"4.04 m",
+     "val":4.04
+    },
+    "heading":{
+     "exp":"3.1415 rad",
+     "val":3.1415
+    }
+   },
    "left_ball_enter":{
     "x":{
      "exp":"7.021 m",
@@ -200,31 +214,31 @@
  "config":{
   "frontLeft":{
    "x":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    },
    "y":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    }
   },
   "backLeft":{
    "x":{
-    "exp":"-13 in",
-    "val":-0.3302
+    "exp":"-13.75 in",
+    "val":-0.34925
    },
    "y":{
-    "exp":"13 in",
-    "val":0.3302
+    "exp":"13.75 in",
+    "val":0.34925
    }
   },
   "mass":{
-   "exp":"115 lbs",
-   "val":52.16312255
+   "exp":"150 lbs",
+   "val":68.0388555
   },
   "inertia":{
-   "exp":"4 kg m ^ 2",
-   "val":4.0
+   "exp":"6 kg m ^ 2",
+   "val":6.0
   },
   "gearing":{
    "exp":"6.75",
@@ -270,6 +284,6 @@
   "root":"home/ryan/Documents/2026-Rebuild/src",
   "genVars":true,
   "genTrajData":true,
-  "useChoreoLib":true
+  "useChoreoLib":false
  }
 }

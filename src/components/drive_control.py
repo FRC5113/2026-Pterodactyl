@@ -1,11 +1,14 @@
-from choreo.trajectory import SwerveSample
 from magicbot import StateMachine, will_reset_to
 from magicbot.state_machine import state
 from wpilib import DriverStation
 from wpimath import units
 from wpimath.geometry import Pose2d
 
+from choreo.trajectory import SwerveSample
 from components.swerve_drive import SwerveDrive
+
+_isAutonomousEnabled = DriverStation.isAutonomousEnabled
+_isTeleop = DriverStation.isTeleop
 
 
 class DriveControl(StateMachine):
@@ -34,9 +37,15 @@ class DriveControl(StateMachine):
     point_joy_y = will_reset_to(0.0)
     sample = will_reset_to(None)  # Trajectory sample for autonomous path following
     xbrake_req = will_reset_to(False)  # Request to engage X-brake mode
+    point_field_req = will_reset_to(
+        False
+    )  # Request to point towards field angle while driving
 
     def setup(self):
         pass
+
+    def on_enable(self):
+        self.point_target = self.swerve_drive.cached_pose.rotation().radians()
 
     def drive_manual(
         self,
@@ -106,6 +115,18 @@ class DriveControl(StateMachine):
         self.point_joy_x = joy_x
         self.point_joy_y = joy_y
 
+    def drive_point_field(
+        self,
+        vx: units.meters_per_second,
+        vy: units.meters_per_second,
+        angle: units.radians,
+    ):
+        """Request field-relative drive while facing a field-absolute angle."""
+        self.translationX = vx
+        self.translationY = vy
+        self.point_target = angle
+        self.point_field_req = True
+
     def drive_auto(self, sample: SwerveSample = None):
         """Provide a trajectory sample for autonomous path following."""
         self.sample = sample
@@ -143,7 +164,7 @@ class DriveControl(StateMachine):
         self.field_relative = False
         if self.go_to_pose:
             self.next_state("going_to_pose")
-        elif DriverStation.isAutonomousEnabled():
+        elif _isAutonomousEnabled():
             self.next_state("run_auton_routine")
         else:
             self.next_state("free")
@@ -153,26 +174,55 @@ class DriveControl(StateMachine):
         """
         Default teleop state - accepts manual joystick input.
         Continuously checks for state transition triggers.
+        Issue a drive command THIS frame even when transitioning so there
+        is no one-frame gap where no command reaches the swerve drive.
         """
-        self.swerve_drive.drive(
+        if _isAutonomousEnabled():
+            self.next_state("run_auton_routine")
+
+        elif self.go_to_pose:
+            self.next_state("going_to_pose")
+
+        elif self.xbrake_req:
+            self.next_state("x_brake_state")
+
+        elif self.point_field_req:
+            self.next_state(
+                "point_towards_field"
+            )  # Reuse point_towards_target state but with field-relative commands
+
+        elif self.point_to_target:
+            self.next_state("point_towards_target")
+
+        elif self.point_joy_target:
+            self.next_state("point_towards_joy")
+
+        elif self.drive_sysid:
+            self.next_state("drive_sysid_state")
+
+        else:
+            self.swerve_drive.drive(
+                self.translationX,
+                self.translationY,
+                self.rotationX,
+                self.field_relative,
+            )
+
+    @state
+    def apply_request(self):
+        """
+        State to apply drive commands when transitioning from free to a state that requires an immediate command.
+        This prevents a one-frame delay in command application during transitions.
+        Transitions back to free after applying the command.
+        """
+        self.swerve_drive.apply_control(
             self.translationX,
             self.translationY,
             self.rotationX,
             self.field_relative,
         )
-        # Check for state transitions in priority order
-        if DriverStation.isAutonomousEnabled():
-            self.next_state("run_auton_routine")
-        elif self.go_to_pose:
-            self.next_state("going_to_pose")
-        elif self.xbrake_req:
-            self.next_state("x_brake_state")
-        elif self.point_to_target:
-            self.next_state("point_towards_target")
-        elif self.point_joy_target:
-            self.next_state("point_towards_joy")
-        elif self.drive_sysid:
-            self.next_state("drive_sysid_state")
+        # Transition back to free to allow for new commands or state changes
+        self.next_state("free")
 
     @state
     def x_brake_state(self):
@@ -220,15 +270,14 @@ class DriveControl(StateMachine):
             self.next_state("free")
 
     @state
-    def drive_sysid_state(self):
-        """
-        System identification state - applies constant voltage for characterization.
-        Exits when drive_sysid is no longer requested (resets each cycle via will_reset_to).
-        """
-        if not self.drive_sysid:
+    def point_towards_field(self):
+        self.swerve_drive.drive_point_field(
+            self.translationX,
+            self.translationY,
+            self.point_target,
+        )
+        if not self.point_field_req:
             self.next_state("free")
-            return
-        self.swerve_drive.sysid_drive(self.sysid_volts)
 
     @state
     def going_to_pose(self):
@@ -248,7 +297,7 @@ class DriveControl(StateMachine):
         Drive commands come from auto_base.py which calls drive_auto() with samples.
         Returns to free state when teleop begins.
         """
-        if DriverStation.isTeleop():
+        if _isTeleop():
             self.next_state("free")
             return
         if self.drive_auto_man:
