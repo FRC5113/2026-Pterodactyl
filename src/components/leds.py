@@ -6,7 +6,6 @@ from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 from game import is_alliance_hub_active
 from lemonlib.util import AlertManager, AlertType, LEDController
-from magicbot import feedback
 
 
 class LEDStrip:
@@ -80,7 +79,7 @@ class LEDStrip:
             self.leds.set_solid_color(self.intake_up)
 
         elif is_alliance_hub_active():
-            self.leds.set_solid_color(self.zone_active, 2)
+            self.leds.set_solid_color(self.zone_active)
 
         else:
             self.leds.move_across(self.idle)

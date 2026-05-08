@@ -16,8 +16,13 @@ from wpimath.geometry import (
 _Alliance = wpilib.DriverStation.Alliance
 _RED = _Alliance.kRed
 
-apriltag_layout = robotpy_apriltag.AprilTagFieldLayout.loadField(
-    robotpy_apriltag.AprilTagField.k2026RebuiltWelded
+# Custom apriltag field layout
+# self.field_layout = robotpy_apriltag.AprilTagFieldLayout(
+#     str(Path(__file__).parent.resolve() / "2026_test_field.json")
+# )
+
+apriltag_layout = robotpy_apriltag.AprilTagFieldLayout(
+    wpilib.getDeployDirectory() + "/2026-rebuilt-welded.json"
 )
 
 TagId = typing.Literal[

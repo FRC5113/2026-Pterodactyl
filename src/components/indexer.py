@@ -5,7 +5,6 @@ from phoenix6.configs import (
 )
 from phoenix6.hardware import TalonFXS
 from phoenix6.signals import (
-    MotorAlignmentValue,
     MotorArrangementValue,
     NeutralModeValue,
 )
@@ -34,7 +33,7 @@ class Indexer:
         self.voltage_control = controls.VoltageOut(0)
         self.duty_control = controls.DutyCycleOut(0)
         self.kicker_follower = controls.Follower(
-            self.right_kicker_motor.device_id, MotorAlignmentValue.OPPOSED
+            self.right_kicker_motor.device_id, True
         )
         self.coast_control = controls.CoastOut()
 

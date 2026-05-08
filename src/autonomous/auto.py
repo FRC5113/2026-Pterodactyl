@@ -1,218 +1,190 @@
-from magicbot import timed_state
-
-from autonomous.auto_base import AutoBase
-from components.drive_control import DriveControl
+from enum import Enum
+from typing import List
+from wpimath.geometry import Pose2d, Rotation2d
+from wpimath.units import meters, degrees, milliseconds
+from components.swerve_drive import SwerveDrive
+from components.shooter import Shooter
 from components.intake import Intake
 from components.shooter_controller import ShooterController
+from magicbot import AutonomousStateMachine, state
+import time
+class StepStatus(Enum):
+    RUNNING = 1
+    DONE = 2
 
-"""
-Trajectories: (start with trajectory:)
-- outpost_shoot
-- hub_shoot
-- lt_intake
-- rt_intake
-- end_of_lt_intake_to_shoot
-- end_of_rt_intake_to_shoot
-- lt_outpost
-- rt_outpost
-- auto_test
-- hard_shoot_outpost
-"""
+class AnnoyingGenericMagicbotAutoWrapperBecauseMagicBotIsPoorlyBuilt(AutonomousStateMachine):
+    MODE_NAME = "I mean seriously who's dumb idea was it to lock teams into this half baked excuse for an Auto framework"
+    def on_enable(self):
+        self.runner = AutoRunner(tempAutoRoutine)
+    @state(first=True)
+    def THE_ONLY_STATE(self):
+        self.runner.run()
+class AutoContext:
+    sd: SwerveDrive
+    sh: Shooter
+    it: Intake
+    sc: ShooterController
 
-"""
-States: (start with state:)
-- shoot
-- outpost_wait
-- intake_down
-"""
+    def __init__(self, sd: SwerveDrive, sh: Shooter, it: Intake, sc: ShooterController):
+        self.sd = sd
+        self.sh = sh
+        self.it = it
+        self.sc = sc
 
+class AutoStep:
+    """Base class for all auto steps"""
 
-class hub_shoot_outpost_shoot(AutoBase):
-    MODE_NAME = "H-shoot-outpost-shoot"
-
-    drive_control: DriveControl
-    shooter_controller: ShooterController
-    intake: Intake
-
-    def __init__(self):
-        super().__init__(
-            [
-                "state:move_back",
-                "state:intake_out",
-                "state:hard_shoot",
-                "trajectory:hard_shoot_outpost",
-                "state:outpost_wait",
-                "trajectory:outpost_shoot",
-                "state:shoot",
-            ]
-        )
-
-    @timed_state(duration=1.5, next_state="next_step")
-    def move_back(self):
-        self.drive_control.drive_auto_manual(
-            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
-        )
-
-    @timed_state(duration=1, next_state="next_step")
-    def intake_out(self):
-        self.intake.set_arm_voltage(-8)
-
-    @timed_state(duration=5, next_state="next_step")
-    def hard_shoot(self):
-        self.shooter_controller.request_force_shoot(45.5)
-        self.intake.set_voltage(-10)
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        raise NotImplementedError
 
 
-class hard_code_shoot(AutoBase):
-    MODE_NAME = "Hard Code Shoot"
+class AutoRunner:
+    def __init__(self, steps: List[AutoStep]):
+        self.steps = steps
+        self.ctx = None
+        self.index = 0
 
-    drive_control: DriveControl
-    shooter_controller: ShooterController
-    intake: Intake
+    def reset(self):
+        self.index = 0
 
-    def __init__(self):
-        super().__init__(
-            [
-                "state:move_back",
-                "state:intake_out",
-                "state:hard_shoot",
-            ]
-        )
+    def run(self, ctx: AutoContext):
+        if self.index >= len(self.steps):
+            return
 
-    @timed_state(duration=1.5, next_state="next_step")
-    def move_back(self):
-        self.drive_control.drive_auto_manual(
-            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
-        )
+        status = self.steps[self.index].execute(ctx)
 
-    @timed_state(duration=16.5, next_state="next_step")
-    def hard_shoot(self):
-        self.shooter_controller.request_force_shoot(45.5)
-        self.intake.set_voltage(-10)
-
-    @timed_state(duration=2, next_state="next_step")
-    def intake_out(self):
-        self.intake.set_arm_voltage(-8)
+        if status == StepStatus.DONE:
+            self.index += 1
 
 
-class hard_code_shoot_angled(AutoBase):
-    MODE_NAME = "Hard Code Shoot angled"
-    DEFAULT = True
+class ParallelStep(AutoStep):
+    """
+    Runs multiple steps at the same time.
+    Finishes when ALL steps are DONE.
+    """
 
-    drive_control: DriveControl
-    shooter_controller: ShooterController
-    intake: Intake
+    def __init__(self, *steps: AutoStep):
+        self.steps = steps
+        # Track which sub-steps have completed so we don't re-execute them
+        self._done = [False] * len(steps)
 
-    def __init__(self):
-        super().__init__(
-            [
-                "state:move_back",
-                "state:intake_out",
-                "state:hard_shoot",
-            ]
-        )
-
-    @timed_state(duration=1.5, next_state="next_step")
-    def move_back(self):
-        self.drive_control.drive_auto_manual(
-            translationX=-1, translationY=0.0, rotationX=0.0, field_relative=False
-        )
-
-    @timed_state(duration=16.5, next_state="next_step")
-    def hard_shoot(self):
-        self.shooter_controller.request_force_shoot(46)
-        self.intake.set_voltage(-10)
-
-    @timed_state(duration=2, next_state="next_step")
-    def intake_out(self):
-        self.intake.set_arm_voltage(-8)
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        all_done = True
+        for i in range(len(self.steps)):
+            if self._done[i]:
+                continue
+            status = self.steps[i].execute(ctx)
+            if status == StepStatus.DONE:
+                self._done[i] = True
+            else:
+                all_done = False
+        # If any step is not done yet, we're still running
+        if not all_done:
+            return StepStatus.RUNNING
+        return StepStatus.DONE
 
 
-# class auto_test(AutoBase):
-#     MODE_NAME = "Auto Test"
+class SwerveDriveAuto(AutoStep):
+    """
+    Field-oriented drive: takes absolute field coordinates (x, y in meters, heading in degrees).
+    Uses WPILib coordinate system where (0,0) is at field corner from blue alliance perspective.
+    """
 
-#     drive_control: DriveControl
+    POSITION_TOLERANCE = 0.02  # meters
 
-#     def __init__(self):
-#         super().__init__(
-#             [
-#                 "trajectory:auto_test",
-#                 "state:outpost_wait",
-#                 "state:shoot",
-#             ]
-#         )
+    def __init__(self, x: meters, y: meters, heading: degrees):
+        self.x = x
+        self.y = y
+        self.heading_deg = heading
+        self.target_pose = None
+
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        # TODO: PID - it should do pid not just naivley drive there and dead stop
+        # TODO: Angle tolerance
+        if self.target_pose is None:
+            self.target_pose = Pose2d(
+                self.x, self.y, Rotation2d.fromDegrees(self.heading_deg)
+            )
+            ctx.sd.set_desired_pose(self.target_pose)
+
+        distance = ctx.sd.get_distance_from_pose(self.target_pose)
+        if distance <= self.POSITION_TOLERANCE:
+            return StepStatus.DONE
+        return StepStatus.RUNNING
+
+class SwerveDriveBotRelativeAuto(AutoStep):
+    def __init__(self, x: meters, y: meters, heading: degrees):
+        self.x = x
+        self.y = y
+        self.heading = heading
+        self.target_pose = None
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        raise Exception("TODO")
+class IntakeAuto(AutoStep):
+    """Lets you turn on or off the intake with the boolean parameter"""
+
+    def __init__(self, is_on: bool):
+        self.is_on = is_on
+        self.applied = False
+
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        if not self.applied:
+            ctx.it.set_voltage(12 if self.is_on else 0)
+            self.applied = True
+        return StepStatus.DONE
 
 
-class hub_outpost_shoot(AutoBase):
-    MODE_NAME = "H-Outpost>Shoot"
+class ShootAuto(AutoStep):
+    STATIC_ANGLE = 78  # Not sure this is right
 
     def __init__(self):
-        super().__init__(
-            [
-                "state:intake_down",
-                "trajectory:hub_outpost",
-                "state:outpost_wait",
-                "trajectory:outpost_shoot",
-                "state:shoot",
-            ]
-        )
+        self.started = False
+        self.durration = 5.0
+        # TODO: This should have a durration parameter
+    def execute(self, ctx: AutoContext) -> StepStatus:
+        if self.start == 0:
+            self.start = time.perf_counter()
+        if time.perf_counter() - self.start > self.durration:
+            return StepStatus.DONE
+        ctx.sc.request_shoot()
+        return StepStatus.RUNNING
 
 
-class lt_intake_center_shoot(AutoBase):
-    MODE_NAME = "Lt-Intake_Center>Shoot"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "state:intake_down",
-                "trajectory:lt_intake",
-                "state:go_forward_and_intake",
-                "trajectory:end_of_lt_intake_to_shoot",
-                "state:shoot",
-            ]
-        )
-
-
-class rt_intake_center_shoot(AutoBase):
-    MODE_NAME = "Rt-Intake_Center>Shoot"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "state:intake_down",
-                "trajectory:rt_intake",
-                "state:go_forward_and_intake",
-                "trajectory:end_of_rt_intake_to_shoot",
-                "state:shoot",
-            ]
-        )
-
-
-class lt_outpost_shoot(AutoBase):
-    MODE_NAME = "Lt-Outpost>Shoot"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "state:intake_down",
-                "trajectory:lt_outpost",
-                "state:outpost_wait",
-                "trajectory:outpost_shoot",
-                "state:shoot",
-            ]
-        )
-
-
-class rt_outpost_shoot(AutoBase):
-    MODE_NAME = "Rt-Outpost>Shoot"
-
-    def __init__(self):
-        super().__init__(
-            [
-                "state:intake_down",
-                "trajectory:rt_outpost",
-                "state:outpost_wait",
-                "trajectory:outpost_shoot",
-                "state:shoot",
-            ]
-        )
+# THESE ARE ALL MADE UP NUMBERS!!!!!!!!!
+tempAutoRoutine = AutoRunner(
+    [
+        SwerveDriveAuto(0.63, 0.04, -213.81),
+        SwerveDriveAuto(0.76, 0.04, 0.47),
+        SwerveDriveAuto(0.82, 0.04, 0.18),
+        SwerveDriveAuto(0.82, 0.04, 0.00),
+        SwerveDriveAuto(0.76, 0.04, -0.18),
+        SwerveDriveAuto(0.63, 0.04, 182.00),
+        IntakeAuto(True),
+        SwerveDriveAuto(0.22, -0.00, -178.70),
+        SwerveDriveAuto(0.25, 0.01, -1.33),
+        SwerveDriveAuto(0.27, 0.01, -0.53),
+        SwerveDriveAuto(0.27, 0.01, -0.00),
+        SwerveDriveAuto(0.25, 0.01, 0.53),
+        SwerveDriveAuto(0.22, -0.00, 85.71),
+        SwerveDriveAuto(0.01, -0.26, 3.38),
+        SwerveDriveAuto(0.01, -0.31, 0.00),
+        SwerveDriveAuto(0.01, -0.33, 0.00),
+        SwerveDriveAuto(0.01, -0.33, -0.00),
+        SwerveDriveAuto(0.01, -0.31, 0.00),
+        SwerveDriveAuto(0.01, -0.26, -99.82),
+        SwerveDriveAuto(-0.20, 0.01, -165.52),
+        SwerveDriveAuto(-0.24, 0.01, -0.52),
+        SwerveDriveAuto(-0.25, 0.01, 0.09),
+        SwerveDriveAuto(-0.26, 0.01, 0.57),
+        SwerveDriveAuto(-0.24, 0.02, 1.16),
+        SwerveDriveAuto(-0.21, 0.02, 139.84),
+        IntakeAuto(False),
+        SwerveDriveAuto(-0.62, 0.34, -114.70),
+        SwerveDriveAuto(-0.89, 0.21, -15.44),
+        SwerveDriveAuto(-1.03, 0.09, -8.34),
+        SwerveDriveAuto(-1.03, -0.02, 353.79),
+        SwerveDriveAuto(-0.91, -0.12, -6.56),
+        SwerveDriveAuto(-0.65, -0.21, -24.36),
+        ShootAuto(),
+    ],
+)

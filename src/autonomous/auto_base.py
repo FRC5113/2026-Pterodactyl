@@ -1,15 +1,15 @@
 import math
 from typing import List
 
+import choreo
+import choreo.util
+from choreo.trajectory import SwerveTrajectory
 from magicbot import AutonomousStateMachine, state, timed_state
 from wpilib import DriverStation, Field2d, SmartDashboard
 from wpimath.geometry import Pose2d
 
-import choreo
-import choreo.util
-from choreo.trajectory import SwerveTrajectory
 from components.drive_control import DriveControl
-from components.intake import Intake, IntakeAngle
+from components.intake import Intake
 from components.shooter_controller import ShooterController
 from components.swerve_drive import SwerveDrive
 
@@ -192,8 +192,11 @@ class AutoBase(AutonomousStateMachine):
     @timed_state(duration=3.0, next_state="next_step")
     def go_forward_and_intake(self):
         self.drive_control.drive_auto_manual(1, 0.0, 0.0, False)
-        self.intake.set_arm_angle(IntakeAngle.INTAKING.value)
-        self.intake.set_voltage(8)
+        self.intake.set_voltage(10)
+
+    @timed_state(duration=0.5, next_state="next_step")
+    def intake_out(self):
+        self.intake.set_arm_voltage(-8)
 
     @timed_state(duration=5.0, next_state="next_step")
     def outpost_wait(self):
