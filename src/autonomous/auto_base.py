@@ -8,6 +8,7 @@ from magicbot import AutonomousStateMachine, state, timed_state
 from wpilib import DriverStation, Field2d, SmartDashboard
 from wpimath.geometry import Pose2d
 
+from components.bigboy import BigBoy
 from components.drive_control import DriveControl
 from components.intake import Intake
 from components.shooter_controller import ShooterController
@@ -18,6 +19,7 @@ from lemonlib.util import is_red
 
 
 class AutoBase(AutonomousStateMachine):
+    bigboy: BigBoy
     shooter_controller: ShooterController
     drive_control: DriveControl
     swerve_drive: SwerveDrive
@@ -171,7 +173,7 @@ class AutoBase(AutonomousStateMachine):
             state_tm, is_red()
         )  # Sample trajectory at current time
         if sample is not None:
-            self.shooter_controller.drive_auto(
+            self.drive_control.drive_auto(
                 sample
             )  # Drive using the sampled trajectory
 
@@ -186,7 +188,9 @@ class AutoBase(AutonomousStateMachine):
 
     @timed_state(duration=20.0, next_state="next_step")
     def shoot(self):
-        self.shooter_controller.request_shoot()
+        # Route through BigBoy so the SOTM solver keeps pushing the correct
+        # target RPS to the shooter state machine.
+        self.bigboy.request_shoot()
         self.intake.set_voltage(-10)
 
     @timed_state(duration=3.0, next_state="next_step")

@@ -55,11 +55,16 @@ class DriveControl(StateMachine):
         field_relative: bool,
     ):
         """
-        Request manual drive control. Accepted in 'free' and 'point_towards_target'
-        states. In point_towards_target, translation is passed through but rotation
+        Request manual drive control. Accepted in 'free' and any pointing
+        state. In pointing states, translation is passed through but rotation
         is overridden by the pointing PID.
         """
-        if self.current_state in ("free", "point_towards_target", "point_towards_joy"):
+        if self.current_state in (
+            "free",
+            "point_towards_target",
+            "point_towards_joy",
+            "point_towards_field",
+        ):
             self.translationX = translationX
             self.translationY = translationY
             self.rotationX = rotationX
@@ -124,6 +129,13 @@ class DriveControl(StateMachine):
         """Request field-relative drive while facing a field-absolute angle."""
         self.translationX = vx
         self.translationY = vy
+        self.point_target = angle
+        self.point_field_req = True
+
+    def point_field(self, angle: units.radians):
+        """Override rotation to face a field-absolute angle while keeping the
+        translation from the most recent drive_manual call. Use this for
+        aim-assist where the driver controls translation."""
         self.point_target = angle
         self.point_field_req = True
 
@@ -276,7 +288,11 @@ class DriveControl(StateMachine):
             self.translationY,
             self.point_target,
         )
-        if not self.point_field_req:
+        # Xbrake always wins — driver must be able to stop the bot even
+        # while aim-assist is active.
+        if self.xbrake_req:
+            self.next_state("x_brake_state")
+        elif not self.point_field_req:
             self.next_state("free")
 
     @state

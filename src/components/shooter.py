@@ -152,16 +152,6 @@ class Shooter:
 
         # cache velocity
         self._cached_velocity = self.left_motor.get_velocity().value
-        # velocity = self._cached_velocity
-
-        # # Shot detection (velocity drop)
-        # if velocity < self._last_velocity - 5:  # tune threshold
-        #     self._boost_timer = 10  # ~200ms boost
-
-        # self._last_velocity = velocity
-        # if self._boost_timer > 0:
-        #     self._boost_timer -= 1
-        #     self.shooter_slot = 1
 
         if self.manual_control:
             self.left_motor.set_control(

@@ -10,6 +10,7 @@ from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
+from components.bigboy import BigBoy
 from components.drive_control import DriveControl
 from components.indexer import Indexer
 from components.intake import Intake
@@ -34,9 +35,14 @@ from phoenix6.hardware import TalonFX, TalonFXS
 
 class MyRobot(LemonRobot):
     led_strip: LEDStrip
-    shooter_controller: ShooterController
 
+    # Order matters: shooter_controller runs the SOTM solver each cycle,
+    # bigboy reads its solved target_angle and (if requested) calls
+    # drive_control.point_field, and drive_control consumes that flag.
+    shooter_controller: ShooterController
+    bigboy: BigBoy
     drive_control: DriveControl
+
     odometry: Odometry
     swerve_drive: SwerveDrive
 
@@ -143,7 +149,7 @@ class MyRobot(LemonRobot):
         self.shooter_left_motor = TalonFX(2, self.shooter_canbus)
         self.shooter_right_motor = TalonFX(3, self.shooter_canbus)
 
-        self.shooter_gear_ratio = 1.0
+        self.shooter_gear_ratio = 1.6
         self.shooter_stator_amps: units.amperes = 120.0
         self.shooter_supply_amps: units.amperes = 70.0
         self.shooter_peak_amps: units.amperes = 140.0
@@ -316,11 +322,12 @@ class MyRobot(LemonRobot):
             else:
                 omega = self.omega_filter.calculate(sammi(primary_rx) * self.top_omega)
 
-            self.shooter_controller.drive(
-                -vx,
-                -vy,
-                -omega,
-            )
+            # Drive directly through drive_control every cycle. When BigBoy
+            # requests point_field for aim-assist, drive_control transitions
+            # to point_towards_field and uses these translation values while
+            # overriding rotation with the SOTM solver's target angle — so
+            # the driver keeps full translation control while shooting.
+            self.drive_control.drive_manual(-vx, -vy, -omega, True)
 
             if primary.getCrossButton():
                 self.drive_control.Xbrake()
@@ -350,16 +357,16 @@ class MyRobot(LemonRobot):
         """
         with self.consumeExceptions():
             if secondary.getRightTriggerAxis() >= 0.8:
-                self.shooter_controller.request_shoot()
+                self.bigboy.request_shoot()
 
             elif secondary.getStartButton():
-                self.shooter_controller.request_force_shoot(100.0)
+                self.bigboy.request_force_shoot(100.0)
 
             elif secondary.getYButton():
-                self.shooter_controller.request_unjam()
+                self.bigboy.request_unjam()
 
             elif secondary.getAButton():
-                self.shooter_controller.request_force_shoot(47.5)
+                self.bigboy.request_force_shoot(47.5)
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
