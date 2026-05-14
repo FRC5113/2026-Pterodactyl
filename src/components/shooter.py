@@ -43,7 +43,7 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
+        self.shooter_control = controls.VelocityTorqueCurrentFOC(0).with_slot(0)
 
         # follower (set once)
         self.shooter_follower = controls.Follower(self.left_motor.device_id, True)
