@@ -43,11 +43,11 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.VelocityTorqueCurrentFOC(0).with_slot(0)
+        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
 
         # follower (set once)
-        self.shooter_follower = controls.Follower(self.left_motor.device_id, True)
-        self.right_motor.set_control(self.shooter_follower)
+        self.shooter_follower = controls.Follower(self.right_motor.device_id, True)
+        self.left_motor.set_control(self.shooter_follower)
 
         self.voltage_control = controls.VoltageOut(0)
         self.coast_control = controls.CoastOut()
@@ -72,7 +72,7 @@ class Shooter:
         config.feedback = (
             FeedbackConfigs()
             .with_feedback_sensor_source(FeedbackSensorSourceValue.ROTOR_SENSOR)
-            .with_sensor_to_mechanism_ratio(self.shooter_gear_ratio)
+            .with_sensor_to_mechanism_ratio(1.6)
         )
 
         # Current limits
@@ -154,10 +154,10 @@ class Shooter:
         self._cached_velocity = self.left_motor.get_velocity().value
 
         if self.manual_control:
-            self.left_motor.set_control(
+            self.right_motor.set_control(
                 self.voltage_control.with_output(self.shooter_voltage)
             )
         else:
-            self.left_motor.set_control(
+            self.right_motor.set_control(
                 self.shooter_control.with_velocity(self.shooter_velocity)
             )

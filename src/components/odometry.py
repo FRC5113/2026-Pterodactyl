@@ -176,63 +176,64 @@ class Odometry:
         return (fused_pose, newest_ts, (fused_std_x, fused_std_y, fused_std_rot))
 
     def execute(self):
-        disabled = is_disabled()
+        # disabled = is_disabled()
 
-        # Update yaw rate history (deque auto-evicts oldest)
-        yaw_rate = self.swerve_drive.get_velocity().omega
-        self._yaw_rate_history.append(yaw_rate)
+        # # Update yaw rate history (deque auto-evicts oldest)
+        # yaw_rate = self.swerve_drive.get_velocity().omega
+        # self._yaw_rate_history.append(yaw_rate)
 
-        # Collect valid estimates from all cameras for fusion
-        valid_estimates: list[tuple[Pose2d, float, tuple[float, float, float]]] = []
+        # # Collect valid estimates from all cameras for fusion
+        # valid_estimates: list[tuple[Pose2d, float, tuple[float, float, float]]] = []
 
-        for cam_idx, (cam, pose_est) in enumerate(self._camera_estimator_pairs):
-            cam.update()
+        # for cam_idx, (cam, pose_est) in enumerate(self._camera_estimator_pairs):
+        #     cam.update()
 
-            for res in cam.results:
-                targets = res.getTargets()
-                if not targets:
-                    continue
+        #     for res in cam.results:
+        #         targets = res.getTargets()
+        #         if not targets:
+        #             continue
 
-                best_target = res.getBestTarget()
-                if best_target and best_target.poseAmbiguity > 0.2:
-                    continue
+        #         best_target = res.getBestTarget()
+        #         if best_target and best_target.poseAmbiguity > 0.2:
+        #             continue
 
-                # Try multi-tag estimation first (most accurate)
-                pupdate = pose_est.estimateCoprocMultiTagPose(res)
+        #         # Try multi-tag estimation first (most accurate)
+        #         pupdate = pose_est.estimateCoprocMultiTagPose(res)
 
-                if pupdate is None:
-                    pupdate = pose_est.estimateCoprocMultiTagPose(res)
-                    if pupdate is None:
-                        continue
+        #         if pupdate is None:
+        #             pupdate = pose_est.estimateCoprocMultiTagPose(res)
+        #             if pupdate is None:
+        #                 continue
 
-                is_gyro_fused = False
+        #         is_gyro_fused = False
 
-                pose3d = pupdate.estimatedPose
-                twod_pose = pose3d.toPose2d()
-                ts = pupdate.timestampSeconds
+        #         pose3d = pupdate.estimatedPose
+        #         twod_pose = pose3d.toPose2d()
+        #         ts = pupdate.timestampSeconds
 
-                # Compute std devs
-                tag_count = len(targets)
-                total_dist = sum(
-                    t.getBestCameraToTarget().translation().norm() for t in targets
-                )
-                avg_dist = total_dist / tag_count
-                if avg_dist > 2.0 and not disabled:
-                    continue
+        #         # Compute std devs
+        #         tag_count = len(targets)
+        #         total_dist = sum(
+        #             t.getBestCameraToTarget().translation().norm() for t in targets
+        #         )
+        #         avg_dist = total_dist / tag_count
+        #         if avg_dist > 2.0 and not disabled:
+        #             continue
 
-                std_devs = self._compute_std_devs(avg_dist, tag_count, is_gyro_fused)
+        #         std_devs = self._compute_std_devs(avg_dist, tag_count, is_gyro_fused)
 
-                # Record timestamp
-                self._last_timestamps[cam_idx] = ts
+        #         # Record timestamp
+        #         self._last_timestamps[cam_idx] = ts
 
-                valid_estimates.append((twod_pose, ts, std_devs))
+        #         valid_estimates.append((twod_pose, ts, std_devs))
 
-        # Fuse and apply
-        if valid_estimates:
-            if len(valid_estimates) == 1:
-                pose, ts, stds = valid_estimates[0]
-            else:
-                pose, ts, stds = self._fuse_estimates(valid_estimates)
+        # # Fuse and apply
+        # if valid_estimates:
+        #     if len(valid_estimates) == 1:
+        #         pose, ts, stds = valid_estimates[0]
+        #     else:
+        #         pose, ts, stds = self._fuse_estimates(valid_estimates)
 
-            self.swerve_drive.addVisionPoseEstimate(pose, ts, stds)
-            self.estimated_field.setRobotPose(self.swerve_drive.cached_pose)
+        #     self.swerve_drive.addVisionPoseEstimate(pose, ts, stds)
+        #     self.estimated_field.setRobotPose(self.swerve_drive.cached_pose)
+        pass

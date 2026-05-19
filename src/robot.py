@@ -162,9 +162,9 @@ class MyRobot(LemonRobot):
                 "kP": 0.35,
                 "kI": 0.0,
                 "kD": 0.0,
-                "kS": 0.0,
-                "kV": 0.11137,
-                "kA": 0.0,  # 0.29663,
+                "kS": 0.075,
+                "kV": 0.179,
+                "kA": 0.13,  # 0.29663,
             },
             (not self.low_bandwidth) and self.tuning_enabled,
         )
@@ -270,8 +270,8 @@ class MyRobot(LemonRobot):
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
-        self.primary = LemonInput(type="PS5")
-        self.secondary = LemonInput(type="Xbox")
+        self.primary = LemonInput(0,type="PS5")
+        self.secondary = LemonInput(1,type="Xbox")
 
         self.x_filter = SlewRateLimiter(self.rasing_slew_rate)
         self.y_filter = SlewRateLimiter(self.rasing_slew_rate)
