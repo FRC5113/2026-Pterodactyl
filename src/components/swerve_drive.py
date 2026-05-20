@@ -352,7 +352,7 @@ class SwerveDrive(Sendable):
             self.pending_request = self.apply_speeds_req.with_speeds(speeds)
 
     def reset_gyro(self) -> None:
-        self.drivetrain.seed_field_centric(Rotation2d.fromDegrees(180) if DriverStation.getAlliance() == _RED else Rotation2d())
+        self.drivetrain.reset_rotation(Rotation2d())
         # self.pigeon_alert.enable()
 
     def addVisionPoseEstimate(

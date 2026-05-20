@@ -32,10 +32,10 @@ class LEDStrip:
 
         self.zone_active = (0, 255, 255)
 
-        self.leds.set_solid_color(self.disabled)
+        self.leds.set_gradient((255,0,255),(self.zone_active))
 
     def on_disable(self):
-        self.leds.set_solid_color(self.disabled)
+        self.leds.set_gradient((255,0,255),(self.zone_active))
 
     """
     INFORMATIONAL METHODS
@@ -75,11 +75,11 @@ class LEDStrip:
         elif DriverStation.isAutonomousEnabled():
             self.leds.move_across(self.auton_color, 20, 50)
 
-        elif self.intake.get_position() > IntakeAngle.LED_DOWN.value:
-            self.leds.set_solid_color(self.intake_up)
+        # elif self.intake.get_position() > IntakeAngle.LED_DOWN.value:
+        #     self.leds.set_solid_color(self.intake_up)
 
-        elif is_alliance_hub_active():
-            self.leds.set_solid_color(self.zone_active)
+        # elif is_alliance_hub_active():
+        #     self.leds.set_solid_color(self.zone_active)
 
         else:
-            self.leds.move_across(self.idle)
+            self.leds.move_across([(255,0,0),(255,100,0)],20,20)

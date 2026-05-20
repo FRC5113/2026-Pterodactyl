@@ -43,7 +43,7 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
+        self.shooter_control = controls.VelocityTorqueCurrentFOC(0).with_slot(0)
 
         # follower (set once)
         self.shooter_follower = controls.Follower(self.right_motor.device_id, True)
@@ -152,12 +152,15 @@ class Shooter:
 
         # cache velocity
         self._cached_velocity = self.left_motor.get_velocity().value
+        
 
         if self.manual_control:
             self.right_motor.set_control(
                 self.voltage_control.with_output(self.shooter_voltage)
             )
-        else:
+        elif abs(self.shooter_velocity) > 0.0:
             self.right_motor.set_control(
                 self.shooter_control.with_velocity(self.shooter_velocity)
             )
+        else:
+            self.right_motor.set_control(self.coast_control)
