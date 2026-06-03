@@ -43,7 +43,7 @@ class Shooter:
 
         self._configure_motors()
 
-        self.shooter_control = controls.VelocityTorqueCurrentFOC(0).with_slot(0)
+        self.shooter_control = controls.VelocityVoltage(0).with_slot(0)
 
         # follower (set once)
         self.shooter_follower = controls.Follower(self.right_motor.device_id, True)
@@ -137,10 +137,10 @@ class Shooter:
     INFORMATIONAL METHODS
     """
 
-    # @feedback
+    @feedback
     def get_velocity(self) -> float:
         return self._cached_velocity
-
+    @feedback
     def get_target_velocity(self) -> float:
         return self.shooter_velocity
 
