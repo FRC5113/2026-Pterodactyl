@@ -15,7 +15,7 @@ class TunerConstants:
     # output type specified by SwerveModuleConstants.SteerMotorClosedLoopOutput
     _steer_gains = (
         configs.Slot0Configs()
-        #voltage
+        # voltage
         .with_k_p(90)
         .with_k_i(0.0)
         .with_k_d(1)
@@ -69,7 +69,18 @@ class TunerConstants:
 
     # Initial configs for the drive and steer motors and the azimuth encoder; these cannot be null.
     # Some configs will be overwritten; check the `with_*_initial_configs()` API documentation.
-    _drive_initial_configs = configs.TalonFXConfiguration()
+    _drive_initial_configs = (
+        configs.TalonFXConfiguration()
+        .with_current_limits(
+            configs.CurrentLimitsConfigs()
+            # Default supply current limit is 70 A, but it can be lowered to avoid brownouts.
+            # Supply current limits can be larger than the breaker current rating.
+            .with_supply_current_limit(70.0).with_supply_current_limit_enable(True)
+        )
+        .with_closed_loop_ramps(
+            configs.ClosedLoopRampsConfigs().with_voltage_closed_loop_ramp_period(0.3)
+        )
+    )
     _steer_initial_configs = configs.TalonFXConfiguration().with_current_limits(
         configs.CurrentLimitsConfigs()
         # Swerve azimuth does not require much torque output, so we can set a relatively low

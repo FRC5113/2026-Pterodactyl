@@ -2,7 +2,6 @@ import math
 
 from choreo.trajectory import SwerveSample
 from magicbot import will_reset_to
-from phoenix6 import configs, hardware, swerve, utils
 from phoenix6.signals import StaticFeedforwardSignValue
 from phoenix6.swerve import requests
 from wpilib import DriverStation, Field2d, SmartDashboard, Timer
@@ -19,6 +18,7 @@ from wpiutil import Sendable, SendableBuilder
 from generated.tuner_constants import TunerConstants
 from lemonlib.smart import SmartPreference, SmartProfile
 from lemonlib.util import Alert, AlertType
+from phoenix6 import configs, hardware, swerve, utils
 
 _RED = DriverStation.Alliance.kRed
 
@@ -126,6 +126,15 @@ class SwerveDrive(Sendable):
             .with_drive_request_type(swerve.SwerveModule.DriveRequestType.VELOCITY)
             .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
         )
+        self.drive_voltage_req = (
+            requests.FieldCentric()
+            .with_deadband(0.0)
+            .with_rotational_deadband(0.0)
+            .with_drive_request_type(
+                swerve.SwerveModule.DriveRequestType.OPEN_LOOP_VOLTAGE
+            )
+            .with_steer_request_type(swerve.SwerveModule.SteerRequestType.POSITION)
+        )
 
         self.still_states = self.swerve_module_states
 
@@ -151,10 +160,6 @@ class SwerveDrive(Sendable):
         self.holonomic_controller = HolonomicDriveController(
             self.x_controller, self.y_controller, self.theta_controller
         )
-
-        # Apply steer & drive gains from SmartProfiles to all modules
-        if self.tuning_enabled:
-            self._apply_motor_gains()
 
         # # Set operator perspective based on alliance colour
         if DriverStation.getAlliance() == _RED:

@@ -4,9 +4,9 @@
 import math
 
 from magicbot import feedback
+from phoenix6.hardware import TalonFX, TalonFXS
 from wpilib import DataLogManager, DriverStation, Field2d
 from wpimath import units
-from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Rotation3d, Transform3d
 
 from autonomous.auto_base import AutoBase
@@ -30,7 +30,6 @@ from lemonlib.util import (
     curve,
 )
 from phoenix6 import CANBus
-from phoenix6.hardware import TalonFX, TalonFXS
 
 
 class MyRobot(LemonRobot):
@@ -270,12 +269,8 @@ class MyRobot(LemonRobot):
 
     def teleopInit(self):
         # initialize HIDs here in case they are changed after robot initializes
-        self.primary = LemonInput(0,type="PS5")
-        self.secondary = LemonInput(1,type="Xbox")
-
-        self.x_filter = SlewRateLimiter(self.rasing_slew_rate)
-        self.y_filter = SlewRateLimiter(self.rasing_slew_rate)
-        self.omega_filter = SlewRateLimiter(self.rasing_slew_rate)
+        self.primary = LemonInput(0, type="PS5")
+        self.secondary = LemonInput(1, type="Xbox")
 
     def teleopPeriodic(self):
         primary = self.primary
@@ -310,17 +305,17 @@ class MyRobot(LemonRobot):
             if abs(primary_ly) < 0.1:
                 vx = 0.0
             else:
-                vx = self.x_filter.calculate(sammi(primary_ly) * mult * top_speed)
+                vx = sammi(primary_ly) * mult * top_speed
             if abs(primary_lx) < 0.1:
                 vy = 0.0
             else:
-                vy = self.y_filter.calculate(sammi(primary_lx) * mult * top_speed)
+                vy = sammi(primary_lx) * mult * top_speed
 
             # if self.primary.getLeftBumper():
             if abs(primary_rx) <= 0.0:
                 omega = 0.0
             else:
-                omega = self.omega_filter.calculate(sammi(primary_rx) * self.top_omega)
+                omega = sammi(primary_rx) * self.top_omega
 
             # Drive directly through drive_control every cycle. When BigBoy
             # requests point_field for aim-assist, drive_control transitions
@@ -367,6 +362,39 @@ class MyRobot(LemonRobot):
 
             elif secondary.getAButton():
                 self.bigboy.request_force_shoot(47.5)
+
+    def testInit(self):
+        self.primary = LemonInput(0, type="PS5")
+
+    def testPeriodic(self):
+        control_req = self.swerve_drive.drive_voltage_req
+
+        self.swerve_drive.apply_control(
+            control_req.with_velocity_x(
+                12.0 * self.sammi_curve(self.primary.getLeftY())
+            )
+            .with_velocity_y(12.0 * self.sammi_curve(self.primary.getLeftX()))
+            .with_rotational_rate(12.0 * self.sammi_curve(self.primary.getRightX()))
+        )
+
+        if self.primary.getCrossButton():
+            self.drive_control.Xbrake()
+
+        if self.primary.getSquareButton():
+            self.swerve_drive.reset_gyro()
+
+        if self.primary.getL2Axis() >= 0.8:
+            self.bigboy.request_force_shoot(self.primary.getL2Axis() * 60.0)
+
+        if self.primary.getTriangleButton():
+            self.intake.set_arm_voltage(12)
+        elif self.primary.getCircleButton():
+            self.intake.set_arm_voltage(-6)
+
+        if self.primary.getL2Axis() >= 0.8:
+            self.intake.set_voltage(-10.0)
+        elif self.primary.getL1Button():
+            self.intake.set_voltage(10.0)
 
     def _display_auto_trajectory(self) -> None:
         selected_auto = self._automodes.chooser.getSelected()
